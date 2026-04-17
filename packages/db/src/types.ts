@@ -35,3 +35,6 @@ export type NewNewsSignal = typeof schema.newsSignals.$inferInsert;
 
 export type SensitivityRun = typeof schema.sensitivityRuns.$inferSelect;
 export type NewSensitivityRun = typeof schema.sensitivityRuns.$inferInsert;
+
+export type NewsSource = typeof schema.newsSources.$inferSelect;
+export type NewNewsSource = typeof schema.newsSources.$inferInsert;

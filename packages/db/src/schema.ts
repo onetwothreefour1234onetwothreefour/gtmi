@@ -398,3 +398,22 @@ export const sensitivityRuns = pgTable(
     }),
   ]
 );
+
+// 13. news_sources
+export const newsSources = pgTable(
+  'news_sources',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    url: text('url').notNull().unique(),
+    publication: text('publication').notNull(),
+    isActive: boolean('is_active').default(true).notNull(),
+  },
+  () => [
+    pgPolicy('Team members can write news_sources', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated', // V1 PLACEHOLDER: tighten to specific team role before public launch.
+      using: sql`true`,
+    }),
+  ]
+);
