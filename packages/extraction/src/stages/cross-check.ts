@@ -1,0 +1,134 @@
+import { createAnthropicClient, MODEL_EXTRACTION } from '../clients/anthropic';
+import type { CrossCheckResult, ExtractionOutput, ScrapeResult } from '../types/extraction';
+import type { CrossCheckStage } from '../types/pipeline';
+
+const SYSTEM_PROMPT =
+  'You are an independent cross-check agent for immigration data extraction. Your job is to ' +
+  'compare a value extracted from an official government source against a Tier 2 source ' +
+  '(law firm commentary, advisory publication, or similar). You do not re-extract data. ' +
+  'You only compare. Determine whether the Tier 2 source agrees with, disagrees with, or ' +
+  'contains no relevant information about the claimed value.';
+
+function buildUserMessage(extraction: ExtractionOutput, tier2ContentMarkdown: string): string {
+  return (
+    `Cross-check the following extraction against the Tier 2 source:\n\n` +
+    `Extracted value (from Tier 1 government source): ${extraction.valueRaw}\n` +
+    `Supporting sentence from Tier 1: ${extraction.sourceSentence}\n` +
+    `Field: ${extraction.fieldDefinitionKey}\n\n` +
+    `Tier 2 source content:\n---\n${tier2ContentMarkdown}\n---\n\n` +
+    `Determine whether the Tier 2 source:\n` +
+    `(a) Agrees with the extracted value\n` +
+    `(b) Disagrees with the extracted value\n` +
+    `(c) Contains no relevant information about this value\n\n` +
+    `Return your answer as a valid JSON object with exactly this structure — no markdown, no explanation:\n` +
+    `{\n` +
+    `  "agrees": boolean,\n` +
+    `  "notes": string | null\n` +
+    `}\n\n` +
+    `Rules:\n` +
+    `- agrees: true only if the Tier 2 source explicitly corroborates the extracted value.\n` +
+    `- agrees: false for both disagreement and no relevant information.\n` +
+    `- notes: One sentence explaining your determination, or null if agrees is true and unambiguous.`
+  );
+}
+
+function stripJsonFences(text: string): string {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  return fenced?.[1]?.trim() ?? text.trim();
+}
+
+interface RawLlmResponse {
+  agrees: boolean;
+  notes: string | null;
+}
+
+function assertLlmResponse(parsed: unknown, fieldKey: string): RawLlmResponse {
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error(`Cross-check response is not an object for field ${fieldKey}`);
+  }
+  const obj = parsed as Record<string, unknown>;
+  const errors: string[] = [];
+
+  if (typeof obj['agrees'] !== 'boolean') errors.push('agrees must be a boolean');
+  if (obj['notes'] !== null && typeof obj['notes'] !== 'string')
+    errors.push('notes must be a string or null');
+
+  if (errors.length > 0) {
+    throw new Error(`Cross-check response invalid for field ${fieldKey}: ${errors.join('; ')}`);
+  }
+
+  return {
+    agrees: obj['agrees'] as boolean,
+    notes: obj['notes'] as string | null,
+  };
+}
+
+export class CrossCheckStageImpl implements CrossCheckStage {
+  async execute(
+    extraction: ExtractionOutput,
+    tier2Scrape: ScrapeResult
+  ): Promise<CrossCheckResult> {
+    if (extraction.valueRaw === '') {
+      return {
+        agrees: false,
+        tier2Url: tier2Scrape.url,
+        notes: 'No Tier 1 value to cross-check.',
+      };
+    }
+
+    const client = createAnthropicClient();
+
+    const response = await client.messages
+      .create({
+        model: MODEL_EXTRACTION,
+        max_tokens: 512,
+        system: SYSTEM_PROMPT,
+        messages: [
+          {
+            role: 'user',
+            content: buildUserMessage(extraction, tier2Scrape.contentMarkdown),
+          },
+        ],
+      })
+      .catch((error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Cross-check API call failed for field ${extraction.fieldDefinitionKey} / program ${extraction.programId}: ${msg}`
+        );
+      });
+
+    type ContentItem = (typeof response.content)[number];
+    const lastTextBlock = response.content
+      .filter((block): block is Extract<ContentItem, { type: 'text' }> => block.type === 'text')
+      .at(-1);
+
+    if (!lastTextBlock) {
+      throw new Error(
+        `Cross-check returned no text content for field ${extraction.fieldDefinitionKey} / program ${extraction.programId}`
+      );
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(stripJsonFences(lastTextBlock.text));
+    } catch {
+      throw new Error(
+        `Cross-check response was not valid JSON for field ${extraction.fieldDefinitionKey} / program ${extraction.programId}: ${lastTextBlock.text}`
+      );
+    }
+
+    const validated = assertLlmResponse(parsed, extraction.fieldDefinitionKey);
+
+    if (!validated.agrees) {
+      console.warn(
+        `Cross-check disagreement — program: ${extraction.programId}, field: ${extraction.fieldDefinitionKey}, notes: ${validated.notes}`
+      );
+    }
+
+    return {
+      agrees: validated.agrees,
+      tier2Url: tier2Scrape.url,
+      notes: validated.notes,
+    };
+  }
+}

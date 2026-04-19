@@ -33,6 +33,7 @@ export type {
   ValidateStage,
 } from './types/pipeline';
 
+export { CrossCheckStageImpl } from './stages/cross-check';
 export { DiscoverStageImpl } from './stages/discover';
 export { ExtractStageImpl } from './stages/extract';
 export { ScrapeStageImpl } from './stages/scrape';
