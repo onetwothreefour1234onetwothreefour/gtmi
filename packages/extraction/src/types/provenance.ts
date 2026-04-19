@@ -6,7 +6,7 @@ export interface ProvenanceRecord {
   sourceUrl: string;
   geographicLevel: GeographicLevel;
   sourceTier: SourceTier;
-  scrapeTimestamp: Date;
+  scrapeTimestamp: string;
   contentHash: string;
   sourceSentence: string;
   characterOffsets: { start: number; end: number };

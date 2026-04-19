@@ -156,7 +156,7 @@ export const extractSingleProgram = task({
         sourceUrl,
         geographicLevel: winningDiscovered.geographicLevel,
         sourceTier: winningDiscovered.tier,
-        scrapeTimestamp: winningScrape.scrapedAt,
+        scrapeTimestamp: winningScrape.scrapedAt.toISOString(),
         contentHash: winningScrape.contentHash,
         sourceSentence: extraction.sourceSentence,
         characterOffsets: extraction.characterOffsets,

@@ -28,7 +28,7 @@ export class PublishStageImpl implements PublishStage {
     if (!provenance.extractionModel) missing.push('extractionModel');
     if (!provenance.validationModel) missing.push('validationModel');
     if (!provenance.methodologyVersion) missing.push('methodologyVersion');
-    if (!(provenance.scrapeTimestamp instanceof Date)) missing.push('scrapeTimestamp');
+    if (typeof provenance.scrapeTimestamp !== 'string') missing.push('scrapeTimestamp');
     if (missing.length > 0) {
       throw new Error(
         `Publish failed: missing required provenance fields [${missing.join(', ')}] for field ${extraction.fieldDefinitionKey} / program ${extraction.programId}`
