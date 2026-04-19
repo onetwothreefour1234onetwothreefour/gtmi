@@ -1,9 +1,11 @@
-import type { ReviewDecision } from './extraction';
+import type { GeographicLevel, ReviewDecision, SourceTier } from './extraction';
 
 export type CrossCheckOutcome = 'agree' | 'disagree' | 'not_checked';
 
 export interface ProvenanceRecord {
   sourceUrl: string;
+  geographicLevel: GeographicLevel;
+  sourceTier: SourceTier;
   scrapeTimestamp: Date;
   contentHash: string;
   sourceSentence: string;
