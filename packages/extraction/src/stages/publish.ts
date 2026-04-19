@@ -1,4 +1,5 @@
 import { db, fieldDefinitions, fieldValues, methodologyVersions } from '@gtmi/db';
+import { normalizeRawValue, ScoringError } from '@gtmi/scoring';
 import { eq } from 'drizzle-orm';
 import type { ExtractionOutput, ValidationResult } from '../types/extraction';
 import type { ProvenanceRecord } from '../types/provenance';
@@ -35,7 +36,11 @@ export class PublishStageImpl implements PublishStage {
     }
 
     const fieldDefRows = await db
-      .select({ id: fieldDefinitions.id })
+      .select({
+        id: fieldDefinitions.id,
+        normalizationFn: fieldDefinitions.normalizationFn,
+        scoringRubricJsonb: fieldDefinitions.scoringRubricJsonb,
+      })
       .from(fieldDefinitions)
       .where(eq(fieldDefinitions.key, extraction.fieldDefinitionKey))
       .limit(1);
@@ -45,7 +50,18 @@ export class PublishStageImpl implements PublishStage {
         `Publish failed: no field_definition found with key "${extraction.fieldDefinitionKey}"`
       );
     }
-    const fieldDefinitionId = fieldDefRows[0]!.id;
+    const fieldDef = fieldDefRows[0]!;
+    const fieldDefinitionId = fieldDef.id;
+
+    let valueNormalized: number | string | boolean;
+    try {
+      valueNormalized = normalizeRawValue(extraction.valueRaw, fieldDef);
+    } catch (error) {
+      const msg = error instanceof ScoringError ? error.message : String(error);
+      throw new Error(
+        `Normalization failed for field "${extraction.fieldDefinitionKey}" / program "${extraction.programId}": ${msg}`
+      );
+    }
 
     const methodologyRows = await db
       .select({ id: methodologyVersions.id })
@@ -66,6 +82,7 @@ export class PublishStageImpl implements PublishStage {
         programId: extraction.programId,
         fieldDefinitionId,
         valueRaw: extraction.valueRaw,
+        valueNormalized,
         provenance,
         status: 'approved',
         extractedAt: extraction.extractedAt,
