@@ -1,9 +1,14 @@
 import { task } from '@trigger.dev/sdk/v3';
-import type { ExtractionInput } from '@gtmi/extraction';
+import { DiscoverStageImpl } from '@gtmi/extraction';
 
 export const extractSingleProgram = task({
   id: 'extract-single-program',
-  run: async (payload: Pick<ExtractionInput, 'programId'>) => {
-    console.log(`extract-single-program: programId=${payload.programId} — not yet implemented`);
+  run: async (payload: { programId: string; programName: string; country: string }) => {
+    const discover = new DiscoverStageImpl();
+    const result = await discover.execute(payload.programId, payload.programName, payload.country);
+    console.log(
+      `Stage 0 complete for ${result.programId}: ${result.discoveredUrls.length} URLs discovered`
+    );
+    return result;
   },
 });

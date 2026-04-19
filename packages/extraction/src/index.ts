@@ -25,6 +25,7 @@ export type { CrossCheckOutcome, ProvenanceRecord } from './types/provenance';
 
 export type {
   CrossCheckStage,
+  DiscoverStage,
   ExtractStage,
   ExtractionPipeline,
   HumanReviewStage,

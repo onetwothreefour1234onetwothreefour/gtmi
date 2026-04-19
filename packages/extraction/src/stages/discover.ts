@@ -26,31 +26,64 @@ function buildUserMessage(programName: string, country: string): string {
   );
 }
 
+function stripJsonFences(text: string): string {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  return fenced?.[1]?.trim() ?? text.trim();
+}
+
+const VALID_TIERS = new Set([1, 2, 3]);
+const VALID_GEO_LEVELS = new Set(['global', 'continental', 'national', 'regional']);
+
+function assertDiscoveredUrl(item: unknown, index: number, programId: string): DiscoveredUrl {
+  if (typeof item !== 'object' || item === null) {
+    throw new Error(`Discovery item ${index} is not an object for program ${programId}`);
+  }
+  const obj = item as Record<string, unknown>;
+  const missing: string[] = [];
+  if (typeof obj['url'] !== 'string') missing.push('url');
+  if (!VALID_TIERS.has(obj['tier'] as number)) missing.push('tier');
+  if (!VALID_GEO_LEVELS.has(obj['geographicLevel'] as string)) missing.push('geographicLevel');
+  if (typeof obj['reason'] !== 'string') missing.push('reason');
+  if (typeof obj['isOfficial'] !== 'boolean') missing.push('isOfficial');
+  if (missing.length > 0) {
+    throw new Error(
+      `Discovery item ${index} is missing or invalid fields [${missing.join(', ')}] for program ${programId}`
+    );
+  }
+  return obj as unknown as DiscoveredUrl;
+}
+
+function parseDiscoveredUrls(raw: string, programId: string): DiscoveredUrl[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripJsonFences(raw));
+  } catch {
+    throw new Error(`Discovery response was not valid JSON for program ${programId}: ${raw}`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(`Discovery response was not an array for program ${programId}: ${raw}`);
+  }
+  return parsed.map((item, i) => assertDiscoveredUrl(item, i, programId));
+}
+
 export class DiscoverStageImpl implements DiscoverStage {
   async execute(programId: string, programName: string, country: string): Promise<DiscoveryResult> {
     const client = createAnthropicClient();
-
-    const discoveryTools: Parameters<typeof client.messages.create>[0]['tools'] = [
-      // @ts-expect-error: web_search_20250305 is a valid API tool not yet typed in SDK 0.39.0
-      { type: 'web_search_20250305', name: 'web_search' },
-    ];
 
     const response = await client.messages
       .create({
         model: MODEL_DISCOVERY,
         max_tokens: 2000,
-        tools: discoveryTools,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: buildUserMessage(programName, country) }],
       })
       .catch((error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        throw new Error(`Discovery failed for program ${programId}: ${msg}`);
+        throw new Error(`Discovery API call failed for program ${programId}: ${msg}`);
       });
 
-    const content = response.content;
-    type ContentItem = (typeof content)[number];
-    const lastTextBlock = content
+    type ContentItem = (typeof response.content)[number];
+    const lastTextBlock = response.content
       .filter((block): block is Extract<ContentItem, { type: 'text' }> => block.type === 'text')
       .at(-1);
 
@@ -58,20 +91,7 @@ export class DiscoverStageImpl implements DiscoverStage {
       throw new Error(`Discovery returned no text content for program ${programId}`);
     }
 
-    const raw = lastTextBlock.text;
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      throw new Error(`Discovery response was not valid JSON for program ${programId}: ${raw}`);
-    }
-
-    if (!Array.isArray(parsed)) {
-      throw new Error(`Discovery response was not valid JSON for program ${programId}: ${raw}`);
-    }
-
-    const discoveredUrls = (parsed as DiscoveredUrl[]).slice(0, 5);
+    const discoveredUrls = parseDiscoveredUrls(lastTextBlock.text, programId).slice(0, 5);
 
     if (discoveredUrls.length === 0) {
       throw new Error(`Discovery returned zero URLs for program ${programId}`);
