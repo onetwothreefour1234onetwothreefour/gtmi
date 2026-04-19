@@ -1,8 +1,10 @@
 export {
   createAnthropicClient,
+  MODEL_CROSSCHECK,
   MODEL_DISCOVERY,
   MODEL_EXTRACTION,
   MODEL_SUMMARY,
+  MODEL_VALIDATION,
 } from './clients/anthropic';
 export type { ExtractionModel } from './clients/anthropic';
 
@@ -30,6 +32,7 @@ export type {
   ExtractionPipeline,
   HumanReviewStage,
   PublishStage,
+  ScrapeStage,
   ValidateStage,
 } from './types/pipeline';
 

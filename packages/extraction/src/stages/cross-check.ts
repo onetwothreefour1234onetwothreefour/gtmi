@@ -1,4 +1,4 @@
-import { createAnthropicClient, MODEL_EXTRACTION } from '../clients/anthropic';
+import { createAnthropicClient, MODEL_CROSSCHECK } from '../clients/anthropic';
 import type { CrossCheckResult, ExtractionOutput, ScrapeResult } from '../types/extraction';
 import type { CrossCheckStage } from '../types/pipeline';
 
@@ -80,7 +80,7 @@ export class CrossCheckStageImpl implements CrossCheckStage {
 
     const response = await client.messages
       .create({
-        model: MODEL_EXTRACTION,
+        model: MODEL_CROSSCHECK,
         max_tokens: 512,
         system: SYSTEM_PROMPT,
         messages: [

@@ -1,4 +1,4 @@
-import { createAnthropicClient, MODEL_EXTRACTION } from '../clients/anthropic';
+import { createAnthropicClient, MODEL_VALIDATION } from '../clients/anthropic';
 import type { ExtractionOutput, ScrapeResult } from '../types/extraction';
 import type { ValidationResult } from '../types/extraction';
 import type { ValidateStage } from '../types/pipeline';
@@ -84,7 +84,7 @@ export class ValidateStageImpl implements ValidateStage {
       return {
         isValid: false,
         validationConfidence: 1.0,
-        validationModel: MODEL_EXTRACTION,
+        validationModel: MODEL_VALIDATION,
         notes: 'No value was extracted; validation skipped.',
       };
     }
@@ -93,7 +93,7 @@ export class ValidateStageImpl implements ValidateStage {
 
     const response = await client.messages
       .create({
-        model: MODEL_EXTRACTION,
+        model: MODEL_VALIDATION,
         max_tokens: 512,
         system: SYSTEM_PROMPT,
         messages: [
@@ -135,7 +135,7 @@ export class ValidateStageImpl implements ValidateStage {
     return {
       isValid: validated.isValid,
       validationConfidence: validated.validationConfidence,
-      validationModel: MODEL_EXTRACTION,
+      validationModel: MODEL_VALIDATION,
       notes: validated.notes,
     };
   }

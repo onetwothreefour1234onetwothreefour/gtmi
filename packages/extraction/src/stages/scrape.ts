@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type FirecrawlApp from '@mendable/firecrawl-js';
 import { createFirecrawlClient } from '../clients/firecrawl';
 import type { DiscoveredUrl, ScrapeResult } from '../types/extraction';
+import type { ScrapeStage } from '../types/pipeline';
 
 interface ScrapeStageOptions {
   delayMs?: number;
@@ -15,7 +16,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export class ScrapeStageImpl {
+export class ScrapeStageImpl implements ScrapeStage {
   private readonly delayMs: number;
 
   constructor(options: ScrapeStageOptions = {}) {
