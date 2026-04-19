@@ -17,7 +17,7 @@ import type {
 import { db, fieldDefinitions, programs } from '@gtmi/db';
 import { and, eq, ilike } from 'drizzle-orm';
 
-const METHODOLOGY_VERSION = 'v1.0.0';
+const METHODOLOGY_VERSION = '1.0.0';
 const AUTO_APPROVE_CONFIDENCE_THRESHOLD = 0.85;
 
 async function main() {
@@ -61,6 +61,13 @@ async function main() {
   const tier2Scrape: ScrapeResult | null = tier2DiscoveredUrl
     ? (scrapeByUrl.get(tier2DiscoveredUrl.url) ?? null)
     : null;
+
+  // A discovered-but-failed scrape (httpStatus 0, empty content) is treated as not-checked,
+  // not as a disagreement — same outcome as no Tier 2 URL being discovered.
+  const effectiveTier2Scrape: ScrapeResult | null =
+    tier2Scrape !== null && tier2Scrape.httpStatus !== 0 && tier2Scrape.contentMarkdown !== ''
+      ? tier2Scrape
+      : null;
 
   // Pre-loop: load field definitions
   const allFieldDefs = await db.select().from(fieldDefinitions);
@@ -107,8 +114,8 @@ async function main() {
     let crossCheck: CrossCheckResult;
     let crossCheckOutcome: CrossCheckOutcome;
 
-    if (tier2Scrape !== null) {
-      crossCheck = await crossCheckStage.execute(extraction, tier2Scrape);
+    if (effectiveTier2Scrape !== null) {
+      crossCheck = await crossCheckStage.execute(extraction, effectiveTier2Scrape);
       crossCheckOutcome = crossCheck.agrees ? 'agree' : 'disagree';
     } else {
       crossCheck = { agrees: true, tier2Url: '', notes: 'No Tier 2 source discovered' };
@@ -140,7 +147,7 @@ async function main() {
       validationModel: validation.validationModel,
       validationConfidence: validation.validationConfidence,
       crossCheckResult: crossCheckOutcome,
-      crossCheckUrl: tier2Scrape?.url ?? null,
+      crossCheckUrl: effectiveTier2Scrape?.url ?? null,
       reviewedBy: 'auto',
       reviewedAt: new Date(),
       methodologyVersion: METHODOLOGY_VERSION,
