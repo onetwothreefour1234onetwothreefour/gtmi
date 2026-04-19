@@ -1,3 +1,5 @@
+import type { ReviewDecision } from './extraction';
+
 export type CrossCheckOutcome = 'agree' | 'disagree' | 'not_checked';
 
 export interface ProvenanceRecord {
@@ -15,4 +17,5 @@ export interface ProvenanceRecord {
   reviewedBy: string | null;
   reviewedAt: Date | null;
   methodologyVersion: string;
+  reviewDecision: ReviewDecision;
 }
