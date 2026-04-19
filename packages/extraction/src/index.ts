@@ -34,3 +34,4 @@ export type {
 } from './types/pipeline';
 
 export { DiscoverStageImpl } from './stages/discover';
+export { ScrapeStageImpl } from './stages/scrape';
