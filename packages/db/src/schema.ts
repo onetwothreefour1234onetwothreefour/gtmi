@@ -9,6 +9,7 @@ import {
   jsonb,
   uuid,
   index,
+  uniqueIndex,
   pgPolicy,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -204,7 +205,7 @@ export const fieldValues = pgTable(
       .references(() => methodologyVersions.id),
   },
   (table) => [
-    index('idx_field_values_prog_def').on(table.programId, table.fieldDefinitionId),
+    uniqueIndex('idx_field_values_prog_def').on(table.programId, table.fieldDefinitionId),
     index('idx_field_values_status').on(table.status),
     index('idx_field_values_methodology').on(table.methodologyVersionId),
     index('idx_field_values_source_id').on(table.sourceId),

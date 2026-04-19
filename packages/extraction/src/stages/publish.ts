@@ -76,6 +76,10 @@ export class PublishStageImpl implements PublishStage {
     }
     const methodologyVersionId = methodologyRows[0]!.id;
 
+    // source_id is intentionally left null: the sources table holds pre-seeded
+    // static program-level URLs, while Stage 0 discovers URLs dynamically. Most
+    // discovered URLs will not match a sources row. The full source URL, tier,
+    // and geographic level are preserved in the JSONB provenance record.
     const inserted = await db
       .insert(fieldValues)
       .values({
@@ -88,6 +92,18 @@ export class PublishStageImpl implements PublishStage {
         extractedAt: extraction.extractedAt,
         reviewedAt: provenance.reviewedAt,
         methodologyVersionId,
+      })
+      .onConflictDoUpdate({
+        target: [fieldValues.programId, fieldValues.fieldDefinitionId],
+        set: {
+          valueRaw: extraction.valueRaw,
+          valueNormalized,
+          provenance,
+          status: 'approved',
+          extractedAt: extraction.extractedAt,
+          reviewedAt: provenance.reviewedAt,
+          methodologyVersionId,
+        },
       })
       .returning({ id: fieldValues.id });
 
