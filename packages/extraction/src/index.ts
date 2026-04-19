@@ -1,12 +1,20 @@
-export { createAnthropicClient, MODEL_EXTRACTION, MODEL_SUMMARY } from './clients/anthropic';
+export {
+  createAnthropicClient,
+  MODEL_DISCOVERY,
+  MODEL_EXTRACTION,
+  MODEL_SUMMARY,
+} from './clients/anthropic';
 export type { ExtractionModel } from './clients/anthropic';
 
 export { createFirecrawlClient } from './clients/firecrawl';
 
 export type {
   CrossCheckResult,
+  DiscoveredUrl,
+  DiscoveryResult,
   ExtractionInput,
   ExtractionOutput,
+  GeographicLevel,
   ReviewDecision,
   ScrapeResult,
   SourceTier,
@@ -23,3 +31,5 @@ export type {
   PublishStage,
   ValidateStage,
 } from './types/pipeline';
+
+export { DiscoverStageImpl } from './stages/discover';

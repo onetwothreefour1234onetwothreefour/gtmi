@@ -1,11 +1,16 @@
 import type {
   CrossCheckResult,
+  DiscoveryResult,
   ExtractionOutput,
   ReviewDecision,
   ScrapeResult,
   ValidationResult,
 } from './extraction';
 import type { ProvenanceRecord } from './provenance';
+
+export interface DiscoverStage {
+  execute(programId: string, programName: string, country: string): Promise<DiscoveryResult>;
+}
 
 export interface ExtractStage {
   execute(scrape: ScrapeResult, fieldKey: string, programId: string): Promise<ExtractionOutput>;
@@ -42,6 +47,7 @@ export interface PublishStage {
 }
 
 export interface ExtractionPipeline {
+  discover: DiscoverStage;
   extract: ExtractStage;
   validate: ValidateStage;
   crossCheck: CrossCheckStage;

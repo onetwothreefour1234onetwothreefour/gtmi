@@ -40,3 +40,21 @@ export interface CrossCheckResult {
   tier2Url: string;
   notes: string | null;
 }
+
+export type GeographicLevel = 'global' | 'continental' | 'national' | 'regional';
+
+export interface DiscoveredUrl {
+  url: string;
+  tier: SourceTier;
+  geographicLevel: GeographicLevel;
+  reason: string;
+  isOfficial: boolean;
+}
+
+export interface DiscoveryResult {
+  programId: string;
+  programName: string;
+  country: string;
+  discoveredUrls: DiscoveredUrl[];
+  discoveredAt: Date;
+}
