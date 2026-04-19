@@ -35,6 +35,7 @@ export type {
 
 export { CrossCheckStageImpl } from './stages/cross-check';
 export { DiscoverStageImpl } from './stages/discover';
+export { HumanReviewStageImpl } from './stages/human-review';
 export { ExtractStageImpl } from './stages/extract';
 export { ScrapeStageImpl } from './stages/scrape';
 export { ValidateStageImpl } from './stages/validate';
