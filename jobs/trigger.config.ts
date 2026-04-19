@@ -8,5 +8,4 @@ export default defineConfig({
     extensions: [],
     conditions: ['node', 'require', 'default'],
   },
-  dependenciesToBundle: ['@gtmi/extraction', '@gtmi/db', '@gtmi/shared'],
 });
