@@ -7,5 +7,6 @@ export default defineConfig({
   build: {
     extensions: [],
     conditions: ['node', 'require', 'default'],
+    external: ['import-in-the-middle'],
   },
 });
