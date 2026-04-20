@@ -117,7 +117,11 @@ async function main() {
       `  ↳ Extracted: "${extraction.valueRaw.substring(0, 60)}..." (confidence: ${extraction.extractionConfidence})`
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 8000));
+    // Tier 1 rate limit: 30K input tokens/min for Sonnet.
+    // With 30K char content (~7.5K tokens) × up to 5 scrapes per field,
+    // plus validation and cross-check calls, we need ~25s between fields
+    // to stay under the limit. This is slow but correct for canary.
+    await new Promise((resolve) => setTimeout(resolve, 25000));
 
     fieldsExtracted++;
 

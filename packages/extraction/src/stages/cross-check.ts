@@ -33,8 +33,17 @@ function buildUserMessage(extraction: ExtractionOutput, tier2ContentMarkdown: st
 }
 
 function stripJsonFences(text: string): string {
+  // Try markdown code fences first
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  return fenced?.[1]?.trim() ?? text.trim();
+  if (fenced?.[1]) return fenced[1].trim();
+
+  // If no fences, extract the JSON object from anywhere in the response
+  // (models sometimes prepend explanatory text before the JSON)
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) return jsonMatch[0].trim();
+
+  // Fallback: return as-is and let JSON.parse throw a clear error
+  return text.trim();
 }
 
 interface RawLlmResponse {

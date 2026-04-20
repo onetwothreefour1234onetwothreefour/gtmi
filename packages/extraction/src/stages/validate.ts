@@ -23,7 +23,7 @@ function buildUserMessage(extraction: ExtractionOutput, contentMarkdown: string)
     `Source sentence: ${extraction.sourceSentence}\n` +
     `Claimed character offsets in content: start=${start}, end=${end}\n\n` +
     `Content around the claimed offsets (±${CONTEXT_WINDOW} chars):\n---\n${offsetContext}\n---\n\n` +
-    `Full content for complete verification:\n---\n${contentMarkdown}\n---\n\n` +
+    `Full content for complete verification:\n---\n${contentMarkdown.slice(0, 30000)}\n---\n\n` +
     `Answer both questions:\n` +
     `(1) Does the source sentence appear in the full content at or near the stated offsets?\n` +
     `(2) Does the source sentence clearly and directly support the extracted value?\n\n` +
@@ -41,8 +41,17 @@ function buildUserMessage(extraction: ExtractionOutput, contentMarkdown: string)
 }
 
 function stripJsonFences(text: string): string {
+  // Try markdown code fences first
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  return fenced?.[1]?.trim() ?? text.trim();
+  if (fenced?.[1]) return fenced[1].trim();
+
+  // If no fences, extract the JSON object from anywhere in the response
+  // (models sometimes prepend explanatory text before the JSON)
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) return jsonMatch[0].trim();
+
+  // Fallback: return as-is and let JSON.parse throw a clear error
+  return text.trim();
 }
 
 interface RawLlmResponse {
