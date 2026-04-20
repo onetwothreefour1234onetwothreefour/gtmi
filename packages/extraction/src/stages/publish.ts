@@ -69,7 +69,7 @@ export class PublishStageImpl implements PublishStage {
 
     let valueNormalized: number | string | boolean;
     try {
-      valueNormalized = normalizeRawValue(_numericValue, fieldDef);
+      valueNormalized = normalizeRawValue(rawAsString, fieldDef);
     } catch (error) {
       const msg = error instanceof ScoringError ? error.message : String(error);
       throw new Error(
