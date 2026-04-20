@@ -69,6 +69,12 @@ function selectTier2ForField(
 }
 
 async function main() {
+  const countryArgIdx = process.argv.indexOf('--country');
+  const countryArg = countryArgIdx !== -1 ? process.argv[countryArgIdx + 1] : undefined;
+  if (countryArg !== 'AUS' && countryArg !== 'SGP') {
+    throw new Error('Usage: canary-run.ts --country <AUS|SGP>');
+  }
+
   // --- Shared: load field definitions + wave filter ---
   let allFieldDefs = await db.select().from(fieldDefinitions);
   const fieldPrompts = new Map<string, string>();
@@ -123,32 +129,36 @@ async function main() {
     }
   }
 
-  // --- Find target programs ---
-  const ausRows = await db
-    .select()
-    .from(programs)
-    .where(and(eq(programs.countryIso, 'AUS'), ilike(programs.name, '%Skills in Demand%')));
-  if (ausRows.length === 0) {
-    const all = await db.select().from(programs).where(eq(programs.countryIso, 'AUS'));
-    throw new Error(
-      `No AUS program matching "%Skills in Demand%" found.\nExisting AUS programs:\n${all.map((r) => `  - ${r.name}`).join('\n')}`
-    );
-  }
-  const ausProgram = ausRows[0]!;
+  // --- Find target program for --country argument ---
+  const canaryTarget = await (async () => {
+    if (countryArg === 'AUS') {
+      const ausRows = await db
+        .select()
+        .from(programs)
+        .where(and(eq(programs.countryIso, 'AUS'), ilike(programs.name, '%Skills in Demand%')));
+      if (ausRows.length === 0) {
+        const all = await db.select().from(programs).where(eq(programs.countryIso, 'AUS'));
+        throw new Error(
+          `No AUS program matching "%Skills in Demand%" found.\nExisting AUS programs:\n${all.map((r) => `  - ${r.name}`).join('\n')}`
+        );
+      }
+      return ausRows[0]!;
+    } else {
+      const sgpRows = await db
+        .select()
+        .from(programs)
+        .where(and(eq(programs.countryIso, 'SGP'), ilike(programs.name, '%S Pass%')));
+      if (sgpRows.length === 0) {
+        const all = await db.select().from(programs).where(eq(programs.countryIso, 'SGP'));
+        throw new Error(
+          `No SGP program matching "%S Pass%" found.\nExisting SGP programs:\n${all.map((r) => `  - ${r.name}`).join('\n')}`
+        );
+      }
+      return sgpRows[0]!;
+    }
+  })();
 
-  const sgpRows = await db
-    .select()
-    .from(programs)
-    .where(and(eq(programs.countryIso, 'SGP'), ilike(programs.name, '%S Pass%')));
-  if (sgpRows.length === 0) {
-    const all = await db.select().from(programs).where(eq(programs.countryIso, 'SGP'));
-    throw new Error(
-      `No SGP program matching "%S Pass%" found.\nExisting SGP programs:\n${all.map((r) => `  - ${r.name}`).join('\n')}`
-    );
-  }
-  const sgpProgram = sgpRows[0]!;
-
-  const CANARY_TARGETS = [ausProgram, sgpProgram];
+  const CANARY_TARGETS = [canaryTarget];
 
   // --- Shared stages (initialized once) ---
   const extract = new ExtractStageImpl(fieldPrompts);
