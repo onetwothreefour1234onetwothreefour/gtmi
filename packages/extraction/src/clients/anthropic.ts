@@ -1,9 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-export const MODEL_EXTRACTION = 'claude-opus-4-7' as const;
-export const MODEL_DISCOVERY = 'claude-opus-4-7' as const;
-export const MODEL_VALIDATION = 'claude-opus-4-7' as const;
-export const MODEL_CROSSCHECK = 'claude-opus-4-7' as const;
+export const MODEL_EXTRACTION = 'claude-sonnet-4-6' as const;
+export const MODEL_DISCOVERY = 'claude-sonnet-4-6' as const;
+export const MODEL_VALIDATION = 'claude-sonnet-4-6' as const;
+export const MODEL_CROSSCHECK = 'claude-sonnet-4-6' as const;
 export const MODEL_SUMMARY = 'claude-sonnet-4-6' as const;
 
 export type ExtractionModel =
