@@ -13,9 +13,24 @@ const SYSTEM_PROMPT =
   '- Condition blocks ("To be eligible you must meet all of the following:")\n' +
   '- Numbered requirement lists\n' +
   '- Table rows with criteria or threshold values\n\n' +
-  'If the field value is presented as part of a condition or list rather than a standalone ' +
-  'labelled value, extract the relevant condition text verbatim as the valueRaw. ' +
-  'Do not summarise or paraphrase — copy the text exactly as it appears on the page. ' +
+  'When extracting valueRaw, apply the following rules based on the type of value:\n\n' +
+  'For numeric fields (salary thresholds, fees, years, counts, ages, processing times): ' +
+  'return only the base numeric value with its currency symbol or unit if present — nothing else. ' +
+  'Do not include explanatory text, conditions, or ranges. ' +
+  "For example: '$3,300' not 'minimum of $3,300 per month for applicants under 45'. " +
+  'If a range exists, return the minimum value only.\n\n' +
+  'For categorical fields (yes/no, required/not required, open list/restricted list, automatic/by permit): ' +
+  'return a concise standardised label — one to five words maximum. ' +
+  "For example: 'required', 'not required', 'open list', 'restricted list', 'automatic', 'by permit'.\n\n" +
+  'For text fields (eligibility conditions, requirements, inclusion options): ' +
+  'return a single clean sentence of no more than 20 words that captures the core requirement. ' +
+  'Do not copy verbatim fragments. Summarise the key condition in plain English. ' +
+  "For example: 'Minimum 1 year relevant work experience in nominated occupation' not " +
+  "'at least 1 year relevant work experience in your nominated occupation or a related field as assessed by the department'.\n\n" +
+  'For count fields (number of steps, number of changes): return only the integer count. ' +
+  "For example: '4' not 'Step 1 Before you apply, Step 2 Apply online, Step 3 Wait for decision, Step 4 Receive outcome'.\n\n" +
+  'The sourceSentence field must still contain the exact verbatim text from the source that supports the extracted value — ' +
+  'this is for provenance only and is separate from valueRaw.\n\n' +
   'Only return an empty valueRaw if the information is genuinely absent from the content.';
 
 function buildUserMessage(
@@ -37,7 +52,7 @@ function buildUserMessage(
     `  "extractionConfidence": number\n` +
     `}\n\n` +
     `Rules:\n` +
-    `- valueRaw: The extracted value exactly as stated in the content, or "" if not found.\n` +
+    `- valueRaw: The clean extracted value formatted per the field-type rules in the system prompt, or "" if not found.\n` +
     `- sourceSentence: The exact sentence from the content containing the value, or "" if not found.\n` +
     `- characterOffsets: start and end character index of sourceSentence within the content. Set both to 0 if not found.\n` +
     `- extractionConfidence: A number from 0.0 to 1.0. Use 0.0 if the value was not found.`

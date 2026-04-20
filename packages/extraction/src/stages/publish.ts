@@ -56,8 +56,17 @@ export class PublishStageImpl implements PublishStage {
     const rawAsString =
       typeof extraction.valueRaw === 'string' ? extraction.valueRaw : String(extraction.valueRaw);
 
+    const _currencyStripped = rawAsString.replace(
+      /\b(AUD|SGD|USD|GBP|CAD|HKD|EUR|JPY|NZD|CHF)\b/gi,
+      ''
+    );
+    const _unitStripped = _currencyStripped.replace(
+      /\b(per\s+month|per\s+year|per\s+annum|p\.a\.|\/month|\/year|\/mth|\/yr|days|years|months|weeks)\b/gi,
+      ''
+    );
     const _sanitized =
-      (rawAsString.trimStart().startsWith('-') ? '-' : '') + rawAsString.replace(/[^0-9.]/g, '');
+      (_unitStripped.trimStart().startsWith('-') ? '-' : '') +
+      _unitStripped.replace(/[^0-9.]/g, '');
     const _numericValue = parseFloat(_sanitized);
 
     if (isNaN(_numericValue)) {
