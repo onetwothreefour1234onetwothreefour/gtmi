@@ -5,7 +5,9 @@ import type { DiscoverStage } from '../types/pipeline';
 
 const SYSTEM_PROMPT =
   'You are a specialist immigration research agent. Your job is to find the most ' +
-  'authoritative and useful web sources for a given visa or residency program. You must ' +
+  'authoritative web sources for a given visa or residency program that contain ' +
+  'structured, field-level eligibility and criteria data — such as salary thresholds, ' +
+  'occupation lists, fees, processing times, and family or pathway entitlements. You must ' +
   'always prioritise official government sources. You classify each source by its geographic ' +
   'level: global (UN, World Bank, ILO), continental (EU, ASEAN, OECD regional), national ' +
   '(country-level government), or regional (province, state, canton, emirate-level ' +
@@ -31,6 +33,15 @@ function buildUserMessage(programName: string, country: string): string {
     `Search specifically for "${programName} ${country} official visa page" and the visa subclass number ` +
     `with country and "immigration" to find the exact listing page. ` +
     `This official listing page MUST be your first result. Only then find additional supplementary pages. ` +
+    `PRIORITISE urls that are most likely to contain structured eligibility and program criteria data, ` +
+    `specifically: salary or income thresholds, educational qualification requirements, work experience ` +
+    `requirements, occupation or skills lists, visa processing times, government fees, family member ` +
+    `inclusion rights, permanent residency and citizenship pathways, and policy stability or review history. ` +
+    `DEPRIORITISE or EXCLUDE urls that are primarily about: employer sponsorship processes, English language ` +
+    `test provider lists, generic visa landing pages with no field-level criteria data, immigration ` +
+    `consultation or agent services, and news or media articles. ` +
+    `Return urls ranked by relevance — most relevant first (after the mandatory official listing page) — ` +
+    `weighted by how much structured field-level criteria data each page is expected to contain. ` +
     `Rules: (1) The first entry must always be the official national government page. ` +
     `(2) Remaining entries may include: additional government pages (regional, state, federal ` +
     `agency), official continental sources (e.g. EU directives), supplementary official pages ` +
@@ -40,7 +51,8 @@ function buildUserMessage(programName: string, country: string): string {
     `state, canton, emirate-level government). ` +
     `(4) tier must be 1, 2, or 3. ` +
     `(5) isOfficial must be true for any government or intergovernmental source. ` +
-    `(6) reason must be one sentence. ` +
+    `(6) reason must be one sentence explaining what specific field-level data (e.g. salary thresholds, ` +
+    `occupation lists, fees, processing times) this page is expected to contain. ` +
     `(7) Do not include duplicate URLs, redirects, or pages that do not contain ` +
     `program-specific information.`
   );

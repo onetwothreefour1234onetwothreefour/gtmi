@@ -125,9 +125,15 @@ export class ValidateStageImpl implements ValidateStage {
       .at(-1);
 
     if (!lastTextBlock) {
-      throw new Error(
-        `Validation returned no text content for field ${extraction.fieldDefinitionKey} / program ${extraction.programId}`
+      console.warn(
+        `Validation returned no text content for field ${extraction.fieldDefinitionKey} / program ${extraction.programId} — skipping validation`
       );
+      return {
+        isValid: false,
+        validationConfidence: 0,
+        validationModel: MODEL_VALIDATION,
+        notes: 'Validation returned no text content from LLM.',
+      };
     }
 
     let parsed: unknown;
@@ -140,6 +146,16 @@ export class ValidateStageImpl implements ValidateStage {
     }
 
     const validated = assertLlmResponse(parsed, extraction.fieldDefinitionKey);
+
+    const actualPos = scrape.contentMarkdown.indexOf(extraction.sourceSentence);
+    if (actualPos !== -1 && actualPos !== extraction.characterOffsets.start) {
+      console.warn(
+        `[${extraction.fieldDefinitionKey}] Offset mismatch: ` +
+          `claimed start=${extraction.characterOffsets.start}, ` +
+          `end=${extraction.characterOffsets.end}, ` +
+          `actual position=${actualPos}`
+      );
+    }
 
     return {
       isValid: validated.isValid,

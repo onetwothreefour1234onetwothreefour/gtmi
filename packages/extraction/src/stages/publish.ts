@@ -53,9 +53,21 @@ export class PublishStageImpl implements PublishStage {
     const fieldDef = fieldDefRows[0]!;
     const fieldDefinitionId = fieldDef.id;
 
+    const _sanitized =
+      (extraction.valueRaw.trimStart().startsWith('-') ? '-' : '') +
+      extraction.valueRaw.replace(/[^0-9.]/g, '');
+    const _numericValue = parseFloat(_sanitized);
+
+    if (isNaN(_numericValue)) {
+      console.warn(
+        `[${extraction.fieldDefinitionKey}] Normalization skipped: cannot parse "${extraction.valueRaw}" as a number`
+      );
+      return;
+    }
+
     let valueNormalized: number | string | boolean;
     try {
-      valueNormalized = normalizeRawValue(extraction.valueRaw, fieldDef);
+      valueNormalized = normalizeRawValue(_numericValue, fieldDef);
     } catch (error) {
       const msg = error instanceof ScoringError ? error.message : String(error);
       throw new Error(
