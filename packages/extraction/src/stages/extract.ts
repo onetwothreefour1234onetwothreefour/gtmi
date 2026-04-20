@@ -113,6 +113,13 @@ export class ExtractStageImpl implements ExtractStage {
 
     const client = createAnthropicClient();
 
+    if (scrape.contentMarkdown.length > 8000) {
+      console.log(
+        `  ↳ [${fieldKey}] Content truncated from ${scrape.contentMarkdown.length} to 8000 chars`
+      );
+    }
+    const truncatedContent = scrape.contentMarkdown.slice(0, 8000);
+
     const response = await client.messages
       .create({
         model: MODEL_EXTRACTION,
@@ -121,7 +128,7 @@ export class ExtractStageImpl implements ExtractStage {
         messages: [
           {
             role: 'user',
-            content: buildUserMessage(fieldKey, extractionPromptMd, scrape.contentMarkdown),
+            content: buildUserMessage(fieldKey, extractionPromptMd, truncatedContent),
           },
         ],
       })
