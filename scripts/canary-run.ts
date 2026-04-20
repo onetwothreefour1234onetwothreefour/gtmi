@@ -60,7 +60,9 @@ async function main() {
   const discoveredByUrl = new Map<string, DiscoveredUrl>();
   for (const du of discoveryResult.discoveredUrls) discoveredByUrl.set(du.url, du);
 
-  const tier1Scrapes = scrapeResults.filter((sr) => discoveredByUrl.get(sr.url)?.tier === 1);
+  const tier1Scrapes = scrapeResults
+    .filter((sr) => discoveredByUrl.get(sr.url)?.tier === 1)
+    .slice(0, 5);
 
   const tier2DiscoveredUrl = discoveryResult.discoveredUrls.find((u) => u.tier === 2);
   const tier2Scrape: ScrapeResult | null = tier2DiscoveredUrl
@@ -115,7 +117,7 @@ async function main() {
       `  ↳ Extracted: "${extraction.valueRaw.substring(0, 60)}..." (confidence: ${extraction.extractionConfidence})`
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await new Promise((resolve) => setTimeout(resolve, 8000));
 
     fieldsExtracted++;
 

@@ -61,7 +61,9 @@ export const extractSingleProgram = task({
     }
 
     // Partition scrape results: tier-1 for extraction, first tier-2 for cross-check
-    const tier1Scrapes = scrapeResults.filter((sr) => discoveredByUrl.get(sr.url)?.tier === 1);
+    const tier1Scrapes = scrapeResults
+      .filter((sr) => discoveredByUrl.get(sr.url)?.tier === 1)
+      .slice(0, 5);
 
     const tier2DiscoveredUrl = discoveryResult.discoveredUrls.find((u) => u.tier === 2);
     const tier2Scrape: ScrapeResult | null = tier2DiscoveredUrl
