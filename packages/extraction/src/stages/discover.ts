@@ -12,17 +12,24 @@ const SYSTEM_PROMPT =
 
 function buildUserMessage(programName: string, country: string): string {
   return (
-    `Find the top 5 most relevant and authoritative web pages for this program: ` +
-    `${programName} in ${country}. Return your answer as a valid JSON array with exactly ` +
-    `this structure — no markdown, no explanation, just the JSON array: ` +
+    `Find up to 10 of the most relevant and authoritative web pages for this program: ` +
+    `${programName} in ${country}. Only include URLs that genuinely add value — do not ` +
+    `pad to reach 10. Return your answer as a valid JSON array with exactly this structure ` +
+    `— no markdown, no explanation, just the JSON array: ` +
     `[{"url": string, "tier": 1|2|3, "geographicLevel": "global"|"continental"|"national"|"regional", ` +
     `"reason": string, "isOfficial": boolean}]. ` +
     `Rules: (1) The first entry must always be the official national government page. ` +
-    `(2) tier must be 1, 2, or 3. ` +
-    `(3) geographicLevel must be one of: global, continental, national, regional. ` +
-    `(4) isOfficial must be true for any government or intergovernmental source. ` +
-    `(5) reason must be one sentence. ` +
-    `(6) Do not include duplicate URLs.`
+    `(2) Remaining entries may include: additional government pages (regional, state, federal ` +
+    `agency), official continental sources (e.g. EU directives), supplementary official pages ` +
+    `(fees, processing times, forms), and Tier 2 law firm sources for cross-check purposes. ` +
+    `(3) Classify each URL by geographic level: global (UN, World Bank, ILO), continental ` +
+    `(EU, ASEAN, OECD regional), national (country-level government), or regional (province, ` +
+    `state, canton, emirate-level government). ` +
+    `(4) tier must be 1, 2, or 3. ` +
+    `(5) isOfficial must be true for any government or intergovernmental source. ` +
+    `(6) reason must be one sentence. ` +
+    `(7) Do not include duplicate URLs, redirects, or pages that do not contain ` +
+    `program-specific information.`
   );
 }
 
@@ -91,7 +98,7 @@ export class DiscoverStageImpl implements DiscoverStage {
       throw new Error(`Discovery returned no text content for program ${programId}`);
     }
 
-    const discoveredUrls = parseDiscoveredUrls(lastTextBlock.text, programId).slice(0, 5);
+    const discoveredUrls = parseDiscoveredUrls(lastTextBlock.text, programId).slice(0, 10);
 
     if (discoveredUrls.length === 0) {
       throw new Error(`Discovery returned zero URLs for program ${programId}`);

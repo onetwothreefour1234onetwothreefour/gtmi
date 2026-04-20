@@ -6,7 +6,17 @@ const SYSTEM_PROMPT =
   'You are a precise data extraction agent for immigration program research. Extract ' +
   'specific field values from official immigration program documentation. Return only ' +
   'valid JSON — no markdown, no explanation. Do not infer, extrapolate, or use general ' +
-  'knowledge. Only extract values explicitly stated in the provided content.';
+  'knowledge. Only extract values explicitly stated in the provided content.\n\n' +
+  'Government pages commonly present eligibility data in these formats — treat all of ' +
+  'them as explicit statements:\n' +
+  '- Bullet point eligibility lists ("You must...", "You need to...", "Applicants must...")\n' +
+  '- Condition blocks ("To be eligible you must meet all of the following:")\n' +
+  '- Numbered requirement lists\n' +
+  '- Table rows with criteria or threshold values\n\n' +
+  'If the field value is presented as part of a condition or list rather than a standalone ' +
+  'labelled value, extract the relevant condition text verbatim as the valueRaw. ' +
+  'Do not summarise or paraphrase — copy the text exactly as it appears on the page. ' +
+  'Only return an empty valueRaw if the information is genuinely absent from the content.';
 
 function buildUserMessage(
   fieldKey: string,
@@ -165,12 +175,14 @@ export class ExtractStageImpl implements ExtractStage {
       throw new Error(`No scrape results provided for field ${fieldKey} / program ${programId}`);
     }
 
-    const candidates = await Promise.all(
-      scrapes.map(async (scrape) => ({
-        output: await this.execute(scrape, fieldKey, programId),
-        sourceUrl: scrape.url,
-      }))
-    );
+    const candidates: { output: ExtractionOutput; sourceUrl: string }[] = [];
+    for (let i = 0; i < scrapes.length; i++) {
+      if (i > 0) await new Promise((resolve) => setTimeout(resolve, 2000));
+      candidates.push({
+        output: await this.execute(scrapes[i]!, fieldKey, programId),
+        sourceUrl: scrapes[i]!.url,
+      });
+    }
 
     return candidates.reduce((best, current) =>
       current.output.extractionConfidence > best.output.extractionConfidence ? current : best

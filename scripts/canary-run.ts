@@ -11,6 +11,7 @@ import type {
   CrossCheckOutcome,
   CrossCheckResult,
   DiscoveredUrl,
+  ExtractionOutput,
   ProvenanceRecord,
   ScrapeResult,
 } from '@gtmi/extraction';
@@ -87,13 +88,31 @@ async function main() {
 
   // Per-field pipeline loop
   for (const def of allFieldDefs) {
-    const { output: extraction, sourceUrl } = await extract.executeMulti(
-      tier1Scrapes,
-      def.key,
-      programId
+    console.log(
+      `[${allFieldDefs.indexOf(def) + 1}/48] Processing field: ${def.key} — ${def.label}`
     );
 
-    if (extraction.valueRaw === '') continue;
+    let extractionResult: { output: ExtractionOutput; sourceUrl: string };
+    try {
+      extractionResult = await extract.executeMulti(tier1Scrapes, def.key, programId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.log(`  ↳ [${def.key}] Extraction failed — skipping: ${msg}`);
+      continue;
+    }
+    const { output: extraction, sourceUrl } = extractionResult;
+
+    if (extraction.valueRaw === '') {
+      console.log(`  ↳ No value found — skipping`);
+      continue;
+    }
+
+    console.log(
+      `  ↳ Extracted: "${extraction.valueRaw.substring(0, 60)}..." (confidence: ${extraction.extractionConfidence})`
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
     fieldsExtracted++;
 
     const winningScrape = scrapeByUrl.get(sourceUrl);
@@ -110,6 +129,9 @@ async function main() {
     }
 
     const validation = await validate.execute(extraction, winningScrape);
+    console.log(
+      `  ↳ Validation: ${validation.isValid ? 'valid' : 'invalid'} (confidence: ${validation.validationConfidence})`
+    );
 
     let crossCheck: CrossCheckResult;
     let crossCheckOutcome: CrossCheckOutcome;
@@ -121,12 +143,15 @@ async function main() {
       crossCheck = { agrees: true, tier2Url: '', notes: 'No Tier 2 source discovered' };
       crossCheckOutcome = 'not_checked';
     }
+    console.log(`  ↳ Cross-check: ${crossCheckOutcome}`);
 
     const isAutoApproved =
       extraction.extractionConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD &&
       validation.isValid &&
       validation.validationConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD &&
       (crossCheck.agrees || crossCheckOutcome === 'not_checked');
+
+    console.log(`  ↳ Decision: ${isAutoApproved ? 'AUTO-APPROVED' : 'QUEUED FOR REVIEW'}`);
 
     if (!isAutoApproved) {
       await humanReview.enqueue(extraction, validation, crossCheck);
