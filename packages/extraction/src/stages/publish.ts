@@ -53,9 +53,11 @@ export class PublishStageImpl implements PublishStage {
     const fieldDef = fieldDefRows[0]!;
     const fieldDefinitionId = fieldDef.id;
 
+    const rawAsString =
+      typeof extraction.valueRaw === 'string' ? extraction.valueRaw : String(extraction.valueRaw);
+
     const _sanitized =
-      (extraction.valueRaw.trimStart().startsWith('-') ? '-' : '') +
-      extraction.valueRaw.replace(/[^0-9.]/g, '');
+      (rawAsString.trimStart().startsWith('-') ? '-' : '') + rawAsString.replace(/[^0-9.]/g, '');
     const _numericValue = parseFloat(_sanitized);
 
     if (isNaN(_numericValue)) {

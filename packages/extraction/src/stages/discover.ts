@@ -40,6 +40,54 @@ function buildUserMessage(programName: string, country: string): string {
     `DEPRIORITISE or EXCLUDE urls that are primarily about: employer sponsorship processes, English language ` +
     `test provider lists, generic visa landing pages with no field-level criteria data, immigration ` +
     `consultation or agent services, and news or media articles. ` +
+    `SOURCE MIX REQUIREMENT: Your 10 URLs must represent a genuine mix of the following five ` +
+    `source categories. Official government sources may account for up to 5 of the 10 URLs. ` +
+    `The remaining URLs must be drawn from the non-government categories below, selected and ` +
+    `ranked strictly by their relevance and suitability for the specific field-level data this ` +
+    `program requires — not by convenience or domain familiarity. If a non-government source ` +
+    `covers multiple relevant fields (salary thresholds, fees, family rights, pathway timelines) ` +
+    `it should be ranked higher than a source covering only one. ` +
+    `Category 1 — Official government and intergovernmental sources (up to 5 URLs, Tier 1): ` +
+    `The primary official source for this visa or program — typically the national immigration ` +
+    `authority, ministry of manpower, or home affairs department. Include the main program page ` +
+    `plus additional official pages covering fees, occupation lists, processing times, or ` +
+    `eligibility criteria. Also include relevant legislation or gazette instruments if they ` +
+    `contain specific thresholds or eligibility rules. These must be direct government domain ` +
+    `URLs — not third-party summaries of government content. ` +
+    `Category 2 — Global and regional institutional sources (Tier 1, counted within the 5 ` +
+    `official URLs if intergovernmental): Authoritative international bodies that publish ` +
+    `country-level data relevant to the program's context — such as organisations that track ` +
+    `talent mobility, governance quality, labour market conditions, or migration policy trends ` +
+    `across countries. Prefer sources that publish structured, annually-updated country ` +
+    `comparisons rather than single-country reports. ` +
+    `Category 3 — Established immigration law and advisory firms (Tier 2, prioritised by ` +
+    `field coverage depth): Reputable professional services firms that publish detailed, ` +
+    `regularly-updated visa guides as part of their advisory practice. These guides should ` +
+    `cover eligibility criteria, salary thresholds, application procedures, dependent rights, ` +
+    `and pathway options in depth. Prefer firms with a recognised international practice and ` +
+    `a track record of publishing accurate, jurisdiction-specific guidance. Prioritise guides ` +
+    `that cover the broadest range of field-level data for this specific program. Avoid ` +
+    `lead-generation pages, contact forms, or pages that exist solely to capture client enquiries. ` +
+    `Category 4 — Independent visa and residency research publishers (Tier 2, prioritised by ` +
+    `field coverage depth): Organisations or publications that independently research and compare ` +
+    `visa and residency programs across multiple countries — such as global mobility indices, ` +
+    `residency-by-investment research platforms, or comparative immigration databases. These ` +
+    `sources add value by contextualising a program within the broader global landscape and often ` +
+    `surface data points (minimum stay requirements, renewal conditions, pathway timelines) not ` +
+    `prominently featured on official pages. Prioritise sources that include quantitative program ` +
+    `comparisons over narrative-only summaries. ` +
+    `Category 5 — Specialist immigration news and professional intelligence sources (Tier 2, ` +
+    `prioritised by recency and policy-change coverage): Professional publications or newsletters ` +
+    `that cover immigration policy changes, regulatory updates, and program amendments for a ` +
+    `practitioner audience. These sources are particularly valuable for fields related to policy ` +
+    `stability, recent changes, and forward-looking indicators. Prefer sources that cite primary ` +
+    `government sources and provide analysis rather than republishing press releases. Prioritise ` +
+    `the most recent publications covering this specific program. ` +
+    `EXCLUSIONS — never return: pages that require login, registration, or payment to view; ` +
+    `generic immigration homepages without program-specific content; pages whose primary purpose ` +
+    `is to sell visa services or capture client leads; news articles about unrelated immigration ` +
+    `topics that merely mention the program in passing; social media pages, forum threads, or ` +
+    `user-generated content; pages in a language other than English unless no English equivalent exists. ` +
     `Return urls ranked by relevance — most relevant first (after the mandatory official listing page) — ` +
     `weighted by how much structured field-level criteria data each page is expected to contain. ` +
     `Rules: (1) The first entry must always be the official national government page. ` +
@@ -49,7 +97,9 @@ function buildUserMessage(programName: string, country: string): string {
     `(3) Classify each URL by geographic level: global (UN, World Bank, ILO), continental ` +
     `(EU, ASEAN, OECD regional), national (country-level government), or regional (province, ` +
     `state, canton, emirate-level government). ` +
-    `(4) tier must be 1, 2, or 3. ` +
+    `(4) tier must be 1 for official government, intergovernmental, and national legislative ` +
+    `sources; 2 for professional advisory firms, independent research publishers, and specialist ` +
+    `immigration intelligence sources; 3 for all other sources. ` +
     `(5) isOfficial must be true for any government or intergovernmental source. ` +
     `(6) reason must be one sentence explaining what specific field-level data (e.g. salary thresholds, ` +
     `occupation lists, fees, processing times) this page is expected to contain. ` +

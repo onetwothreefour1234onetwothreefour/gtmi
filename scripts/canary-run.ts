@@ -1,5 +1,4 @@
 import {
-  CrossCheckStageImpl,
   DiscoverStageImpl,
   ExtractStageImpl,
   HumanReviewStageImpl,
@@ -17,56 +16,16 @@ import type {
 } from '@gtmi/extraction';
 import { db, fieldDefinitions, programs } from '@gtmi/db';
 import { WAVE_1_ENABLED, WAVE_1_FIELD_CODES } from './wave-config';
-import { COUNTRY_LEVEL_SOURCES, getCountryLevelSources } from './country-sources';
+import {
+  COUNTRY_LEVEL_SOURCES,
+  getCountryLevelSources,
+  fetchWgiScore,
+  ISO3_TO_ISO2,
+} from './country-sources';
 import { and, eq, ilike } from 'drizzle-orm';
 
 const METHODOLOGY_VERSION = '1.0.0';
 const AUTO_APPROVE_CONFIDENCE_THRESHOLD = 0.85;
-
-function selectTier2ForField(
-  fieldLabel: string,
-  tier2Urls: DiscoveredUrl[],
-  scrapeByUrl: Map<string, ScrapeResult>
-): ScrapeResult | null {
-  const valid: Array<{ discovered: DiscoveredUrl; scrape: ScrapeResult }> = [];
-  for (const u of tier2Urls) {
-    const scrape = scrapeByUrl.get(u.url);
-    if (scrape && scrape.httpStatus !== 0 && scrape.contentMarkdown !== '') {
-      valid.push({ discovered: u, scrape });
-    }
-  }
-  if (valid.length === 0) return null;
-
-  const keywords = fieldLabel
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 2);
-
-  let bestScore = 0;
-  let bestIdx = 0;
-  for (let i = 0; i < valid.length; i++) {
-    const reason = valid[i].discovered.reason.toLowerCase();
-    const score = keywords.filter((kw) => reason.includes(kw)).length;
-    if (score > bestScore) {
-      bestScore = score;
-      bestIdx = i;
-    }
-  }
-
-  if (bestScore === 0) {
-    console.warn(
-      `  ↳ Cross-check Tier 2: no relevant source for "${fieldLabel}" — falling back to ${valid[0].discovered.url}`
-    );
-    return valid[0].scrape;
-  }
-
-  const selected = valid[bestIdx];
-  const matched = keywords.filter((kw) => selected.discovered.reason.toLowerCase().includes(kw));
-  console.log(
-    `  ↳ Cross-check Tier 2 selected: ${selected.discovered.url} (matched: ${matched.join(', ')})`
-  );
-  return selected.scrape;
-}
 
 async function main() {
   const countryArgIdx = process.argv.indexOf('--country');
@@ -134,6 +93,15 @@ async function main() {
     }
   }
 
+  // --- Phase 1: pre-fetch WGI score for target country ---
+  console.log('\nPhase 1: Fetching WGI score from World Bank API...');
+  const wgiResult = await fetchWgiScore(countryArg);
+  if (wgiResult) {
+    console.log(`  [WGI] ${countryArg}: score=${wgiResult.score}, year=${wgiResult.year}`);
+  } else {
+    console.warn(`  [WGI] ${countryArg}: World Bank API returned no score`);
+  }
+
   // --- Find target program for --country argument ---
   const canaryTarget = await (async () => {
     if (countryArg === 'AUS') {
@@ -168,7 +136,6 @@ async function main() {
   // --- Shared stages (initialized once) ---
   const extract = new ExtractStageImpl(fieldPrompts);
   const validate = new ValidateStageImpl();
-  const crossCheckStage = new CrossCheckStageImpl();
   const humanReview = new HumanReviewStageImpl();
   const publish = new PublishStageImpl();
 
@@ -214,8 +181,6 @@ async function main() {
       .filter((sr) => discoveredByUrl.get(sr.url)?.tier === 1)
       .slice(0, 5);
 
-    const tier2DiscoveredUrls = discoveryResult.discoveredUrls.filter((u) => u.tier === 2);
-
     let fieldsExtracted = 0;
     let fieldsAutoApproved = 0;
     let fieldsQueued = 0;
@@ -232,6 +197,56 @@ async function main() {
         for (const gs of globalFieldScrapes) {
           console.log(`  ↳ [${def.key}] Using global source: ${gs.url}`);
         }
+      }
+
+      if (def.key === 'E.3.2') {
+        if (wgiResult) {
+          console.log(
+            `  ↳ [E.3.2] Using pre-fetched WGI score: ${wgiResult.score} (${wgiResult.year})`
+          );
+          const wgiExtraction: ExtractionOutput = {
+            fieldDefinitionKey: 'E.3.2',
+            programId,
+            valueRaw: wgiResult.score,
+            sourceSentence: `World Bank WGI Government Effectiveness estimate for ${wgiResult.countryName}: ${wgiResult.score} (${wgiResult.year})`,
+            characterOffsets: { start: 0, end: 0 },
+            extractionModel: 'world-bank-api-direct',
+            extractionConfidence: 1.0,
+            extractedAt: new Date(),
+          };
+          const wgiValidation = {
+            isValid: true,
+            validationConfidence: 1.0,
+            validationModel: 'world-bank-api-direct',
+            notes: 'Direct World Bank API source — no LLM extraction needed',
+          };
+          const wgiProvenance: ProvenanceRecord = {
+            sourceUrl: `https://api.worldbank.org/v2/country/${ISO3_TO_ISO2[countryArg]}/indicator/GE.EST?format=json&mrv=1&source=3`,
+            geographicLevel: 'global',
+            sourceTier: 1,
+            scrapeTimestamp: new Date().toISOString(),
+            contentHash: '',
+            sourceSentence: wgiExtraction.sourceSentence,
+            characterOffsets: { start: 0, end: 0 },
+            extractionModel: 'world-bank-api-direct',
+            extractionConfidence: 1.0,
+            validationModel: 'world-bank-api-direct',
+            validationConfidence: 1.0,
+            crossCheckResult: 'not_checked',
+            crossCheckUrl: null,
+            reviewedBy: 'auto',
+            reviewedAt: new Date(),
+            methodologyVersion: METHODOLOGY_VERSION,
+            reviewDecision: 'approve',
+          };
+          await publish.execute(wgiExtraction, wgiValidation, wgiProvenance);
+          fieldsExtracted++;
+          fieldsAutoApproved++;
+          console.log(`  ↳ [E.3.2] Published — AUTO-APPROVED`);
+        } else {
+          console.warn(`  ↳ [E.3.2] No WGI score available for ${countryArg} — skipping`);
+        }
+        continue;
       }
 
       // Program-specific tier 1 first (primary), global sources appended (supplementary)
@@ -289,30 +304,17 @@ async function main() {
         `  ↳ Validation: ${validation.isValid ? 'valid' : 'invalid'} (confidence: ${validation.validationConfidence})`
       );
 
-      let crossCheck: CrossCheckResult;
-      let crossCheckOutcome: CrossCheckOutcome;
-
-      // Cross-check: program-specific Tier 2 first; fall back to global if none
-      const fieldTier2Scrape = selectTier2ForField(def.label, tier2DiscoveredUrls, scrapeByUrl);
-      const effectiveCrossCheckScrape = fieldTier2Scrape ?? globalFieldScrapes[0] ?? null;
-      if (effectiveCrossCheckScrape !== null) {
-        if (!fieldTier2Scrape && globalFieldScrapes.length > 0) {
-          console.log(`  ↳ Cross-check using global fallback: ${effectiveCrossCheckScrape.url}`);
-        }
-        console.log(`  ↳ [${def.key}] Calling cross-check model...`);
-        crossCheck = await crossCheckStage.execute(extraction, effectiveCrossCheckScrape);
-        crossCheckOutcome = crossCheck.agrees ? 'agree' : 'disagree';
-      } else {
-        crossCheck = { agrees: true, tier2Url: '', notes: 'No Tier 2 source discovered' };
-        crossCheckOutcome = 'not_checked';
-      }
-      console.log(`  ↳ Cross-check: ${crossCheckOutcome}`);
+      const crossCheck: CrossCheckResult = {
+        agrees: true,
+        tier2Url: '',
+        notes: 'Cross-check removed — extraction uses all sources',
+      };
+      const crossCheckOutcome: CrossCheckOutcome = 'not_checked';
 
       const isAutoApproved =
         extraction.extractionConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD &&
         validation.isValid &&
-        validation.validationConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD &&
-        (crossCheck.agrees || crossCheckOutcome === 'not_checked');
+        validation.validationConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD;
 
       console.log(`  ↳ Decision: ${isAutoApproved ? 'AUTO-APPROVED' : 'QUEUED FOR REVIEW'}`);
 
@@ -335,7 +337,7 @@ async function main() {
         validationModel: validation.validationModel,
         validationConfidence: validation.validationConfidence,
         crossCheckResult: crossCheckOutcome,
-        crossCheckUrl: effectiveCrossCheckScrape?.url ?? null,
+        crossCheckUrl: null,
         reviewedBy: 'auto',
         reviewedAt: new Date(),
         methodologyVersion: METHODOLOGY_VERSION,
