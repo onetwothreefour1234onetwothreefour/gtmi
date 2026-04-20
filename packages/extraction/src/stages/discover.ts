@@ -1,3 +1,4 @@
+import type Anthropic from '@anthropic-ai/sdk';
 import { createAnthropicClient, MODEL_DISCOVERY } from '../clients/anthropic';
 import type { DiscoveredUrl, DiscoveryResult } from '../types/extraction';
 import type { DiscoverStage } from '../types/pipeline';
@@ -85,6 +86,36 @@ function parseDiscoveredUrls(raw: string, programId: string): DiscoveredUrl[] {
   return parsed.map((item, i) => assertDiscoveredUrl(item, i, programId));
 }
 
+async function verifyUrls(urls: DiscoveredUrl[]): Promise<DiscoveredUrl[]> {
+  const results = await Promise.all(
+    urls.map(async (discovered) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const res = await fetch(discovered.url, {
+          method: 'HEAD',
+          signal: controller.signal,
+        });
+        if (res.status === 404 || res.status === 410) {
+          console.warn(
+            `[Discovery] Discarded unreachable URL: ${discovered.url} (status: ${res.status})`
+          );
+          return null;
+        }
+        return discovered;
+      } catch {
+        console.warn(
+          `[Discovery] Discarded unreachable URL: ${discovered.url} (status: connection error)`
+        );
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    })
+  );
+  return results.filter((u): u is DiscoveredUrl => u !== null);
+}
+
 export class DiscoverStageImpl implements DiscoverStage {
   async execute(programId: string, programName: string, country: string): Promise<DiscoveryResult> {
     const client = createAnthropicClient();
@@ -94,6 +125,7 @@ export class DiscoverStageImpl implements DiscoverStage {
         model: MODEL_DISCOVERY,
         max_tokens: 2000,
         system: SYSTEM_PROMPT,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' } as unknown as Anthropic.Tool],
         messages: [{ role: 'user', content: buildUserMessage(programName, country) }],
       })
       .catch((error: unknown) => {
@@ -110,10 +142,11 @@ export class DiscoverStageImpl implements DiscoverStage {
       throw new Error(`Discovery returned no text content for program ${programId}`);
     }
 
-    const discoveredUrls = parseDiscoveredUrls(lastTextBlock.text, programId).slice(0, 10);
+    const parsedUrls = parseDiscoveredUrls(lastTextBlock.text, programId).slice(0, 10);
+    const discoveredUrls = await verifyUrls(parsedUrls);
 
     if (discoveredUrls.length === 0) {
-      throw new Error(`Discovery returned zero URLs for program ${programId}`);
+      throw new Error(`Discovery produced no reachable URLs for program ${programId}`);
     }
 
     return {
