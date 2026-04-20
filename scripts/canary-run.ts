@@ -102,10 +102,15 @@ async function main() {
   const globalScrapeResults: ScrapeResult[] = [];
   for (const u of globalDiscoveredUrls) {
     console.log(`  [Phase 1] Scraping global source: ${u.url}`);
-    const [result] = await scrape.execute([u]);
-    if (result) {
-      globalScrapeResults.push(result);
-      console.log(`  [Phase 1] Done: ${u.url} (${result.contentMarkdown.length} chars)`);
+    try {
+      const [result] = await scrape.execute([u]);
+      if (result) {
+        globalScrapeResults.push(result);
+        console.log(`  [Phase 1] Done: ${u.url} (${result.contentMarkdown.length} chars)`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`  [Phase 1] Failed (skipping): ${u.url} — ${msg}`);
     }
   }
   const globalScrapeByUrl = new Map<string, ScrapeResult>();
