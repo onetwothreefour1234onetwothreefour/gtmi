@@ -18,6 +18,18 @@ function buildUserMessage(programName: string, country: string): string {
     `— no markdown, no explanation, just the JSON array: ` +
     `[{"url": string, "tier": 1|2|3, "geographicLevel": "global"|"continental"|"national"|"regional", ` +
     `"reason": string, "isOfficial": boolean}]. ` +
+    `Your first priority is to find the OFFICIAL GOVERNMENT VISA LISTING PAGE for this specific ` +
+    `program. This is the page on the immigration authority's website that is dedicated ` +
+    `specifically to this visa subclass or program — not the general immigration homepage, not a ` +
+    `news article, not a summary page. ` +
+    `For Australian visas, this is typically at: immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/[visa-name-and-subclass]/[stream-name]. ` +
+    `For UK visas: gov.uk/[visa-name]. ` +
+    `For Canadian visas: canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/[program]. ` +
+    `For Singapore: mom.gov.sg/passes-and-permits/[pass-name]. ` +
+    `For Hong Kong: immd.gov.hk. ` +
+    `Search specifically for "${programName} ${country} official visa page" and the visa subclass number ` +
+    `with country and "immigration" to find the exact listing page. ` +
+    `This official listing page MUST be your first result. Only then find additional supplementary pages. ` +
     `Rules: (1) The first entry must always be the official national government page. ` +
     `(2) Remaining entries may include: additional government pages (regional, state, federal ` +
     `agency), official continental sources (e.g. EU directives), supplementary official pages ` +

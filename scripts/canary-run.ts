@@ -44,6 +44,10 @@ async function main() {
   const discover = new DiscoverStageImpl();
   const discoveryResult = await discover.execute(programId, programName, countryIso);
   console.log(`Stage 0 complete: ${discoveryResult.discoveredUrls.length} URLs discovered`);
+  console.log('Discovered URLs:');
+  for (const url of discoveryResult.discoveredUrls) {
+    console.log(`  [Tier ${url.tier}][${url.geographicLevel}] ${url.url}`);
+  }
 
   // Stage 1: Scrape
   const scrape = new ScrapeStageImpl();
