@@ -43,6 +43,11 @@ export interface CrossCheckResult {
 
 export type GeographicLevel = 'global' | 'continental' | 'national' | 'regional';
 
+export interface FieldSpec {
+  key: string;
+  promptMd: string;
+}
+
 export interface DiscoveredUrl {
   url: string;
   tier: SourceTier;

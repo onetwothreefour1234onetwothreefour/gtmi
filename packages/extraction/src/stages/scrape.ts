@@ -1,5 +1,9 @@
+import { db, scrapeCache } from '@gtmi/db';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import type { DiscoveredUrl, ScrapeResult } from '../types/extraction';
 import type { ScrapeStage } from '../types/pipeline';
+
+const SCRAPE_CACHE_TTL_HOURS = 24;
 
 interface ScrapeStageOptions {
   delayMs?: number;
@@ -42,7 +46,63 @@ export class ScrapeStageImpl implements ScrapeStage {
     return results;
   }
 
+  private async readScrapeCache(url: string): Promise<ScrapeResult | null> {
+    try {
+      const rows = await db
+        .select()
+        .from(scrapeCache)
+        .where(and(eq(scrapeCache.url, url), gt(scrapeCache.expiresAt, sql`now()`)))
+        .limit(1);
+      if (rows.length === 0) return null;
+      const row = rows[0]!;
+      return {
+        url: row.url,
+        contentMarkdown: row.contentMarkdown,
+        contentHash: row.contentHash,
+        httpStatus: row.httpStatus,
+        scrapedAt: row.scrapedAt,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async writeScrapeCache(result: ScrapeResult): Promise<void> {
+    if (!result.contentMarkdown) return;
+    try {
+      const expiresAt = new Date(Date.now() + SCRAPE_CACHE_TTL_HOURS * 60 * 60 * 1000);
+      await db
+        .insert(scrapeCache)
+        .values({
+          url: result.url,
+          contentMarkdown: result.contentMarkdown,
+          contentHash: result.contentHash,
+          httpStatus: result.httpStatus,
+          scrapedAt: result.scrapedAt,
+          expiresAt,
+        })
+        .onConflictDoUpdate({
+          target: scrapeCache.url,
+          set: {
+            contentMarkdown: result.contentMarkdown,
+            contentHash: result.contentHash,
+            httpStatus: result.httpStatus,
+            scrapedAt: result.scrapedAt,
+            expiresAt,
+          },
+        });
+    } catch {
+      // cache write failure is non-fatal
+    }
+  }
+
   private async scrapeOne(discovered: DiscoveredUrl, scraperUrl: string): Promise<ScrapeResult> {
+    const cached = await this.readScrapeCache(discovered.url);
+    if (cached) {
+      console.log(`  [Scrape] Cache hit: ${discovered.url}`);
+      return cached;
+    }
+
     const response = await fetch(`${scraperUrl}/scrape`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -111,12 +171,14 @@ export class ScrapeStageImpl implements ScrapeStage {
         ? data.content_markdown.slice(0, 30000)
         : data.content_markdown;
 
-    return {
+    const result: ScrapeResult = {
       url: discovered.url,
       contentMarkdown: content,
       httpStatus: data.http_status,
       scrapedAt: new Date(data.scraped_at),
       contentHash: data.content_hash,
     };
+    await this.writeScrapeCache(result);
+    return result;
   }
 }

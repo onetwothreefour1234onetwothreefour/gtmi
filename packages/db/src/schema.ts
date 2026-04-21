@@ -400,6 +400,104 @@ export const sensitivityRuns = pgTable(
   ]
 );
 
+// 14. scrape_cache
+export const scrapeCache = pgTable(
+  'scrape_cache',
+  {
+    url: text('url').primaryKey(),
+    contentMarkdown: text('content_markdown').notNull(),
+    contentHash: text('content_hash').notNull(),
+    httpStatus: integer('http_status').notNull(),
+    scrapedAt: timestamp('scraped_at').notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+  },
+  () => [
+    pgPolicy('Team members can write scrape_cache', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+  ]
+);
+
+// 15. discovery_cache
+export const discoveryCache = pgTable(
+  'discovery_cache',
+  {
+    cacheKey: text('cache_key').primaryKey(),
+    programId: uuid('program_id').notNull(),
+    discoveredUrls: jsonb('discovered_urls').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+  },
+  () => [
+    pgPolicy('Team members can write discovery_cache', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+  ]
+);
+
+// 16. extraction_cache
+export const extractionCache = pgTable(
+  'extraction_cache',
+  {
+    cacheKey: text('cache_key').primaryKey(),
+    model: text('model').notNull(),
+    resultJsonb: jsonb('result_jsonb').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  () => [
+    pgPolicy('Team members can write extraction_cache', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+  ]
+);
+
+// 17. validation_cache
+export const validationCache = pgTable(
+  'validation_cache',
+  {
+    cacheKey: text('cache_key').primaryKey(),
+    model: text('model').notNull(),
+    resultJsonb: jsonb('result_jsonb').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  () => [
+    pgPolicy('Team members can write validation_cache', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+  ]
+);
+
+// 18. crosscheck_cache
+export const crosscheckCache = pgTable(
+  'crosscheck_cache',
+  {
+    cacheKey: text('cache_key').primaryKey(),
+    model: text('model').notNull(),
+    resultJsonb: jsonb('result_jsonb').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  () => [
+    pgPolicy('Team members can write crosscheck_cache', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+  ]
+);
+
 // 13. news_sources
 export const newsSources = pgTable(
   'news_sources',

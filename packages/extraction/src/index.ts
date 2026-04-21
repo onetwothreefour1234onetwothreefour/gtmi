@@ -16,6 +16,7 @@ export type {
   DiscoveryResult,
   ExtractionInput,
   ExtractionOutput,
+  FieldSpec,
   GeographicLevel,
   ReviewDecision,
   ScrapeResult,

@@ -11,6 +11,7 @@ import type {
   CrossCheckResult,
   DiscoveredUrl,
   ExtractionOutput,
+  FieldSpec,
   ProvenanceRecord,
   ScrapeResult,
 } from '@gtmi/extraction';
@@ -181,92 +182,109 @@ async function main() {
       .filter((sr) => discoveredByUrl.get(sr.url)?.tier === 1)
       .slice(0, 5);
 
+    // Collect all unique scrapes: tier 1 program-specific + all global sources
+    // (deduped by URL so the same page isn't sent twice)
+    const allScrapeUrls = new Set(tier1Scrapes.map((s) => s.url));
+    const allUniqueScrapes: ScrapeResult[] = [...tier1Scrapes];
+    for (const sr of globalScrapeResults) {
+      if (!allScrapeUrls.has(sr.url)) {
+        allScrapeUrls.add(sr.url);
+        allUniqueScrapes.push(sr);
+      }
+    }
+
+    // E.3.2 is handled via direct World Bank API — exclude from LLM batch
+    const llmFields: FieldSpec[] = allFieldDefs
+      .filter((d) => d.key !== 'E.3.2')
+      .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd }));
+
     let fieldsExtracted = 0;
     let fieldsAutoApproved = 0;
     let fieldsQueued = 0;
 
-    // Per-field pipeline loop
-    for (const def of allFieldDefs) {
+    // ── E.3.2: direct World Bank API ────────────────────────────────────────
+    const e32def = allFieldDefs.find((d) => d.key === 'E.3.2');
+    if (e32def) {
+      if (wgiResult) {
+        console.log(
+          `  ↳ [E.3.2] Using pre-fetched WGI score: ${wgiResult.score} (${wgiResult.year})`
+        );
+        const wgiExtraction: ExtractionOutput = {
+          fieldDefinitionKey: 'E.3.2',
+          programId,
+          valueRaw: wgiResult.score,
+          sourceSentence: `World Bank WGI Government Effectiveness estimate for ${wgiResult.countryName}: ${wgiResult.score} (${wgiResult.year})`,
+          characterOffsets: { start: 0, end: 0 },
+          extractionModel: 'world-bank-api-direct',
+          extractionConfidence: 1.0,
+          extractedAt: new Date(),
+        };
+        const wgiValidation = {
+          isValid: true,
+          validationConfidence: 1.0,
+          validationModel: 'world-bank-api-direct',
+          notes: 'Direct World Bank API source — no LLM extraction needed',
+        };
+        const wgiProvenance: ProvenanceRecord = {
+          sourceUrl: `https://api.worldbank.org/v2/country/${ISO3_TO_ISO2[countryArg]}/indicator/GE.EST?format=json&mrv=1&source=3`,
+          geographicLevel: 'global',
+          sourceTier: 1,
+          scrapeTimestamp: new Date().toISOString(),
+          contentHash: '',
+          sourceSentence: wgiExtraction.sourceSentence,
+          characterOffsets: { start: 0, end: 0 },
+          extractionModel: 'world-bank-api-direct',
+          extractionConfidence: 1.0,
+          validationModel: 'world-bank-api-direct',
+          validationConfidence: 1.0,
+          crossCheckResult: 'not_checked',
+          crossCheckUrl: null,
+          reviewedBy: 'auto',
+          reviewedAt: new Date(),
+          methodologyVersion: METHODOLOGY_VERSION,
+          reviewDecision: 'approve',
+        };
+        await publish.execute(wgiExtraction, wgiValidation, wgiProvenance);
+        fieldsExtracted++;
+        fieldsAutoApproved++;
+        console.log(`  ↳ [E.3.2] Published — AUTO-APPROVED`);
+      } else {
+        console.warn(`  ↳ [E.3.2] No WGI score available for ${countryArg} — skipping`);
+      }
+    }
+
+    // ── Batch extraction: all LLM fields across all scrapes ──────────────────
+    console.log(
+      `\nBatch extraction: ${llmFields.length} fields across ${allUniqueScrapes.length} URLs`
+    );
+    let allExtractionResults: Map<string, { output: ExtractionOutput; sourceUrl: string }>;
+    try {
+      allExtractionResults = await extract.executeAllFields(
+        allUniqueScrapes,
+        llmFields,
+        programId,
+        programName,
+        countryIso
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Batch extraction failed: ${msg}`);
+      allExtractionResults = new Map();
+    }
+    console.log(`Batch extraction complete: ${allExtractionResults.size} fields with values`);
+
+    // ── Per-field validation + publish ───────────────────────────────────────
+    for (const def of allFieldDefs.filter((d) => d.key !== 'E.3.2')) {
       console.log(
         `[${allFieldDefs.indexOf(def) + 1}/${allFieldDefs.length}] Processing field: ${def.key} — ${def.label}`
       );
 
-      // Global sources for this field
-      const globalFieldScrapes = globalSourcesByField.get(def.key) ?? [];
-      if (globalFieldScrapes.length > 0) {
-        for (const gs of globalFieldScrapes) {
-          console.log(`  ↳ [${def.key}] Using global source: ${gs.url}`);
-        }
-      }
-
-      if (def.key === 'E.3.2') {
-        if (wgiResult) {
-          console.log(
-            `  ↳ [E.3.2] Using pre-fetched WGI score: ${wgiResult.score} (${wgiResult.year})`
-          );
-          const wgiExtraction: ExtractionOutput = {
-            fieldDefinitionKey: 'E.3.2',
-            programId,
-            valueRaw: wgiResult.score,
-            sourceSentence: `World Bank WGI Government Effectiveness estimate for ${wgiResult.countryName}: ${wgiResult.score} (${wgiResult.year})`,
-            characterOffsets: { start: 0, end: 0 },
-            extractionModel: 'world-bank-api-direct',
-            extractionConfidence: 1.0,
-            extractedAt: new Date(),
-          };
-          const wgiValidation = {
-            isValid: true,
-            validationConfidence: 1.0,
-            validationModel: 'world-bank-api-direct',
-            notes: 'Direct World Bank API source — no LLM extraction needed',
-          };
-          const wgiProvenance: ProvenanceRecord = {
-            sourceUrl: `https://api.worldbank.org/v2/country/${ISO3_TO_ISO2[countryArg]}/indicator/GE.EST?format=json&mrv=1&source=3`,
-            geographicLevel: 'global',
-            sourceTier: 1,
-            scrapeTimestamp: new Date().toISOString(),
-            contentHash: '',
-            sourceSentence: wgiExtraction.sourceSentence,
-            characterOffsets: { start: 0, end: 0 },
-            extractionModel: 'world-bank-api-direct',
-            extractionConfidence: 1.0,
-            validationModel: 'world-bank-api-direct',
-            validationConfidence: 1.0,
-            crossCheckResult: 'not_checked',
-            crossCheckUrl: null,
-            reviewedBy: 'auto',
-            reviewedAt: new Date(),
-            methodologyVersion: METHODOLOGY_VERSION,
-            reviewDecision: 'approve',
-          };
-          await publish.execute(wgiExtraction, wgiValidation, wgiProvenance);
-          fieldsExtracted++;
-          fieldsAutoApproved++;
-          console.log(`  ↳ [E.3.2] Published — AUTO-APPROVED`);
-        } else {
-          console.warn(`  ↳ [E.3.2] No WGI score available for ${countryArg} — skipping`);
-        }
+      const extractionResult = allExtractionResults.get(def.key);
+      if (!extractionResult) {
+        console.log(`  ↳ No value found — skipping`);
         continue;
       }
 
-      // Program-specific tier 1 first (primary), global sources appended (supplementary)
-      const scrapeInputs = [...tier1Scrapes, ...globalFieldScrapes];
-
-      let extractionResult: { output: ExtractionOutput; sourceUrl: string };
-      try {
-        console.log(`  ↳ [${def.key}] Calling extraction model...`);
-        extractionResult = await extract.executeMulti(
-          scrapeInputs,
-          def.key,
-          programId,
-          programName,
-          countryIso
-        );
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.log(`  ↳ [${def.key}] Extraction failed — skipping: ${msg}`);
-        continue;
-      }
       const { output: extraction, sourceUrl } = extractionResult;
 
       if (extraction.valueRaw === '') {
@@ -278,16 +296,8 @@ async function main() {
         `  ↳ Extracted: "${extraction.valueRaw.substring(0, 60)}..." (confidence: ${extraction.extractionConfidence})`
       );
 
-      // Tier 1 rate limit: 30K input tokens/min for Sonnet.
-      // With 30K char content (~7.5K tokens) × up to 5 scrapes per field,
-      // plus validation and cross-check calls, we need ~25s between fields
-      // to stay under the limit. This is slow but correct for canary.
-      console.log(`  ↳ Rate limit delay: waiting 25s before next field...`);
-      await new Promise((resolve) => setTimeout(resolve, 25000));
-
       fieldsExtracted++;
 
-      // winningScrape may come from program-specific or global scrapes
       const winningScrape = scrapeByUrl.get(sourceUrl) ?? globalScrapeByUrl.get(sourceUrl) ?? null;
       if (!winningScrape) {
         throw new Error(

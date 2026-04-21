@@ -1,3 +1,6 @@
+import { createHash } from 'crypto';
+import { db, validationCache } from '@gtmi/db';
+import { eq } from 'drizzle-orm';
 import { createAnthropicClient, MODEL_VALIDATION } from '../clients/anthropic';
 import type { ExtractionOutput, ScrapeResult } from '../types/extraction';
 import type { ValidationResult } from '../types/extraction';
@@ -11,31 +14,18 @@ const SYSTEM_PROMPT =
 
 const CONTEXT_WINDOW = 200;
 
-function buildUserMessage(extraction: ExtractionOutput, contentMarkdown: string): string {
-  const actualPos = contentMarkdown.indexOf(extraction.sourceSentence);
-  const contextStart = actualPos !== -1 ? Math.max(0, actualPos - CONTEXT_WINDOW) : 0;
-  const contextEnd =
-    actualPos !== -1
-      ? Math.min(
-          contentMarkdown.length,
-          actualPos + extraction.sourceSentence.length + CONTEXT_WINDOW
-        )
-      : Math.min(contentMarkdown.length, 400);
-  const offsetContext = contentMarkdown.slice(contextStart, contextEnd);
-  console.log(
-    `  [${extraction.fieldDefinitionKey}] Source sentence ${actualPos !== -1 ? `found at position ${actualPos}` : 'NOT FOUND in content — using fallback context'}`
-  );
-
+function buildUserMessage(
+  extraction: ExtractionOutput,
+  offsetContext: string,
+  actualPos: number
+): string {
   return (
     `Verify the following extraction:\n\n` +
     `Extracted value: ${extraction.valueRaw}\n` +
     `Source sentence: ${extraction.sourceSentence}\n` +
-    `Source sentence position in content: ${actualPos !== -1 ? `found at char ${actualPos}` : 'not found by exact match'}\n\n` +
-    `Content around source sentence (±${CONTEXT_WINDOW} chars):\n---\n${offsetContext}\n---\n\n` +
-    `Full content for complete verification:\n---\n${contentMarkdown.slice(0, 30000)}\n---\n\n` +
-    `Answer both questions:\n` +
-    `(1) Does the source sentence appear verbatim in the full content?\n` +
-    `(2) Does the source sentence clearly and directly support the extracted value?\n\n` +
+    `Source sentence confirmed present in content at char ${actualPos}.\n\n` +
+    `Context around source sentence (±${CONTEXT_WINDOW} chars):\n---\n${offsetContext}\n---\n\n` +
+    `Does the source sentence clearly and directly support the extracted value?\n\n` +
     `Return your answer as a valid JSON object with exactly this structure — no markdown, no explanation:\n` +
     `{\n` +
     `  "isValid": boolean,\n` +
@@ -43,23 +33,17 @@ function buildUserMessage(extraction: ExtractionOutput, contentMarkdown: string)
     `  "notes": string | null\n` +
     `}\n\n` +
     `Rules:\n` +
-    `- isValid: true only if both (1) and (2) are satisfied.\n` +
-    `- validationConfidence: 0.0 to 1.0, your confidence in the isValid determination.\n` +
+    `- isValid: true only if the source sentence clearly and directly supports the value.\n` +
+    `- validationConfidence: 0.0 to 1.0.\n` +
     `- notes: A single sentence explaining your reasoning, or null if isValid is true and confidence is 1.0.`
   );
 }
 
 function stripJsonFences(text: string): string {
-  // Try markdown code fences first
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced?.[1]) return fenced[1].trim();
-
-  // If no fences, extract the JSON object from anywhere in the response
-  // (models sometimes prepend explanatory text before the JSON)
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) return jsonMatch[0].trim();
-
-  // Fallback: return as-is and let JSON.parse throw a clear error
   return text.trim();
 }
 
@@ -96,6 +80,40 @@ function assertLlmResponse(parsed: unknown, fieldKey: string): RawLlmResponse {
   };
 }
 
+function makeCacheKey(extraction: ExtractionOutput): string {
+  const promptHash = createHash('sha256').update(SYSTEM_PROMPT, 'utf8').digest('hex');
+  const sentenceHash = createHash('sha256').update(extraction.sourceSentence, 'utf8').digest('hex');
+  const raw = [extraction.valueRaw, sentenceHash, extraction.fieldDefinitionKey, promptHash].join(
+    '::'
+  );
+  return createHash('sha256').update(raw, 'utf8').digest('hex');
+}
+
+async function readCache(cacheKey: string): Promise<ValidationResult | null> {
+  try {
+    const rows = await db
+      .select()
+      .from(validationCache)
+      .where(eq(validationCache.cacheKey, cacheKey))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return rows[0]!.resultJsonb as ValidationResult;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCache(cacheKey: string, result: ValidationResult): Promise<void> {
+  try {
+    await db
+      .insert(validationCache)
+      .values({ cacheKey, model: result.validationModel, resultJsonb: result })
+      .onConflictDoNothing();
+  } catch {
+    // cache write failure is non-fatal
+  }
+}
+
 export class ValidateStageImpl implements ValidateStage {
   async execute(extraction: ExtractionOutput, scrape: ScrapeResult): Promise<ValidationResult> {
     if (extraction.valueRaw === '') {
@@ -107,6 +125,37 @@ export class ValidateStageImpl implements ValidateStage {
       };
     }
 
+    // Verify presence deterministically before spending an LLM call
+    const actualPos = scrape.contentMarkdown.indexOf(extraction.sourceSentence);
+    if (actualPos === -1) {
+      console.log(
+        `  [${extraction.fieldDefinitionKey}] Source sentence NOT FOUND in content — isValid: false (no LLM call)`
+      );
+      return {
+        isValid: false,
+        validationConfidence: 1.0,
+        validationModel: MODEL_VALIDATION,
+        notes: 'Source sentence not found verbatim in scraped content.',
+      };
+    }
+    console.log(
+      `  [${extraction.fieldDefinitionKey}] Source sentence found at position ${actualPos}`
+    );
+
+    const cacheKey = makeCacheKey(extraction);
+    const cached = await readCache(cacheKey);
+    if (cached) {
+      console.log(`  [${extraction.fieldDefinitionKey}] Validation cache hit`);
+      return cached;
+    }
+
+    const contextStart = Math.max(0, actualPos - CONTEXT_WINDOW);
+    const contextEnd = Math.min(
+      scrape.contentMarkdown.length,
+      actualPos + extraction.sourceSentence.length + CONTEXT_WINDOW
+    );
+    const offsetContext = scrape.contentMarkdown.slice(contextStart, contextEnd);
+
     const client = createAnthropicClient();
 
     const response = await client.messages
@@ -117,7 +166,7 @@ export class ValidateStageImpl implements ValidateStage {
         messages: [
           {
             role: 'user',
-            content: buildUserMessage(extraction, scrape.contentMarkdown),
+            content: buildUserMessage(extraction, offsetContext, actualPos),
           },
         ],
       })
@@ -156,21 +205,14 @@ export class ValidateStageImpl implements ValidateStage {
 
     const validated = assertLlmResponse(parsed, extraction.fieldDefinitionKey);
 
-    const actualPos = scrape.contentMarkdown.indexOf(extraction.sourceSentence);
-    if (actualPos !== -1 && actualPos !== extraction.characterOffsets.start) {
-      console.warn(
-        `[${extraction.fieldDefinitionKey}] Offset mismatch: ` +
-          `claimed start=${extraction.characterOffsets.start}, ` +
-          `end=${extraction.characterOffsets.end}, ` +
-          `actual position=${actualPos}`
-      );
-    }
-
-    return {
+    const result: ValidationResult = {
       isValid: validated.isValid,
       validationConfidence: validated.validationConfidence,
       validationModel: MODEL_VALIDATION,
       notes: validated.notes,
     };
+
+    await writeCache(cacheKey, result);
+    return result;
   }
 }

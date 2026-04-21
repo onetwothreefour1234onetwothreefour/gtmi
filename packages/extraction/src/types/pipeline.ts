@@ -3,6 +3,7 @@ import type {
   DiscoveredUrl,
   DiscoveryResult,
   ExtractionOutput,
+  FieldSpec,
   ReviewDecision,
   ScrapeResult,
   ValidationResult,
@@ -25,6 +26,13 @@ export interface ExtractStage {
     programName: string,
     countryIso: string
   ): Promise<ExtractionOutput>;
+  executeAllFields(
+    scrapes: ScrapeResult[],
+    fields: ReadonlyArray<FieldSpec>,
+    programId: string,
+    programName: string,
+    countryIso: string
+  ): Promise<Map<string, { output: ExtractionOutput; sourceUrl: string }>>;
 }
 
 export interface ValidateStage {

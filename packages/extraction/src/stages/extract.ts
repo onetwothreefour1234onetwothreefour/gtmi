@@ -1,5 +1,8 @@
+import { createHash } from 'crypto';
+import { db, extractionCache } from '@gtmi/db';
+import { eq } from 'drizzle-orm';
 import { createAnthropicClient, MODEL_EXTRACTION } from '../clients/anthropic';
-import type { ExtractionOutput, ScrapeResult } from '../types/extraction';
+import type { ExtractionOutput, FieldSpec, ScrapeResult } from '../types/extraction';
 import type { ExtractStage } from '../types/pipeline';
 
 const SYSTEM_PROMPT =
@@ -33,16 +36,58 @@ const SYSTEM_PROMPT =
   'this is for provenance only and is separate from valueRaw.\n\n' +
   'Only return an empty valueRaw if the information is genuinely absent from the content.';
 
-function buildUserMessage(
+const MAX_CONTENT_CHARS = 30000;
+const EARLY_EXIT_CONFIDENCE = 0.9;
+const INTER_BATCH_DELAY_MS = 30000;
+
+function sha256(input: string): string {
+  return createHash('sha256').update(input, 'utf8').digest('hex');
+}
+
+function makeCacheKey(contentHash: string, fieldKey: string, promptMd: string): string {
+  const promptHash = sha256(SYSTEM_PROMPT + '::' + promptMd);
+  return sha256([contentHash, fieldKey, promptHash].join('::'));
+}
+
+async function readExtractionCache(cacheKey: string): Promise<ExtractionOutput | null> {
+  try {
+    const rows = await db
+      .select()
+      .from(extractionCache)
+      .where(eq(extractionCache.cacheKey, cacheKey))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return rows[0]!.resultJsonb as ExtractionOutput;
+  } catch {
+    return null;
+  }
+}
+
+async function writeExtractionCache(cacheKey: string, result: ExtractionOutput): Promise<void> {
+  try {
+    await db
+      .insert(extractionCache)
+      .values({ cacheKey, model: result.extractionModel, resultJsonb: result })
+      .onConflictDoNothing();
+  } catch {
+    // cache write failure is non-fatal
+  }
+}
+
+function resolvePrompt(promptMd: string, programName: string, countryIso: string): string {
+  return promptMd
+    .replace(/\{program_name\}/g, programName)
+    .replace(/\{program_country\}/g, countryIso);
+}
+
+function buildSingleUserMessage(
   fieldKey: string,
   extractionPromptMd: string,
   programName: string,
   countryIso: string,
   contentMarkdown: string
 ): string {
-  const resolvedPrompt = extractionPromptMd
-    .replace(/\{program_name\}/g, programName)
-    .replace(/\{program_country\}/g, countryIso);
+  const resolvedPrompt = resolvePrompt(extractionPromptMd, programName, countryIso);
   return (
     `Field to extract: ${fieldKey}\n\n` +
     `Instructions:\n${resolvedPrompt}\n\n` +
@@ -64,37 +109,65 @@ function buildUserMessage(
   );
 }
 
+function buildBatchUserMessage(
+  fields: ReadonlyArray<FieldSpec>,
+  programName: string,
+  countryIso: string,
+  contentMarkdown: string
+): string {
+  const fieldList = fields
+    .map((f) => `[${f.key}]\n${resolvePrompt(f.promptMd, programName, countryIso)}`)
+    .join('\n---\n');
+
+  return (
+    `Extract values for the following ${fields.length} fields from the content provided. ` +
+    `Return ALL fields — use empty string and 0.0 confidence for fields not found.\n\n` +
+    `Fields to extract:\n${fieldList}\n\n` +
+    `No-inference directive: If a value is not explicitly stated in the content, ` +
+    `return valueRaw as an empty string and extractionConfidence as 0.\n\n` +
+    `Content to extract from:\n---\n${contentMarkdown}\n---\n\n` +
+    `Return your answer as a valid JSON array with exactly ${fields.length} objects — one per field, in the same order:\n` +
+    `[\n` +
+    `  {\n` +
+    `    "fieldKey": string,\n` +
+    `    "valueRaw": string,\n` +
+    `    "sourceSentence": string,\n` +
+    `    "characterOffsets": { "start": number, "end": number },\n` +
+    `    "extractionConfidence": number\n` +
+    `  }\n` +
+    `]\n\n` +
+    `Rules:\n` +
+    `- Include ALL ${fields.length} fields in the response, in the order listed above.\n` +
+    `- fieldKey: must exactly match the key shown in [brackets] above.\n` +
+    `- valueRaw: formatted per the field-type rules in the system prompt, or "" if not found.\n` +
+    `- sourceSentence: exact verbatim text from content supporting the value, or "" if not found.\n` +
+    `- characterOffsets: start and end character index of sourceSentence. Set both to 0 if not found.\n` +
+    `- extractionConfidence: 0.0 to 1.0. Use 0.0 if the value was not found.`
+  );
+}
+
 function stripJsonFences(text: string): string {
-  // Try markdown code fences first
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced?.[1]) return fenced[1].trim();
-
-  // If no fences, extract the JSON object from anywhere in the response
-  // (models sometimes prepend explanatory text before the JSON)
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const jsonMatch = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
   if (jsonMatch) return jsonMatch[0].trim();
-
-  // Fallback: return as-is and let JSON.parse throw a clear error
   return text.trim();
 }
 
-interface RawLlmResponse {
+interface RawLlmSingle {
   valueRaw: string;
   sourceSentence: string;
   characterOffsets: { start: number; end: number };
   extractionConfidence: number;
 }
 
-function assertLlmResponse(parsed: unknown, fieldKey: string): RawLlmResponse {
-  if (typeof parsed !== 'object' || parsed === null) {
+function assertSingleResponse(parsed: unknown, fieldKey: string): RawLlmSingle {
+  if (typeof parsed !== 'object' || parsed === null)
     throw new Error(`Extraction response is not an object for field ${fieldKey}`);
-  }
   const obj = parsed as Record<string, unknown>;
   const errors: string[] = [];
-
   if (typeof obj['valueRaw'] !== 'string') errors.push('valueRaw must be a string');
   if (typeof obj['sourceSentence'] !== 'string') errors.push('sourceSentence must be a string');
-
   const offsets = obj['characterOffsets'];
   if (typeof offsets !== 'object' || offsets === null) {
     errors.push('characterOffsets must be an object');
@@ -105,21 +178,47 @@ function assertLlmResponse(parsed: unknown, fieldKey: string): RawLlmResponse {
     if (typeof o['end'] !== 'number' || !isFinite(o['end']) || o['end'] < 0)
       errors.push('characterOffsets.end must be a finite number >= 0');
   }
-
   const conf = obj['extractionConfidence'];
   if (typeof conf !== 'number' || !isFinite(conf) || conf < 0 || conf > 1)
     errors.push('extractionConfidence must be a number between 0 and 1');
-
-  if (errors.length > 0) {
+  if (errors.length > 0)
     throw new Error(`Extraction response invalid for field ${fieldKey}: ${errors.join('; ')}`);
-  }
-
   const o = offsets as Record<string, unknown>;
   return {
     valueRaw: obj['valueRaw'] as string,
     sourceSentence: obj['sourceSentence'] as string,
     characterOffsets: { start: o['start'] as number, end: o['end'] as number },
     extractionConfidence: conf as number,
+  };
+}
+
+function assertBatchResponse(parsed: unknown, expectedKeys: string[]): Map<string, RawLlmSingle> {
+  if (!Array.isArray(parsed)) throw new Error('Batch extraction response is not an array');
+  const result = new Map<string, RawLlmSingle>();
+  for (const item of parsed) {
+    if (typeof item !== 'object' || item === null) continue;
+    const obj = item as Record<string, unknown>;
+    const fieldKey = obj['fieldKey'];
+    if (typeof fieldKey !== 'string' || !expectedKeys.includes(fieldKey)) continue;
+    try {
+      result.set(fieldKey, assertSingleResponse(obj, fieldKey));
+    } catch {
+      // skip malformed individual items — other fields still usable
+    }
+  }
+  return result;
+}
+
+function makeOutput(raw: RawLlmSingle, fieldKey: string, programId: string): ExtractionOutput {
+  return {
+    programId,
+    fieldDefinitionKey: fieldKey,
+    valueRaw: raw.valueRaw,
+    sourceSentence: raw.sourceSentence,
+    characterOffsets: raw.characterOffsets,
+    extractionConfidence: raw.extractionConfidence,
+    extractionModel: MODEL_EXTRACTION,
+    extractedAt: new Date(),
   };
 }
 
@@ -130,6 +229,7 @@ export class ExtractStageImpl implements ExtractStage {
     this.fieldPrompts = fieldPrompts;
   }
 
+  // ── Single-field extraction (kept for backwards compatibility) ──────────
   async execute(
     scrape: ScrapeResult,
     fieldKey: string,
@@ -138,19 +238,20 @@ export class ExtractStageImpl implements ExtractStage {
     countryIso: string
   ): Promise<ExtractionOutput> {
     const extractionPromptMd = this.fieldPrompts.get(fieldKey);
-    if (extractionPromptMd === undefined) {
+    if (extractionPromptMd === undefined)
       throw new Error(`No extraction prompt found for field ${fieldKey}`);
+
+    const cacheKey = makeCacheKey(scrape.contentHash, fieldKey, extractionPromptMd);
+    const cached = await readExtractionCache(cacheKey);
+    if (cached) {
+      console.log(`  [${fieldKey}] Extraction cache hit`);
+      return { ...cached, programId, extractedAt: new Date() };
     }
 
     const client = createAnthropicClient();
-
-    const MAX_CONTENT_CHARS = 30000;
-    if (scrape.contentMarkdown.length > MAX_CONTENT_CHARS) {
-      console.log(
-        `  ↳ [${fieldKey}] Content truncated from ${scrape.contentMarkdown.length} to ${MAX_CONTENT_CHARS} chars`
-      );
-    }
-    const truncatedContent = scrape.contentMarkdown.slice(0, MAX_CONTENT_CHARS);
+    const content = scrape.contentMarkdown.slice(0, MAX_CONTENT_CHARS);
+    if (scrape.contentMarkdown.length > MAX_CONTENT_CHARS)
+      console.log(`  ↳ [${fieldKey}] Content truncated to ${MAX_CONTENT_CHARS} chars`);
 
     const MAX_RETRIES = 3;
     const BASE_DELAY_MS = 60000;
@@ -165,12 +266,12 @@ export class ExtractStageImpl implements ExtractStage {
           messages: [
             {
               role: 'user',
-              content: buildUserMessage(
+              content: buildSingleUserMessage(
                 fieldKey,
                 extractionPromptMd,
                 programName,
                 countryIso,
-                truncatedContent
+                content
               ),
             },
           ],
@@ -178,69 +279,202 @@ export class ExtractStageImpl implements ExtractStage {
 
         type ContentItem = (typeof response.content)[number];
         const lastTextBlock = response.content
-          .filter((block): block is Extract<ContentItem, { type: 'text' }> => block.type === 'text')
+          .filter((b): b is Extract<ContentItem, { type: 'text' }> => b.type === 'text')
           .at(-1);
+        if (!lastTextBlock)
+          throw new Error(`Extraction returned no text content for field ${fieldKey}`);
 
-        if (!lastTextBlock) {
-          throw new Error(
-            `Extraction returned no text content for field ${fieldKey} / program ${programId}`
-          );
-        }
-
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(stripJsonFences(lastTextBlock.text));
-        } catch {
-          throw new Error(
-            `Extraction response was not valid JSON for field ${fieldKey} / program ${programId}: ${lastTextBlock.text}`
-          );
-        }
-
-        const validated = assertLlmResponse(parsed, fieldKey);
-
-        return {
-          programId,
-          fieldDefinitionKey: fieldKey,
-          valueRaw: validated.valueRaw,
-          sourceSentence: validated.sourceSentence,
-          characterOffsets: validated.characterOffsets,
-          extractionConfidence: validated.extractionConfidence,
-          extractionModel: MODEL_EXTRACTION,
-          extractedAt: new Date(),
-        };
+        const parsed = JSON.parse(stripJsonFences(lastTextBlock.text));
+        const validated = assertSingleResponse(parsed, fieldKey);
+        const output = makeOutput(validated, fieldKey, programId);
+        await writeExtractionCache(cacheKey, output);
+        return output;
       } catch (err) {
         const isRateLimit =
           err instanceof Error &&
           (err.message.includes('429') ||
             err.message.includes('rate_limit') ||
             err.message.toLowerCase().includes('rate limit'));
-
         if (isRateLimit && attempt < MAX_RETRIES) {
           const delay = BASE_DELAY_MS * attempt;
           console.warn(
-            `  [${fieldKey}] Rate limit hit (attempt ${attempt}/${MAX_RETRIES}) — retrying in ${delay / 1000}s`
+            `  [${fieldKey}] Rate limit (attempt ${attempt}/${MAX_RETRIES}) — retrying in ${delay / 1000}s`
           );
           await new Promise((r) => setTimeout(r, delay));
           continue;
         }
-        lastError =
-          err instanceof Error
-            ? err
-            : new Error(
-                `Extraction API call failed for field ${fieldKey} / program ${programId}: ${String(err)}`
-              );
+        lastError = err instanceof Error ? err : new Error(String(err));
         break;
       }
     }
 
     throw (
-      lastError ??
-      new Error(
-        `Extraction failed after ${MAX_RETRIES} retries for field ${fieldKey} / program ${programId}`
-      )
+      lastError ?? new Error(`Extraction failed after ${MAX_RETRIES} retries for field ${fieldKey}`)
     );
   }
 
+  // ── Batch extraction: all fields from one scrape in a single LLM call ──
+  async executeBatch(
+    scrape: ScrapeResult,
+    fields: ReadonlyArray<FieldSpec>,
+    programId: string,
+    programName: string,
+    countryIso: string
+  ): Promise<Map<string, ExtractionOutput>> {
+    // Split into cached vs uncached
+    const cached = new Map<string, ExtractionOutput>();
+    const uncached: FieldSpec[] = [];
+
+    for (const field of fields) {
+      const cacheKey = makeCacheKey(scrape.contentHash, field.key, field.promptMd);
+      const hit = await readExtractionCache(cacheKey);
+      if (hit) {
+        console.log(`  [${field.key}] Extraction cache hit`);
+        cached.set(field.key, { ...hit, programId, extractedAt: new Date() });
+      } else {
+        uncached.push(field);
+      }
+    }
+
+    if (uncached.length === 0) return cached;
+
+    const content = scrape.contentMarkdown.slice(0, MAX_CONTENT_CHARS);
+    if (scrape.contentMarkdown.length > MAX_CONTENT_CHARS)
+      console.log(`  ↳ [Batch] Content truncated to ${MAX_CONTENT_CHARS} chars`);
+
+    console.log(
+      `  [Batch] Calling extraction model for ${uncached.length} uncached fields on ${scrape.url}`
+    );
+
+    const MAX_RETRIES = 3;
+    const BASE_DELAY_MS = 60000;
+    let llmResults = new Map<string, RawLlmSingle>();
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const client = createAnthropicClient();
+        const response = await client.messages.create({
+          model: MODEL_EXTRACTION,
+          max_tokens: 8192,
+          system: SYSTEM_PROMPT,
+          messages: [
+            {
+              role: 'user',
+              content: buildBatchUserMessage(uncached, programName, countryIso, content),
+            },
+          ],
+        });
+
+        type ContentItem = (typeof response.content)[number];
+        const lastTextBlock = response.content
+          .filter((b): b is Extract<ContentItem, { type: 'text' }> => b.type === 'text')
+          .at(-1);
+        if (!lastTextBlock) throw new Error(`Batch extraction returned no text content`);
+
+        const parsed = JSON.parse(stripJsonFences(lastTextBlock.text));
+        llmResults = assertBatchResponse(
+          parsed,
+          uncached.map((f) => f.key)
+        );
+        lastError = null;
+        break;
+      } catch (err) {
+        const isRateLimit =
+          err instanceof Error &&
+          (err.message.includes('429') ||
+            err.message.includes('rate_limit') ||
+            err.message.toLowerCase().includes('rate limit'));
+        if (isRateLimit && attempt < MAX_RETRIES) {
+          const delay = BASE_DELAY_MS * attempt;
+          console.warn(
+            `  [Batch] Rate limit (attempt ${attempt}/${MAX_RETRIES}) — retrying in ${delay / 1000}s`
+          );
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        lastError = err instanceof Error ? err : new Error(String(err));
+        break;
+      }
+    }
+
+    if (lastError) {
+      console.warn(
+        `  [Batch] Batch LLM call failed — ${lastError.message}. Returning cached results only.`
+      );
+      return cached;
+    }
+
+    // Build outputs and write to cache
+    const outputs = new Map<string, ExtractionOutput>();
+    for (const field of uncached) {
+      const raw = llmResults.get(field.key);
+      if (!raw) {
+        console.warn(`  [${field.key}] Missing from batch response — treated as not found`);
+        continue;
+      }
+      const output = makeOutput(raw, field.key, programId);
+      const cacheKey = makeCacheKey(scrape.contentHash, field.key, field.promptMd);
+      await writeExtractionCache(cacheKey, output);
+      outputs.set(field.key, output);
+    }
+
+    return new Map([...cached, ...outputs]);
+  }
+
+  // ── All-fields across multiple scrapes: batch per URL, merge by confidence ──
+  async executeAllFields(
+    scrapes: ScrapeResult[],
+    fields: ReadonlyArray<FieldSpec>,
+    programId: string,
+    programName: string,
+    countryIso: string
+  ): Promise<Map<string, { output: ExtractionOutput; sourceUrl: string }>> {
+    if (scrapes.length === 0)
+      throw new Error(`No scrape results provided for program ${programId}`);
+
+    const best = new Map<string, { output: ExtractionOutput; sourceUrl: string }>();
+
+    for (let i = 0; i < scrapes.length; i++) {
+      if (i > 0) {
+        console.log(`  [Batch] Waiting ${INTER_BATCH_DELAY_MS / 1000}s before next URL batch...`);
+        await new Promise((r) => setTimeout(r, INTER_BATCH_DELAY_MS));
+      }
+
+      const scrape = scrapes[i]!;
+      const batchOutput = await this.executeBatch(
+        scrape,
+        fields,
+        programId,
+        programName,
+        countryIso
+      );
+
+      for (const [fieldKey, output] of batchOutput) {
+        if (output.valueRaw === '') continue;
+        const existing = best.get(fieldKey);
+        if (!existing || output.extractionConfidence > existing.output.extractionConfidence) {
+          best.set(fieldKey, { output, sourceUrl: scrape.url });
+        }
+      }
+
+      // Early exit: stop trying more URLs if all fields have high-confidence results
+      const stillNeeded = fields.filter((f) => {
+        const r = best.get(f.key);
+        return !r || r.output.extractionConfidence < EARLY_EXIT_CONFIDENCE;
+      });
+      if (stillNeeded.length === 0) {
+        console.log(
+          `  [Batch] All fields at confidence ≥${EARLY_EXIT_CONFIDENCE} — early exit after ${i + 1}/${scrapes.length} URLs`
+        );
+        break;
+      }
+    }
+
+    return best;
+  }
+
+  // ── Legacy multi-URL single-field (kept for Trigger.dev job compatibility) ──
   async executeMulti(
     scrapes: ScrapeResult[],
     fieldKey: string,
@@ -248,9 +482,8 @@ export class ExtractStageImpl implements ExtractStage {
     programName: string,
     countryIso: string
   ): Promise<{ output: ExtractionOutput; sourceUrl: string }> {
-    if (scrapes.length === 0) {
+    if (scrapes.length === 0)
       throw new Error(`No scrape results provided for field ${fieldKey} / program ${programId}`);
-    }
 
     const candidates: { output: ExtractionOutput; sourceUrl: string }[] = [];
     for (let i = 0; i < scrapes.length; i++) {
@@ -259,6 +492,9 @@ export class ExtractStageImpl implements ExtractStage {
         output: await this.execute(scrapes[i]!, fieldKey, programId, programName, countryIso),
         sourceUrl: scrapes[i]!.url,
       });
+      // Early exit if high-confidence result found
+      const best = candidates.at(-1)!;
+      if (best.output.extractionConfidence >= EARLY_EXIT_CONFIDENCE) break;
     }
 
     return candidates.reduce((best, current) =>

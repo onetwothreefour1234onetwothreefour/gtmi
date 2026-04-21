@@ -1,3 +1,6 @@
+import { createHash } from 'crypto';
+import { db, crosscheckCache } from '@gtmi/db';
+import { eq } from 'drizzle-orm';
 import { createAnthropicClient, MODEL_CROSSCHECK } from '../clients/anthropic';
 import type { CrossCheckResult, ExtractionOutput, ScrapeResult } from '../types/extraction';
 import type { CrossCheckStage } from '../types/pipeline';
@@ -72,6 +75,36 @@ function assertLlmResponse(parsed: unknown, fieldKey: string): RawLlmResponse {
   };
 }
 
+function makeCrossCheckCacheKey(extraction: ExtractionOutput, tier2ContentHash: string): string {
+  const raw = [extraction.valueRaw, tier2ContentHash, extraction.fieldDefinitionKey].join('::');
+  return createHash('sha256').update(raw, 'utf8').digest('hex');
+}
+
+async function readCrossCheckCache(cacheKey: string): Promise<CrossCheckResult | null> {
+  try {
+    const rows = await db
+      .select()
+      .from(crosscheckCache)
+      .where(eq(crosscheckCache.cacheKey, cacheKey))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return rows[0]!.resultJsonb as CrossCheckResult;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCrossCheckCache(cacheKey: string, result: CrossCheckResult): Promise<void> {
+  try {
+    await db
+      .insert(crosscheckCache)
+      .values({ cacheKey, model: MODEL_CROSSCHECK, resultJsonb: result })
+      .onConflictDoNothing();
+  } catch {
+    // cache write failure is non-fatal
+  }
+}
+
 export class CrossCheckStageImpl implements CrossCheckStage {
   async execute(
     extraction: ExtractionOutput,
@@ -83,6 +116,13 @@ export class CrossCheckStageImpl implements CrossCheckStage {
         tier2Url: tier2Scrape.url,
         notes: 'No Tier 1 value to cross-check.',
       };
+    }
+
+    const cacheKey = makeCrossCheckCacheKey(extraction, tier2Scrape.contentHash);
+    const cached = await readCrossCheckCache(cacheKey);
+    if (cached) {
+      console.log(`  [${extraction.fieldDefinitionKey}] Cross-check cache hit`);
+      return { ...cached, tier2Url: tier2Scrape.url };
     }
 
     const client = createAnthropicClient();
@@ -134,10 +174,12 @@ export class CrossCheckStageImpl implements CrossCheckStage {
       );
     }
 
-    return {
+    const result: CrossCheckResult = {
       agrees: validated.agrees,
       tier2Url: tier2Scrape.url,
       notes: validated.notes,
     };
+    await writeCrossCheckCache(cacheKey, result);
+    return result;
   }
 }

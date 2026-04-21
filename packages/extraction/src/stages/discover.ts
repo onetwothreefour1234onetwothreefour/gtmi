@@ -1,5 +1,11 @@
+import { createHash } from 'crypto';
+import { db, discoveryCache } from '@gtmi/db';
+import { and, eq, gt } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import type { DiscoveredUrl, DiscoveryResult } from '../types/extraction';
 import type { DiscoverStage } from '../types/pipeline';
+
+const DISCOVERY_CACHE_TTL_DAYS = 7;
 
 const SYSTEM_PROMPT =
   'You are a specialist immigration research agent. Your job is to find the most ' +
@@ -176,11 +182,77 @@ async function verifyUrls(urls: DiscoveredUrl[]): Promise<DiscoveredUrl[]> {
   return results.filter((u): u is DiscoveredUrl => u !== null);
 }
 
+function makeDiscoveryCacheKey(
+  programId: string,
+  systemPrompt: string,
+  userMessage: string
+): string {
+  const promptHash = createHash('sha256')
+    .update(systemPrompt + '::' + userMessage, 'utf8')
+    .digest('hex');
+  return createHash('sha256')
+    .update(programId + '::' + promptHash, 'utf8')
+    .digest('hex');
+}
+
+async function readDiscoveryCache(cacheKey: string): Promise<DiscoveredUrl[] | null> {
+  try {
+    const rows = await db
+      .select()
+      .from(discoveryCache)
+      .where(and(eq(discoveryCache.cacheKey, cacheKey), gt(discoveryCache.expiresAt, sql`now()`)))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return rows[0]!.discoveredUrls as DiscoveredUrl[];
+  } catch {
+    return null;
+  }
+}
+
+async function writeDiscoveryCache(
+  cacheKey: string,
+  programId: string,
+  discoveredUrls: DiscoveredUrl[]
+): Promise<void> {
+  try {
+    const expiresAt = new Date(Date.now() + DISCOVERY_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000);
+    await db
+      .insert(discoveryCache)
+      .values({ cacheKey, programId, discoveredUrls, expiresAt })
+      .onConflictDoUpdate({
+        target: discoveryCache.cacheKey,
+        set: { discoveredUrls, expiresAt },
+      });
+  } catch {
+    // cache write failure is non-fatal
+  }
+}
+
 export class DiscoverStageImpl implements DiscoverStage {
   async execute(programId: string, programName: string, country: string): Promise<DiscoveryResult> {
     const PERPLEXITY_API_KEY = process.env['PERPLEXITY_API_KEY'];
     if (!PERPLEXITY_API_KEY) {
       throw new Error('PERPLEXITY_API_KEY is not set in environment');
+    }
+
+    const userMessage = buildUserMessage(programName, country);
+    const cacheKey = makeDiscoveryCacheKey(programId, SYSTEM_PROMPT, userMessage);
+    const cachedUrls = await readDiscoveryCache(cacheKey);
+    if (cachedUrls) {
+      console.log(
+        `  [Discovery] Cache hit for ${programName} (${country}) — skipping Perplexity call`
+      );
+      const verified = await verifyUrls(cachedUrls);
+      if (verified.length > 0) {
+        return {
+          programId,
+          programName,
+          country,
+          discoveredUrls: verified,
+          discoveredAt: new Date(),
+        };
+      }
+      console.log(`  [Discovery] All cached URLs now unreachable — re-running discovery`);
     }
 
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -193,7 +265,7 @@ export class DiscoverStageImpl implements DiscoverStage {
         model: 'sonar-pro',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: buildUserMessage(programName, country) },
+          { role: 'user', content: userMessage },
         ],
         temperature: 0.1,
         max_tokens: 2000,
@@ -222,6 +294,8 @@ export class DiscoverStageImpl implements DiscoverStage {
     if (discoveredUrls.length === 0) {
       throw new Error(`Discovery produced no reachable URLs for program ${programId}`);
     }
+
+    await writeDiscoveryCache(cacheKey, programId, discoveredUrls);
 
     return {
       programId,
