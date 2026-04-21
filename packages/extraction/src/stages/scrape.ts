@@ -150,6 +150,7 @@ export class ScrapeStageImpl implements ScrapeStage {
       scraped_at: string;
       content_hash: string;
       error?: string | null;
+      layer?: string | null;
     };
 
     if (data.error) {
@@ -177,7 +178,11 @@ export class ScrapeStageImpl implements ScrapeStage {
       httpStatus: data.http_status,
       scrapedAt: new Date(data.scraped_at),
       contentHash: data.content_hash,
+      layer: data.layer ?? undefined,
     };
+    if (result.layer && result.layer !== 'playwright') {
+      console.log(`  [Scrape] ${discovered.url} served via fallback layer: ${result.layer}`);
+    }
     await this.writeScrapeCache(result);
     return result;
   }

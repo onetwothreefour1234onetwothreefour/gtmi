@@ -8,6 +8,12 @@ export interface ScrapeResult {
   contentHash: string;
   scrapedAt: Date;
   httpStatus: number;
+  /**
+   * Which scraper layer produced this result: "playwright" | "curl_cffi"
+   * | "jina" | "wayback". Absent for cache hits from before Session 9.
+   * Not persisted — ephemeral observability only.
+   */
+  layer?: string;
 }
 
 export interface ExtractionInput {
