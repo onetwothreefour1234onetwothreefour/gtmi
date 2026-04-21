@@ -32,8 +32,11 @@ async function main() {
   const countryArgIdx = process.argv.indexOf('--country');
   const countryArg = countryArgIdx !== -1 ? process.argv[countryArgIdx + 1] : undefined;
   if (countryArg !== 'AUS' && countryArg !== 'SGP') {
-    throw new Error('Usage: canary-run.ts --country <AUS|SGP>');
+    throw new Error('Usage: canary-run.ts --country <AUS|SGP> [--programId <uuid>]');
   }
+
+  const programIdArgIdx = process.argv.indexOf('--programId');
+  const programIdArg = programIdArgIdx !== -1 ? process.argv[programIdArgIdx + 1] : undefined;
 
   // --- Shared: load field definitions + wave filter ---
   let allFieldDefs = await db.select().from(fieldDefinitions);
@@ -105,6 +108,19 @@ async function main() {
 
   // --- Find target program for --country argument ---
   const canaryTarget = await (async () => {
+    if (programIdArg !== undefined) {
+      const rows = await db.select().from(programs).where(eq(programs.id, programIdArg));
+      if (rows.length === 0) {
+        throw new Error(`No program found with id=${programIdArg}`);
+      }
+      const row = rows[0]!;
+      if (row.countryIso !== countryArg) {
+        throw new Error(
+          `Program ${programIdArg} has country_iso="${row.countryIso}" but --country="${countryArg}" — mismatch`
+        );
+      }
+      return row;
+    }
     if (countryArg === 'AUS') {
       const ausRows = await db
         .select()
@@ -116,7 +132,11 @@ async function main() {
           `No AUS program matching "%Skills in Demand%" found.\nExisting AUS programs:\n${all.map((r) => `  - ${r.name}`).join('\n')}`
         );
       }
-      return ausRows[0]!;
+      const selected = ausRows[0]!;
+      console.warn(
+        `[Canary] No --programId provided; selected ${selected.name} (${selected.id}) by ILIKE — consider passing --programId for deterministic runs.`
+      );
+      return selected;
     } else {
       const sgpRows = await db
         .select()
@@ -128,7 +148,11 @@ async function main() {
           `No SGP program matching "%S Pass%" found.\nExisting SGP programs:\n${all.map((r) => `  - ${r.name}`).join('\n')}`
         );
       }
-      return sgpRows[0]!;
+      const selected = sgpRows[0]!;
+      console.warn(
+        `[Canary] No --programId provided; selected ${selected.name} (${selected.id}) by ILIKE — consider passing --programId for deterministic runs.`
+      );
+      return selected;
     }
   })();
 
