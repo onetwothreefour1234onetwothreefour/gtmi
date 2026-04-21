@@ -39,7 +39,7 @@ export class ScrapeStageImpl implements ScrapeStage {
 
   private async scrapeOne(client: FirecrawlApp, discovered: DiscoveredUrl): Promise<ScrapeResult> {
     const response = await client
-      .scrapeUrl(discovered.url, { formats: ['markdown'] })
+      .scrapeUrl(discovered.url, { formats: ['markdown'], onlyMainContent: true })
       .catch((error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         const wrapped = new Error(`Firecrawl threw for ${discovered.url}: ${msg}`);

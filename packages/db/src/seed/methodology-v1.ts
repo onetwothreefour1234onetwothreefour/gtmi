@@ -181,14 +181,6 @@ export const methodologyV1 = {
         '\n\n' +
         `Extraction Task: A.1.1 — Minimum salary threshold
 Question: What is the minimum annual salary, in the local currency as stated in the source, that a principal applicant must earn to qualify for this program?
-Output format:
-{
-"value": <number, annual salary in local currency>,
-"currency": "<ISO 4217 code>",
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If the program has multiple salary tiers, report the standard/core threshold and describe alternatives in notes.
@@ -211,13 +203,6 @@ If the threshold is expressed only as a multiple of median wage, return value: n
         '\n\n' +
         `Extraction Task: A.1.2 — Salary threshold as % of local median wage
 Question: Is the salary threshold for this program defined or benchmarked as a percentage of the local median wage or equivalent statistical reference?
-Output format:
-{
-"value": <number, percent>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If the threshold is a fixed amount (not a percentage), return null.
@@ -247,13 +232,6 @@ Allowed values:
 "salary_plus_multiple": salary plus two or more alternatives.
 "no_salary_route": qualification does not require a salary threshold at all.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 A "fast-track" for high salaries is NOT an alternative pathway; it's a salary-based variant.
@@ -300,13 +278,6 @@ Allowed values:
 "master": master's degree or equivalent.
 "doctorate": doctoral degree or equivalent.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If "equivalent work experience in lieu of degree" is accepted, report the formal floor (what is required if one cannot substitute) and note the substitution option.`,
@@ -339,13 +310,6 @@ If "equivalent work experience in lieu of degree" is accepted, report the formal
         '\n\n' +
         `Extraction Task: A.2.2 — Minimum work experience (years)
 Question: What is the minimum years of relevant professional work experience required of a principal applicant?
-Output format:
-{
-"value": <number, years>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If experience is required only in the absence of a degree, report the experience floor that applies when the degree IS held (often 0).
@@ -376,14 +340,6 @@ Allowed values:
 "upper_intermediate": B2 CEFR or equivalent (IELTS 6.0-6.5).
 "advanced": C1+ CEFR or equivalent (IELTS 7.0+).
 
-Output format:
-{
-"value": <string from allowed values>,
-"accepted_tests": ["<list of accepted test providers>"],
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If components have different minima, report the highest required.
@@ -424,13 +380,6 @@ Allowed values:
 "restricted_list": narrower list (under 100 occupations), targeted at specific sectors.
 "shortage_list_only": only occupations on a periodically updated shortage/critical list.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If the program has multiple streams with different constraints, report for the stream targeted by this extraction and note others.`,
@@ -475,14 +424,6 @@ Allowed values:
 "tight_quota": cap regularly exhausted or demand exceeds supply.
 "quota_undisclosed": cap exists but size is not published in this source.
 
-Output format:
-{
-"value": <string from allowed values>,
-"cap_number": <integer or null>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If document does not characterize demand-vs-supply, default to "moderate_quota" when a number is published without context.
@@ -525,13 +466,6 @@ Record the raw cap number in notes or in cap_number where published.`,
         '\n\n' +
         `Extraction Task: A.3.3 — Applicant age cap
 Question: What is the maximum age at which a principal applicant can qualify for this program?
-Output format:
-{
-"value": <number, years>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If no age cap exists, return 999 and note "no age cap".
@@ -554,13 +488,6 @@ Return null only if age is not addressed at all.`,
         '\n\n' +
         `Extraction Task: B.1.1 — Published SLA processing time (days)
 Question: What is the official published service level agreement for processing a complete application on this program, in calendar days from submission to decision?
-Output format:
-{
-"value": <number, calendar days>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If SLA is expressed as a range or percentile ("90% within 30 days"), report the median/point estimate and describe the original framing.
@@ -590,15 +517,6 @@ Allowed values:
 "available_fast": fast-track available, SLA under 15 days.
 "available_undisclosed_sla": fast-track exists but SLA not published.
 
-Output format:
-{
-"value": <string from allowed values>,
-"fast_track_fee": <number or null>,
-"currency": "<ISO code or null>",
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Fast-track must be a formal option with a stated accelerated SLA, not merely "priority handling".
@@ -630,14 +548,6 @@ If employer-initiated only, note that.`,
         '\n\n' +
         `Extraction Task: B.1.3 — Number of application steps
 Question: How many discrete formal steps must an applicant complete to obtain the visa?
-Output format:
-{
-"value": <integer>,
-"steps": ["<list of named steps>"],
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Count distinct procedural milestones from applicant's perspective (sponsorship request, skills assessment, visa application, biometrics, health check, decision).
@@ -661,14 +571,6 @@ Do not count optional steps.`,
         '\n\n' +
         `Extraction Task: B.2.1 — Principal applicant fees
 Question: What is the total government fee a principal applicant must pay to the issuing authority for a standard application?
-Output format:
-{
-"value": <number, local currency>,
-"currency": "<ISO 4217 code>",
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Include application fee, issuance fee, and mandatory levies to the issuing authority.
@@ -691,14 +593,6 @@ If fees vary by stream or duration, report the standard 2-4 year visa case and n
         '\n\n' +
         `Extraction Task: B.2.2 — Per-dependant fees
 Question: What is the government fee per accompanying dependant paid to the issuing authority?
-Output format:
-{
-"value": <number, local currency per dependant>,
-"currency": "<ISO 4217 code>",
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If spouse and child fees differ, report the higher (common adult dependant case) and note the other.
@@ -720,15 +614,6 @@ If dependants not permitted, return null with notes "no dependants permitted".`,
         '\n\n' +
         `Extraction Task: B.2.3 — Employer-borne levies and skill charges
 Question: What government levies or charges are paid by the sponsoring employer for this program?
-Output format:
-{
-"value": <number, local currency>,
-"currency": "<ISO 4217 code>",
-"basis": "<annual per visa | one-off | other>",
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Include skills levies, training charges, immigration skills charges, similar employer-only government fees.
@@ -751,14 +636,6 @@ If no employer sponsorship requirement, return 0.`,
         '\n\n' +
         `Extraction Task: B.2.4 — Mandatory non-government costs
 Question: What is the approximate total cost of mandatory non-government requirements (medical exam, translation, health insurance during application) for a standard principal applicant?
-Output format:
-{
-"value": <number, USD-equivalent estimate>,
-"components": ["<list of cost components>"],
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Exclude optional agent/lawyer fees.
@@ -788,13 +665,6 @@ Allowed values:
 "hybrid": online initiation but substantial in-person or paper steps remain.
 "offline_only": primarily paper-based or requires in-person submission.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Biometrics appointments do not count against "fully_online" (inherently in-person).
@@ -836,14 +706,6 @@ Paper-only requirements for specific document types (e.g., couriered sworn trans
         '\n\n' +
         `Extraction Task: B.3.2 — In-person / biometric visits required
 Question: How many in-person visits (consulate, visa application center, government office) are required during application?
-Output format:
-{
-"value": <integer>,
-"visit_types": ["<list of required visit types>"],
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Single biometrics = 1.
@@ -875,13 +737,6 @@ Allowed values:
 "limited": appeal is discretionary, narrow, or not clearly available.
 "absent": no appeal right or not addressed.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Administrative review for specific categories (e.g., in-country refusals) should be noted.
@@ -931,13 +786,6 @@ Allowed values:
 "required_initial_only": sponsor required for initial application; holder independent afterward.
 "required_throughout": sponsor required for the duration; losing sponsor jeopardizes status.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Endorsing bodies (Tech Nation, professional bodies) that are not employers: count as "not_required" if endorsement is one-time; "required_throughout" if endorsement must be maintained.`,
@@ -977,14 +825,6 @@ Allowed values:
 "re_application": switching requires new sponsorship application or substantial re-filing.
 "not_permitted": employer switching not permitted.
 
-Output format:
-{
-"value": <string from allowed values>,
-"grace_period_days": <integer or null>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Grace periods after job loss should be noted (and captured in grace_period_days where stated).
@@ -1029,13 +869,6 @@ Allowed values:
 "permitted_with_permission": permitted only with prior authorization.
 "prohibited": self-employment and secondary income not permitted.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Passive investment income (dividends, rental) generally outside these rules unless addressed.
@@ -1074,14 +907,6 @@ Sector/occupation restrictions should be noted.`,
         '\n\n' +
         `Extraction Task: C.1.4 — Labor market test requirement
 Question: Is a labor market test (LMT), resident labor market test, or "no suitable local candidate" certification required before visa issuance?
-Output format:
-{
-"value": <boolean>,
-"exemptions": ["<list of exemption cases if any>"],
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 LMT waived for shortage-list occupations: report true for standard case, note the waiver.
@@ -1113,13 +938,6 @@ Allowed values:
 "by_permit_no_work_rights": applies separately; if approved, cannot work.
 "not_permitted": spouse cannot accompany.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 This indicator reflects a married opposite-sex spouse. Same-sex partner recognition is C.2.4; unmarried partner variations go in notes.`,
@@ -1161,14 +979,6 @@ This indicator reflects a married opposite-sex spouse. Same-sex partner recognit
         '\n\n' +
         `Extraction Task: C.2.2 — Dependent child age cap
 Question: Up to what age can a dependent child be included on the principal's visa?
-Output format:
-{
-"value": <number, years>,
-"student_extension_age": <number or null>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If cap differs for full-time students, report the higher cap and note the condition (populate student_extension_age).
@@ -1191,14 +1001,6 @@ If children age out mid-visa, note this.`,
         '\n\n' +
         `Extraction Task: C.2.3 — Parent or extended family inclusion option
 Question: Does this program permit inclusion of parents, grandparents, or other extended family as dependants?
-Output format:
-{
-"value": <boolean>,
-"eligible_relatives": ["<list if true>"],
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 "Dependant parent" provisions requiring financial dependency qualify as true.
@@ -1221,14 +1023,6 @@ Siblings generally don't count unless explicitly addressed.`,
         '\n\n' +
         `Extraction Task: C.2.4 — Same-sex partner recognition
 Question: Does this program recognize same-sex spouses or same-sex de facto partners as eligible dependants?
-Output format:
-{
-"value": <boolean>,
-"recognition_basis": "<marriage | de_facto | civil_partnership | foreign_marriage | null>",
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Recognition of a foreign same-sex marriage counts as true even if the country doesn't itself perform them.
@@ -1258,13 +1052,6 @@ Allowed values:
 "emergency_only": only emergency care covered publicly.
 "no_access": no public healthcare access.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Hybrid regimes (e.g., levy + private top-up): map to the primary requirement, note secondary.
@@ -1307,13 +1094,6 @@ Allowed values:
 "limited": access in specific circumstances only (age bands, regions).
 "no_access": no access to public education.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Right to attend does not mean right to free attendance: if tuition applies, "fee_based" not "full_access".
@@ -1348,13 +1128,6 @@ Higher-education access is separate and not required here.`,
         '\n\n' +
         `Extraction Task: D.1.1 — PR provision available
 Question: Does this program provide a direct pathway to permanent residence (PR) or equivalent indefinite-stay status?
-Output format:
-{
-"value": <boolean>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Indefinite leave to remain (ILR) or equivalent permanent status counts as true.
@@ -1377,13 +1150,6 @@ Temporary-only program with no documented PR route = false.`,
         '\n\n' +
         `Extraction Task: D.1.2 — Minimum years of residence to PR eligibility
 Question: Minimum cumulative years of residence under this program (or explicitly described combined pathway) before PR eligibility?
-Output format:
-{
-"value": <number, years>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If combined pathway described (e.g., 2 years on this visa + 2 on successor), report the total.
@@ -1405,13 +1171,6 @@ If PR not available, return null.`,
         '\n\n' +
         `Extraction Task: D.1.3 — Physical presence requirement during accrual (days/year)
 Question: How many days per year must the visa holder physically be present for that year to count toward PR qualifying period?
-Output format:
-{
-"value": <number, days per year>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If expressed as maximum-absence (e.g., "no more than 180 days outside"), convert to minimum-presence (365 minus 180 = 185).
@@ -1433,13 +1192,6 @@ If presence not required during accrual, return 0.`,
         '\n\n' +
         `Extraction Task: D.1.4 — PR retention rules (days/year to keep PR)
 Question: After PR is granted, how many days per year must the holder physically remain to retain PR status?
-Output format:
-{
-"value": <number, days per year>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If stated per multi-year period ("no more than 2 consecutive years absent"), convert to average days-per-year equivalent and note original framing.
@@ -1461,13 +1213,6 @@ If PR not available, return null.`,
         '\n\n' +
         `Extraction Task: D.2.1 — Citizenship provision available from this track
 Question: Does the pathway originating from this program lead to eligibility for citizenship, directly or via PR?
-Output format:
-{
-"value": <boolean>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Temporary/indefinite-stay-only program without citizenship eligibility = false.
@@ -1489,13 +1234,6 @@ Requires-switching-tracks is true only if the switch is documented in official m
         '\n\n' +
         `Extraction Task: D.2.2 — Total minimum years from initial visa entry to citizenship eligibility
 Question: Total minimum years from date of initial entry on this program to the earliest date a holder can apply for citizenship?
-Output format:
-{
-"value": <number, years>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Include time spent under PR if that's part of the pathway.
@@ -1518,13 +1256,6 @@ If citizenship not available, return null.`,
         '\n\n' +
         `Extraction Task: D.2.3 — Dual citizenship permitted
 Question: Does the country permit dual or multiple citizenship for naturalizing applicants from this program?
-Output format:
-{
-"value": <boolean>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 "Permitted in practice but requires renunciation formalism not enforced" is true only if source explicitly acknowledges this.
@@ -1553,13 +1284,6 @@ Allowed values:
 "moderate": multiple tests or one substantial test (language B2+ and civics).
 "heavy": multiple substantial tests including language above B2, civics, and integration/history.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Exemptions for age/disability do not change category.
@@ -1598,13 +1322,6 @@ If citizenship not available, return null.`,
         '\n\n' +
         `Extraction Task: D.3.1 — Tax residency trigger (days/year)
 Question: How many days of physical presence trigger full tax residency (worldwide income taxation)?
-Output format:
-{
-"value": <number, days per year>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If test is non-pure-day-count (substantial presence with prior-year weighting, center of vital interests), report primary day-count threshold and describe additional test.
@@ -1634,15 +1351,6 @@ Allowed values:
 "non_dom": regime exempting foreign-source income, typically domicile-based.
 "indefinite_preferential": preferential regime for duration of residence, no time cap.
 
-Output format:
-{
-"value": <string from allowed values>,
-"regime_name": "<official name if stated>",
-"duration_years": <integer or null>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If regime is general (not tied to this visa) but accessible to holders, it qualifies; note eligibility conditions.`,
@@ -1690,13 +1398,6 @@ Allowed values:
 "territorial": residents taxed only on domestic-source income.
 "hybrid": specific income types territorial, others worldwide.
 
-Output format:
-{
-"value": <string from allowed values>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 If source distinguishes by domicile (UK pre-2025 style), report rule for typical new entrant on this visa and explain.`,
@@ -1740,16 +1441,6 @@ Major (eligibility/pathway change, abolition/reintroduction): 3
 Moderate (quota change, fee restructure): 2
 Minor (inflation-only fee adjustment, form/portal update): 1
 
-Output format:
-{
-"value": <number, weighted sum>,
-"changes": [
-{"date": "YYYY-MM-DD", "description": "<short>", "severity": "major|moderate|minor"}
-],
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Only count changes evidenced in THIS document (changelog, "what's new", dated announcements).
@@ -1772,16 +1463,6 @@ If no change history disclosed, return null with notes "change history not discl
         '\n\n' +
         `Extraction Task: E.1.2 — Forward-announced pipeline changes
 Question: Does the document announce any upcoming change with a specified future effective date?
-Output format:
-{
-"value": <boolean>,
-"announced_changes": [
-{"effective_date": "YYYY-MM-DD or window", "description": "<short>"}
-],
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Vague forward-looking statements ("we are reviewing", "changes may be introduced") do NOT qualify. Specific effective date or date window is required.
@@ -1805,14 +1486,6 @@ Multiple changes: list all; value is true if at least one qualifies.`,
         `Extraction Task: E.1.3 — Program age (years since introduction, capped at 20)
 Question: Years since this program was introduced in its current form. Cap at 20.
 "Current form" means: first established under current name and structure. Major reforms changing program name or creating distinct legal basis reset the clock. Minor amendments do not.
-Output format:
-{
-"value": <integer, 0-20>,
-"introduced_date": "YYYY or YYYY-MM or YYYY-MM-DD",
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Compute as (current year) minus (introduction year). Cap at 20. If introduced this year, value is 0.
@@ -1836,15 +1509,6 @@ Year only (no month/day) acceptable; use January 1 for calculation.`,
         '\n\n' +
         `Extraction Task: E.2.1 — Published approval rate or admission statistics
 Question: Does the document publish approval rate or admission statistics for this program?
-Output format:
-{
-"value": <boolean>,
-"statistics_present": ["approval_rate | applications_received | visas_granted"],
-"most_recent_period": "YYYY or YYYY-QN",
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Statistics must be from the last 3 years; older statistics alone = false.
@@ -1875,15 +1539,6 @@ Allowed values:
 "exists_undisclosed": cap exists, number not published.
 "not_addressed": document silent on whether a cap exists.
 
-Output format:
-{
-"value": <string from allowed values>,
-"cap_number": <integer or null>,
-"cap_period": "<e.g., annual, per fiscal year, one-off>",
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 cap_number populated only for "published_current" or "published_historical_only".
@@ -1934,16 +1589,6 @@ Allowed values:
 "minimal": high-level overview with eligibility listed but little else.
 "absent": does not address decision criteria.
 
-Output format:
-{
-"value": <string from allowed values>,
-"has_evidence_requirements": <boolean>,
-"has_worked_examples": <boolean>,
-"has_decision_criteria": <boolean>,
-"source_sentence": "...",
-"confidence": <0.0-1.0>,
-"notes": "<optional>"
-}
 Edge cases:
 
 Base rating on THIS document plus official guidance it directly links from the same authority (caseworker manual, policy guide). No third-party guides.

@@ -255,7 +255,13 @@ async function main() {
       let extractionResult: { output: ExtractionOutput; sourceUrl: string };
       try {
         console.log(`  ↳ [${def.key}] Calling extraction model...`);
-        extractionResult = await extract.executeMulti(scrapeInputs, def.key, programId);
+        extractionResult = await extract.executeMulti(
+          scrapeInputs,
+          def.key,
+          programId,
+          programName,
+          countryIso
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.log(`  ↳ [${def.key}] Extraction failed — skipping: ${msg}`);

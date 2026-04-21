@@ -18,7 +18,13 @@ export interface ScrapeStage {
 }
 
 export interface ExtractStage {
-  execute(scrape: ScrapeResult, fieldKey: string, programId: string): Promise<ExtractionOutput>;
+  execute(
+    scrape: ScrapeResult,
+    fieldKey: string,
+    programId: string,
+    programName: string,
+    countryIso: string
+  ): Promise<ExtractionOutput>;
 }
 
 export interface ValidateStage {

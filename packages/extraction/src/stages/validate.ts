@@ -12,20 +12,29 @@ const SYSTEM_PROMPT =
 const CONTEXT_WINDOW = 200;
 
 function buildUserMessage(extraction: ExtractionOutput, contentMarkdown: string): string {
-  const { start, end } = extraction.characterOffsets;
-  const contextStart = Math.max(0, start - CONTEXT_WINDOW);
-  const contextEnd = Math.min(contentMarkdown.length, end + CONTEXT_WINDOW);
+  const actualPos = contentMarkdown.indexOf(extraction.sourceSentence);
+  const contextStart = actualPos !== -1 ? Math.max(0, actualPos - CONTEXT_WINDOW) : 0;
+  const contextEnd =
+    actualPos !== -1
+      ? Math.min(
+          contentMarkdown.length,
+          actualPos + extraction.sourceSentence.length + CONTEXT_WINDOW
+        )
+      : Math.min(contentMarkdown.length, 400);
   const offsetContext = contentMarkdown.slice(contextStart, contextEnd);
+  console.log(
+    `  [${extraction.fieldDefinitionKey}] Source sentence ${actualPos !== -1 ? `found at position ${actualPos}` : 'NOT FOUND in content — using fallback context'}`
+  );
 
   return (
     `Verify the following extraction:\n\n` +
     `Extracted value: ${extraction.valueRaw}\n` +
     `Source sentence: ${extraction.sourceSentence}\n` +
-    `Claimed character offsets in content: start=${start}, end=${end}\n\n` +
-    `Content around the claimed offsets (±${CONTEXT_WINDOW} chars):\n---\n${offsetContext}\n---\n\n` +
+    `Source sentence position in content: ${actualPos !== -1 ? `found at char ${actualPos}` : 'not found by exact match'}\n\n` +
+    `Content around source sentence (±${CONTEXT_WINDOW} chars):\n---\n${offsetContext}\n---\n\n` +
     `Full content for complete verification:\n---\n${contentMarkdown.slice(0, 30000)}\n---\n\n` +
     `Answer both questions:\n` +
-    `(1) Does the source sentence appear in the full content at or near the stated offsets?\n` +
+    `(1) Does the source sentence appear verbatim in the full content?\n` +
     `(2) Does the source sentence clearly and directly support the extracted value?\n\n` +
     `Return your answer as a valid JSON object with exactly this structure — no markdown, no explanation:\n` +
     `{\n` +

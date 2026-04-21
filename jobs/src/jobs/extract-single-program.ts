@@ -102,7 +102,9 @@ export const extractSingleProgram = task({
       const { output: extraction, sourceUrl } = await extract.executeMulti(
         tier1Scrapes,
         def.key,
-        programId
+        programId,
+        programName,
+        country
       );
 
       // Nothing was found in any tier-1 source for this field — skip silently

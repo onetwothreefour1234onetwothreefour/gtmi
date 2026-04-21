@@ -36,11 +36,16 @@ const SYSTEM_PROMPT =
 function buildUserMessage(
   fieldKey: string,
   extractionPromptMd: string,
+  programName: string,
+  countryIso: string,
   contentMarkdown: string
 ): string {
+  const resolvedPrompt = extractionPromptMd
+    .replace(/\{program_name\}/g, programName)
+    .replace(/\{program_country\}/g, countryIso);
   return (
     `Field to extract: ${fieldKey}\n\n` +
-    `Instructions:\n${extractionPromptMd}\n\n` +
+    `Instructions:\n${resolvedPrompt}\n\n` +
     `No-inference directive: If the value is not explicitly stated in the content below, ` +
     `return valueRaw as an empty string and extractionConfidence as 0.\n\n` +
     `Content to extract from:\n---\n${contentMarkdown}\n---\n\n` +
@@ -128,7 +133,9 @@ export class ExtractStageImpl implements ExtractStage {
   async execute(
     scrape: ScrapeResult,
     fieldKey: string,
-    programId: string
+    programId: string,
+    programName: string,
+    countryIso: string
   ): Promise<ExtractionOutput> {
     const extractionPromptMd = this.fieldPrompts.get(fieldKey);
     if (extractionPromptMd === undefined) {
@@ -145,63 +152,101 @@ export class ExtractStageImpl implements ExtractStage {
     }
     const truncatedContent = scrape.contentMarkdown.slice(0, MAX_CONTENT_CHARS);
 
-    const response = await client.messages
-      .create({
-        model: MODEL_EXTRACTION,
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: buildUserMessage(fieldKey, extractionPromptMd, truncatedContent),
-          },
-        ],
-      })
-      .catch((error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        throw new Error(
-          `Extraction API call failed for field ${fieldKey} / program ${programId}: ${msg}`
-        );
-      });
+    const MAX_RETRIES = 3;
+    const BASE_DELAY_MS = 60000;
+    let lastError: Error | null = null;
 
-    type ContentItem = (typeof response.content)[number];
-    const lastTextBlock = response.content
-      .filter((block): block is Extract<ContentItem, { type: 'text' }> => block.type === 'text')
-      .at(-1);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await client.messages.create({
+          model: MODEL_EXTRACTION,
+          max_tokens: 1024,
+          system: SYSTEM_PROMPT,
+          messages: [
+            {
+              role: 'user',
+              content: buildUserMessage(
+                fieldKey,
+                extractionPromptMd,
+                programName,
+                countryIso,
+                truncatedContent
+              ),
+            },
+          ],
+        });
 
-    if (!lastTextBlock) {
-      throw new Error(
-        `Extraction returned no text content for field ${fieldKey} / program ${programId}`
-      );
+        type ContentItem = (typeof response.content)[number];
+        const lastTextBlock = response.content
+          .filter((block): block is Extract<ContentItem, { type: 'text' }> => block.type === 'text')
+          .at(-1);
+
+        if (!lastTextBlock) {
+          throw new Error(
+            `Extraction returned no text content for field ${fieldKey} / program ${programId}`
+          );
+        }
+
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(stripJsonFences(lastTextBlock.text));
+        } catch {
+          throw new Error(
+            `Extraction response was not valid JSON for field ${fieldKey} / program ${programId}: ${lastTextBlock.text}`
+          );
+        }
+
+        const validated = assertLlmResponse(parsed, fieldKey);
+
+        return {
+          programId,
+          fieldDefinitionKey: fieldKey,
+          valueRaw: validated.valueRaw,
+          sourceSentence: validated.sourceSentence,
+          characterOffsets: validated.characterOffsets,
+          extractionConfidence: validated.extractionConfidence,
+          extractionModel: MODEL_EXTRACTION,
+          extractedAt: new Date(),
+        };
+      } catch (err) {
+        const isRateLimit =
+          err instanceof Error &&
+          (err.message.includes('429') ||
+            err.message.includes('rate_limit') ||
+            err.message.toLowerCase().includes('rate limit'));
+
+        if (isRateLimit && attempt < MAX_RETRIES) {
+          const delay = BASE_DELAY_MS * attempt;
+          console.warn(
+            `  [${fieldKey}] Rate limit hit (attempt ${attempt}/${MAX_RETRIES}) — retrying in ${delay / 1000}s`
+          );
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        lastError =
+          err instanceof Error
+            ? err
+            : new Error(
+                `Extraction API call failed for field ${fieldKey} / program ${programId}: ${String(err)}`
+              );
+        break;
+      }
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(stripJsonFences(lastTextBlock.text));
-    } catch {
-      throw new Error(
-        `Extraction response was not valid JSON for field ${fieldKey} / program ${programId}: ${lastTextBlock.text}`
-      );
-    }
-
-    const validated = assertLlmResponse(parsed, fieldKey);
-
-    return {
-      programId,
-      fieldDefinitionKey: fieldKey,
-      valueRaw: validated.valueRaw,
-      sourceSentence: validated.sourceSentence,
-      characterOffsets: validated.characterOffsets,
-      extractionConfidence: validated.extractionConfidence,
-      extractionModel: MODEL_EXTRACTION,
-      extractedAt: new Date(),
-    };
+    throw (
+      lastError ??
+      new Error(
+        `Extraction failed after ${MAX_RETRIES} retries for field ${fieldKey} / program ${programId}`
+      )
+    );
   }
 
   async executeMulti(
     scrapes: ScrapeResult[],
     fieldKey: string,
-    programId: string
+    programId: string,
+    programName: string,
+    countryIso: string
   ): Promise<{ output: ExtractionOutput; sourceUrl: string }> {
     if (scrapes.length === 0) {
       throw new Error(`No scrape results provided for field ${fieldKey} / program ${programId}`);
@@ -211,7 +256,7 @@ export class ExtractStageImpl implements ExtractStage {
     for (let i = 0; i < scrapes.length; i++) {
       if (i > 0) await new Promise((resolve) => setTimeout(resolve, 5000));
       candidates.push({
-        output: await this.execute(scrapes[i]!, fieldKey, programId),
+        output: await this.execute(scrapes[i]!, fieldKey, programId, programName, countryIso),
         sourceUrl: scrapes[i]!.url,
       });
     }
