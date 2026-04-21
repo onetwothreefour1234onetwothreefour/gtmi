@@ -1,15 +1,8 @@
-import { createHash } from 'node:crypto';
-import type FirecrawlApp from '@mendable/firecrawl-js';
-import { createFirecrawlClient } from '../clients/firecrawl';
 import type { DiscoveredUrl, ScrapeResult } from '../types/extraction';
 import type { ScrapeStage } from '../types/pipeline';
 
 interface ScrapeStageOptions {
   delayMs?: number;
-}
-
-function sha256(content: string): string {
-  return createHash('sha256').update(content).digest('hex');
 }
 
 function sleep(ms: number): Promise<void> {
@@ -24,29 +17,47 @@ export class ScrapeStageImpl implements ScrapeStage {
   }
 
   async execute(discoveredUrls: DiscoveredUrl[]): Promise<ScrapeResult[]> {
-    const client = createFirecrawlClient();
+    const SCRAPER_URL = process.env['SCRAPER_URL'] ?? 'http://localhost:8765';
+
+    try {
+      const health = await fetch(`${SCRAPER_URL}/health`);
+      if (!health.ok) throw new Error('unhealthy');
+    } catch {
+      throw new Error(
+        'Python scraper service is not running. ' +
+          'Start it with: uvicorn main:app --host 0.0.0.0 --port 8765 ' +
+          'from the scraper/ directory.'
+      );
+    }
+
     const results: ScrapeResult[] = [];
     let first = true;
 
     for (const discovered of discoveredUrls) {
       if (!first) await sleep(this.delayMs);
       first = false;
-      results.push(await this.scrapeOne(client, discovered));
+      results.push(await this.scrapeOne(discovered, SCRAPER_URL));
     }
 
     return results;
   }
 
-  private async scrapeOne(client: FirecrawlApp, discovered: DiscoveredUrl): Promise<ScrapeResult> {
-    const response = await client
-      .scrapeUrl(discovered.url, { formats: ['markdown'], onlyMainContent: true })
-      .catch((error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        const wrapped = new Error(`Firecrawl threw for ${discovered.url}: ${msg}`);
-        if (discovered.tier === 1) throw wrapped;
-        console.error(wrapped.message);
-        return null;
-      });
+  private async scrapeOne(discovered: DiscoveredUrl, scraperUrl: string): Promise<ScrapeResult> {
+    const response = await fetch(`${scraperUrl}/scrape`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: discovered.url,
+        only_main_content: true,
+      }),
+      signal: AbortSignal.timeout(45000),
+    }).catch((error: unknown) => {
+      const msg = error instanceof Error ? error.message : String(error);
+      const wrapped = new Error(`Scraper service unreachable for ${discovered.url}: ${msg}`);
+      if (discovered.tier === 1) throw wrapped;
+      console.error(wrapped.message);
+      return null;
+    });
 
     // TODO: archive source page to Wayback Machine Save Page Now API (Phase 5 scope)
 
@@ -54,34 +65,58 @@ export class ScrapeStageImpl implements ScrapeStage {
       return {
         url: discovered.url,
         contentMarkdown: '',
-        contentHash: sha256(''),
+        contentHash: '',
         scrapedAt: new Date(),
         httpStatus: 0,
       };
     }
 
-    if (!response.success) {
-      const msg = `Scrape failed for ${discovered.url}: ${response.error}`;
+    if (!response.ok) {
+      const msg = `Scraper service error for ${discovered.url}: HTTP ${response.status}`;
       if (discovered.tier === 1) throw new Error(msg);
       console.error(msg);
       return {
         url: discovered.url,
         contentMarkdown: '',
-        contentHash: sha256(''),
+        contentHash: '',
+        scrapedAt: new Date(),
+        httpStatus: response.status,
+      };
+    }
+
+    const data = (await response.json()) as {
+      content_markdown: string;
+      http_status: number;
+      scraped_at: string;
+      content_hash: string;
+      error?: string | null;
+    };
+
+    if (data.error) {
+      if (discovered.tier === 1) {
+        throw new Error(`Scraper threw for ${discovered.url}: ${data.error}`);
+      }
+      console.error(`Scraper threw for ${discovered.url}: ${data.error}`);
+      return {
+        url: discovered.url,
+        contentMarkdown: '',
+        contentHash: '',
         scrapedAt: new Date(),
         httpStatus: 0,
       };
     }
 
-    const contentMarkdown = response.markdown ?? '';
-    const httpStatus = response.metadata?.statusCode ?? 200;
+    const content =
+      data.content_markdown.length > 30000
+        ? data.content_markdown.slice(0, 30000)
+        : data.content_markdown;
 
     return {
       url: discovered.url,
-      contentMarkdown,
-      contentHash: sha256(contentMarkdown),
-      scrapedAt: new Date(),
-      httpStatus,
+      contentMarkdown: content,
+      httpStatus: data.http_status,
+      scrapedAt: new Date(data.scraped_at),
+      contentHash: data.content_hash,
     };
   }
 }

@@ -1,5 +1,3 @@
-import type Anthropic from '@anthropic-ai/sdk';
-import { createAnthropicClient, MODEL_DISCOVERY } from '../clients/anthropic';
 import type { DiscoveredUrl, DiscoveryResult } from '../types/extraction';
 import type { DiscoverStage } from '../types/pipeline';
 
@@ -180,31 +178,45 @@ async function verifyUrls(urls: DiscoveredUrl[]): Promise<DiscoveredUrl[]> {
 
 export class DiscoverStageImpl implements DiscoverStage {
   async execute(programId: string, programName: string, country: string): Promise<DiscoveryResult> {
-    const client = createAnthropicClient();
+    const PERPLEXITY_API_KEY = process.env['PERPLEXITY_API_KEY'];
+    if (!PERPLEXITY_API_KEY) {
+      throw new Error('PERPLEXITY_API_KEY is not set in environment');
+    }
 
-    const response = await client.messages
-      .create({
-        model: MODEL_DISCOVERY,
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'sonar-pro',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: buildUserMessage(programName, country) },
+        ],
+        temperature: 0.1,
         max_tokens: 2000,
-        system: SYSTEM_PROMPT,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' } as unknown as Anthropic.Tool],
-        messages: [{ role: 'user', content: buildUserMessage(programName, country) }],
-      })
-      .catch((error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        throw new Error(`Discovery API call failed for program ${programId}: ${msg}`);
-      });
+      }),
+    }).catch((error: unknown) => {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Discovery API call failed for program ${programId}: ${msg}`);
+    });
 
-    type ContentItem = (typeof response.content)[number];
-    const lastTextBlock = response.content
-      .filter((block): block is Extract<ContentItem, { type: 'text' }> => block.type === 'text')
-      .at(-1);
+    if (!response.ok) {
+      throw new Error(`Perplexity API error: HTTP ${response.status} ${await response.text()}`);
+    }
 
-    if (!lastTextBlock) {
+    const data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = data.choices?.[0]?.message?.content ?? '';
+
+    if (!content) {
       throw new Error(`Discovery returned no text content for program ${programId}`);
     }
 
-    const parsedUrls = parseDiscoveredUrls(lastTextBlock.text, programId).slice(0, 10);
+    const parsedUrls = parseDiscoveredUrls(content, programId).slice(0, 10);
     const discoveredUrls = await verifyUrls(parsedUrls);
 
     if (discoveredUrls.length === 0) {
