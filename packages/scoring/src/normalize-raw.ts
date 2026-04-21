@@ -1,4 +1,10 @@
-import { CategoricalRubric, NormalizationFn, ScoringError } from './types.ts';
+import {
+  CategoricalRubric,
+  NormalizationFn,
+  ScoringError,
+  WrappedCategoricalRubric,
+  rubricToScoreMap,
+} from './types.ts';
 
 export type NormalizedValue = number | string | boolean;
 
@@ -8,13 +14,30 @@ function isNormalizationFn(value: string): value is NormalizationFn {
   );
 }
 
-function isCategoricalRubric(value: unknown): value is CategoricalRubric {
+function isWrappedCategoricalRubric(value: unknown): value is WrappedCategoricalRubric {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const rec = value as Record<string, unknown>;
+  if (!Array.isArray(rec['categories'])) return false;
+  return (rec['categories'] as unknown[]).every(
+    (c) =>
+      typeof c === 'object' &&
+      c !== null &&
+      typeof (c as Record<string, unknown>)['value'] === 'string'
+  );
+}
+
+function isFlatCategoricalRubric(value: unknown): value is Record<string, number> {
   return (
     typeof value === 'object' &&
     value !== null &&
     !Array.isArray(value) &&
+    Object.keys(value as Record<string, unknown>).length > 0 &&
     Object.values(value as Record<string, unknown>).every((v) => typeof v === 'number')
   );
+}
+
+function isCategoricalRubric(value: unknown): value is CategoricalRubric {
+  return isWrappedCategoricalRubric(value) || isFlatCategoricalRubric(value);
 }
 
 /**
@@ -56,10 +79,11 @@ export function normalizeRawValue(
           `Field uses categorical normalization but has no valid scoringRubricJsonb`
         );
       }
+      const scoreMap = rubricToScoreMap(scoringRubricJsonb);
       const trimmed = valueRaw.trim();
-      if (!(trimmed in scoringRubricJsonb)) {
+      if (!(trimmed in scoreMap)) {
         throw new ScoringError(
-          `Categorical value "${trimmed}" not in rubric. Valid keys: ${Object.keys(scoringRubricJsonb).join(', ')}`
+          `Categorical value "${trimmed}" not in rubric. Valid keys: ${Object.keys(scoreMap).join(', ')}`
         );
       }
       return trimmed;

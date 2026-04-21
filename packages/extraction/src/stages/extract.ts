@@ -473,32 +473,4 @@ export class ExtractStageImpl implements ExtractStage {
 
     return best;
   }
-
-  // ── Legacy multi-URL single-field (kept for Trigger.dev job compatibility) ──
-  async executeMulti(
-    scrapes: ScrapeResult[],
-    fieldKey: string,
-    programId: string,
-    programName: string,
-    countryIso: string
-  ): Promise<{ output: ExtractionOutput; sourceUrl: string }> {
-    if (scrapes.length === 0)
-      throw new Error(`No scrape results provided for field ${fieldKey} / program ${programId}`);
-
-    const candidates: { output: ExtractionOutput; sourceUrl: string }[] = [];
-    for (let i = 0; i < scrapes.length; i++) {
-      if (i > 0) await new Promise((resolve) => setTimeout(resolve, 5000));
-      candidates.push({
-        output: await this.execute(scrapes[i]!, fieldKey, programId, programName, countryIso),
-        sourceUrl: scrapes[i]!.url,
-      });
-      // Early exit if high-confidence result found
-      const best = candidates.at(-1)!;
-      if (best.output.extractionConfidence >= EARLY_EXIT_CONFIDENCE) break;
-    }
-
-    return candidates.reduce((best, current) =>
-      current.output.extractionConfidence > best.output.extractionConfidence ? current : best
-    );
-  }
 }

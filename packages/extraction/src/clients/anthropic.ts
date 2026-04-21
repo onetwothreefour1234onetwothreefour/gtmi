@@ -1,17 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 export const MODEL_EXTRACTION = 'claude-sonnet-4-6' as const;
-export const MODEL_DISCOVERY = 'claude-sonnet-4-6' as const;
 export const MODEL_VALIDATION = 'claude-sonnet-4-6' as const;
 export const MODEL_CROSSCHECK = 'claude-sonnet-4-6' as const;
-export const MODEL_SUMMARY = 'claude-sonnet-4-6' as const;
 
 export type ExtractionModel =
   | typeof MODEL_EXTRACTION
-  | typeof MODEL_DISCOVERY
   | typeof MODEL_VALIDATION
-  | typeof MODEL_CROSSCHECK
-  | typeof MODEL_SUMMARY;
+  | typeof MODEL_CROSSCHECK;
 
 export function createAnthropicClient(): Anthropic {
   const apiKey = process.env['ANTHROPIC_API_KEY'];

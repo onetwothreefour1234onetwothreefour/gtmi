@@ -14,6 +14,42 @@ const SYSTEM_PROMPT =
 
 const CONTEXT_WINDOW = 200;
 
+function normalizeForMatch(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function findSourceSentencePosition(content: string, sourceSentence: string): number {
+  const direct = content.indexOf(sourceSentence);
+  if (direct !== -1) return direct;
+
+  const normalizedContent = normalizeForMatch(content);
+  const normalizedSentence = normalizeForMatch(sourceSentence);
+  if (normalizedSentence.length === 0) return -1;
+
+  const normalizedPos = normalizedContent.indexOf(normalizedSentence);
+  if (normalizedPos === -1) return -1;
+
+  let originalPos = 0;
+  let normalizedCursor = 0;
+  let inWhitespaceRun = false;
+  for (let i = 0; i < content.length; i++) {
+    if (normalizedCursor === normalizedPos) {
+      originalPos = i;
+      break;
+    }
+    const ch = content[i]!;
+    const isWs = /\s/.test(ch);
+    if (isWs) {
+      if (!inWhitespaceRun && normalizedCursor > 0) normalizedCursor++;
+      inWhitespaceRun = true;
+    } else {
+      normalizedCursor++;
+      inWhitespaceRun = false;
+    }
+  }
+  return originalPos;
+}
+
 function buildUserMessage(
   extraction: ExtractionOutput,
   offsetContext: string,
@@ -125,17 +161,19 @@ export class ValidateStageImpl implements ValidateStage {
       };
     }
 
-    // Verify presence deterministically before spending an LLM call
-    const actualPos = scrape.contentMarkdown.indexOf(extraction.sourceSentence);
+    // Verify presence deterministically before spending an LLM call.
+    // The scraper normalizes whitespace (innerText), so LLM-quoted sentences
+    // rarely match verbatim. Fall back to whitespace-insensitive matching.
+    const actualPos = findSourceSentencePosition(scrape.contentMarkdown, extraction.sourceSentence);
     if (actualPos === -1) {
       console.log(
-        `  [${extraction.fieldDefinitionKey}] Source sentence NOT FOUND in content — isValid: false (no LLM call)`
+        `  [${extraction.fieldDefinitionKey}] Source sentence NOT FOUND in content (strict or normalized) — isValid: false (no LLM call)`
       );
       return {
         isValid: false,
         validationConfidence: 1.0,
         validationModel: MODEL_VALIDATION,
-        notes: 'Source sentence not found verbatim in scraped content.',
+        notes: 'Source sentence not found in scraped content (strict or whitespace-normalized).',
       };
     }
     console.log(

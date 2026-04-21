@@ -2,7 +2,33 @@ export type NormalizationFn = 'min_max' | 'z_score' | 'categorical' | 'boolean';
 
 export type Direction = 'higher_is_better' | 'lower_is_better';
 
-export type CategoricalRubric = Record<string, number>;
+export type FlatCategoricalRubric = Record<string, number>;
+
+export interface WrappedCategoricalRubric {
+  categories: Array<{
+    value: string;
+    score: number;
+    description?: string;
+  }>;
+}
+
+export type CategoricalRubric = FlatCategoricalRubric | WrappedCategoricalRubric;
+
+export function rubricToScoreMap(rubric: CategoricalRubric): Record<string, number> {
+  if (
+    typeof rubric === 'object' &&
+    rubric !== null &&
+    'categories' in rubric &&
+    Array.isArray((rubric as WrappedCategoricalRubric).categories)
+  ) {
+    const map: Record<string, number> = {};
+    for (const c of (rubric as WrappedCategoricalRubric).categories) {
+      map[c.value] = c.score;
+    }
+    return map;
+  }
+  return rubric as FlatCategoricalRubric;
+}
 
 export interface NormalizationParamSet {
   min?: number;

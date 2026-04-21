@@ -4,6 +4,7 @@ import {
   NormalizationFn,
   NormalizationParamSet,
   ScoringError,
+  rubricToScoreMap,
 } from './types.ts';
 
 /**
@@ -55,12 +56,13 @@ export function normalizeZScore(
 }
 
 export function normalizeCategorical(value: string, rubric: CategoricalRubric): number {
-  if (!(value in rubric)) {
+  const scoreMap = rubricToScoreMap(rubric);
+  if (!(value in scoreMap)) {
     throw new ScoringError(
-      `Categorical value "${value}" not found in rubric. Valid keys: ${Object.keys(rubric).join(', ')}`
+      `Categorical value "${value}" not found in rubric. Valid keys: ${Object.keys(scoreMap).join(', ')}`
     );
   }
-  return rubric[value];
+  return scoreMap[value];
 }
 
 export function normalizeBoolean(value: boolean, direction: Direction): number {

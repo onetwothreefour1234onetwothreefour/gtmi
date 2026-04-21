@@ -1,6 +1,5 @@
 import { task } from '@trigger.dev/sdk/v3';
 import {
-  CrossCheckStageImpl,
   DiscoverStageImpl,
   ExtractStageImpl,
   HumanReviewStageImpl,
@@ -12,10 +11,18 @@ import type {
   CrossCheckOutcome,
   CrossCheckResult,
   DiscoveredUrl,
+  ExtractionOutput,
+  FieldSpec,
   ProvenanceRecord,
   ScrapeResult,
 } from '@gtmi/extraction';
 import { db, fieldDefinitions } from '@gtmi/db';
+import { WAVE_1_ENABLED, WAVE_1_FIELD_CODES } from '../../../scripts/wave-config';
+import {
+  COUNTRY_LEVEL_SOURCES,
+  ISO3_TO_ISO2,
+  fetchWgiScore,
+} from '../../../scripts/country-sources';
 
 const METHODOLOGY_VERSION = '1.0.0';
 const AUTO_APPROVE_CONFIDENCE_THRESHOLD = 0.85;
@@ -38,6 +45,14 @@ export const extractSingleProgram = task({
   }): Promise<PipelineResult> => {
     const { programId, programName, country } = payload;
 
+    let allFieldDefs = await db.select().from(fieldDefinitions);
+    const fieldPrompts = new Map<string, string>();
+    for (const def of allFieldDefs) fieldPrompts.set(def.key, def.extractionPromptMd);
+    if (WAVE_1_ENABLED) {
+      allFieldDefs = allFieldDefs.filter((def) => WAVE_1_FIELD_CODES.includes(def.key));
+      console.log(`Wave 1 active — running ${allFieldDefs.length} of 48 fields for ${programId}`);
+    }
+
     // --- Stage 0: Discover ---
     const discover = new DiscoverStageImpl();
     const discoveryResult = await discover.execute(programId, programName, country);
@@ -45,50 +60,68 @@ export const extractSingleProgram = task({
       `Stage 0 complete for ${programId}: ${discoveryResult.discoveredUrls.length} URLs discovered`
     );
 
-    // --- Stage 1: Scrape all discovered URLs ---
+    // --- Stage 1: Scrape discovered URLs + global country-level sources ---
     const scrape = new ScrapeStageImpl();
     const scrapeResults = await scrape.execute(discoveryResult.discoveredUrls);
     console.log(`Stage 1 complete for ${programId}: ${scrapeResults.length} URLs scraped`);
 
-    // Build lookup maps keyed by URL for O(1) access later
+    const globalDiscoveredUrls: DiscoveredUrl[] = COUNTRY_LEVEL_SOURCES.map((s) => ({
+      url: s.url,
+      tier: s.tier,
+      geographicLevel: s.geographicLevel,
+      reason: s.reason,
+      isOfficial: s.tier === 1,
+    }));
+    const globalScrapeResults: ScrapeResult[] = [];
+    for (const u of globalDiscoveredUrls) {
+      try {
+        const [result] = await scrape.execute([u]);
+        if (result && result.contentMarkdown.length > 0) {
+          globalScrapeResults.push(result);
+          console.log(`  [Global] Scraped: ${u.url} (${result.contentMarkdown.length} chars)`);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`  [Global] Skipped ${u.url}: ${msg}`);
+      }
+    }
+    const globalScrapeByUrl = new Map<string, ScrapeResult>();
+    for (const sr of globalScrapeResults) globalScrapeByUrl.set(sr.url, sr);
+
     const scrapeByUrl = new Map<string, ScrapeResult>();
-    for (const sr of scrapeResults) {
-      scrapeByUrl.set(sr.url, sr);
-    }
+    for (const sr of scrapeResults) scrapeByUrl.set(sr.url, sr);
     const discoveredByUrl = new Map<string, DiscoveredUrl>();
-    for (const du of discoveryResult.discoveredUrls) {
-      discoveredByUrl.set(du.url, du);
+    for (const du of discoveryResult.discoveredUrls) discoveredByUrl.set(du.url, du);
+
+    const tier1Scrapes = scrapeResults.filter(
+      (sr) => sr.contentMarkdown.length > 0 && discoveredByUrl.get(sr.url)?.tier === 1
+    );
+    const extractionScrapes = (
+      tier1Scrapes.length > 0
+        ? tier1Scrapes
+        : scrapeResults.filter((sr) => sr.contentMarkdown.length > 0)
+    ).slice(0, 5);
+
+    const allUniqueScrapeUrls = new Set(extractionScrapes.map((s) => s.url));
+    const allUniqueScrapes: ScrapeResult[] = [...extractionScrapes];
+    for (const sr of globalScrapeResults) {
+      if (!allUniqueScrapeUrls.has(sr.url)) {
+        allUniqueScrapeUrls.add(sr.url);
+        allUniqueScrapes.push(sr);
+      }
     }
 
-    // Partition scrape results: tier-1 for extraction, first tier-2 for cross-check
-    const tier1Scrapes = scrapeResults
-      .filter((sr) => discoveredByUrl.get(sr.url)?.tier === 1)
-      .slice(0, 5);
-
-    const tier2DiscoveredUrl = discoveryResult.discoveredUrls.find((u) => u.tier === 2);
-    const tier2Scrape: ScrapeResult | null = tier2DiscoveredUrl
-      ? (scrapeByUrl.get(tier2DiscoveredUrl.url) ?? null)
-      : null;
-
-    // A discovered-but-failed scrape (httpStatus 0, empty content) is treated as not-checked,
-    // not as a disagreement — same outcome as no Tier 2 URL being discovered.
-    const effectiveTier2Scrape: ScrapeResult | null =
-      tier2Scrape !== null && tier2Scrape.httpStatus !== 0 && tier2Scrape.contentMarkdown !== ''
-        ? tier2Scrape
-        : null;
-
-    // --- Pre-loop: Load all field definitions from DB ---
-    const allFieldDefs = await db.select().from(fieldDefinitions);
-
-    const fieldPrompts = new Map<string, string>();
-    for (const def of allFieldDefs) {
-      fieldPrompts.set(def.key, def.extractionPromptMd);
+    if (allUniqueScrapes.length === 0) {
+      throw new Error(
+        `No usable scrape results for program ${programId} — all ${scrapeResults.length} program scrapes and ${globalScrapeResults.length} global scrapes returned empty content`
+      );
     }
+    console.log(
+      `  [Pipeline] Using ${allUniqueScrapes.length} scrapes (${extractionScrapes.length} program, ${globalScrapeResults.length} global)`
+    );
 
-    // Instantiate remaining stages
     const extract = new ExtractStageImpl(fieldPrompts);
     const validate = new ValidateStageImpl();
-    const crossCheckStage = new CrossCheckStageImpl();
     const humanReview = new HumanReviewStageImpl();
     const publish = new PublishStageImpl();
 
@@ -96,66 +129,117 @@ export const extractSingleProgram = task({
     let fieldsAutoApproved = 0;
     let fieldsQueued = 0;
 
-    // --- Per-field pipeline loop ---
-    for (const def of allFieldDefs) {
-      // Stage 2: Extract — pick the best result across all tier-1 scrapes
-      const { output: extraction, sourceUrl } = await extract.executeMulti(
-        tier1Scrapes,
-        def.key,
-        programId,
-        programName,
-        country
-      );
+    // --- E.3.2: direct World Bank WGI API (bypasses LLM) ---
+    const e32def = allFieldDefs.find((d) => d.key === 'E.3.2');
+    if (e32def) {
+      const wgiResult = await fetchWgiScore(country);
+      if (wgiResult) {
+        const wgiExtraction: ExtractionOutput = {
+          fieldDefinitionKey: 'E.3.2',
+          programId,
+          valueRaw: wgiResult.score,
+          sourceSentence: `World Bank WGI Government Effectiveness estimate for ${wgiResult.countryName}: ${wgiResult.score} (${wgiResult.year})`,
+          characterOffsets: { start: 0, end: 0 },
+          extractionModel: 'world-bank-api-direct',
+          extractionConfidence: 1.0,
+          extractedAt: new Date(),
+        };
+        const wgiValidation = {
+          isValid: true,
+          validationConfidence: 1.0,
+          validationModel: 'world-bank-api-direct',
+          notes: 'Direct World Bank API source — no LLM extraction needed',
+        };
+        const iso2 = ISO3_TO_ISO2[country];
+        const wgiProvenance: ProvenanceRecord = {
+          sourceUrl: iso2
+            ? `https://api.worldbank.org/v2/country/${iso2}/indicator/GE.EST?format=json&mrv=1&source=3`
+            : 'https://api.worldbank.org/v2/wgi',
+          geographicLevel: 'global',
+          sourceTier: 1,
+          scrapeTimestamp: new Date().toISOString(),
+          contentHash: '',
+          sourceSentence: wgiExtraction.sourceSentence,
+          characterOffsets: { start: 0, end: 0 },
+          extractionModel: 'world-bank-api-direct',
+          extractionConfidence: 1.0,
+          validationModel: 'world-bank-api-direct',
+          validationConfidence: 1.0,
+          crossCheckResult: 'not_checked',
+          crossCheckUrl: null,
+          reviewedBy: 'auto',
+          reviewedAt: new Date(),
+          methodologyVersion: METHODOLOGY_VERSION,
+          reviewDecision: 'approve',
+        };
+        await publish.execute(wgiExtraction, wgiValidation, wgiProvenance);
+        fieldsExtracted++;
+        fieldsAutoApproved++;
+        console.log(`  [E.3.2] Published from World Bank API — AUTO-APPROVED`);
+      } else {
+        console.warn(`  [E.3.2] No WGI score available for ${country} — skipping`);
+      }
+    }
 
-      // Nothing was found in any tier-1 source for this field — skip silently
+    // --- Stage 2: Batch extract LLM fields (E.3.2 excluded — sourced via API above) ---
+    const llmFields: FieldSpec[] = allFieldDefs
+      .filter((d) => d.key !== 'E.3.2')
+      .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd }));
+
+    const allExtractionResults = await extract.executeAllFields(
+      allUniqueScrapes,
+      llmFields,
+      programId,
+      programName,
+      country
+    );
+
+    // --- Per-field validate + publish ---
+    for (const def of allFieldDefs.filter((d) => d.key !== 'E.3.2')) {
+      const extractionResult = allExtractionResults.get(def.key);
+      if (!extractionResult) continue;
+
+      const { output: extraction, sourceUrl } = extractionResult;
       if (extraction.valueRaw === '') continue;
 
       fieldsExtracted++;
 
-      // Resolve the winning scrape and its discovery metadata for provenance
-      const winningScrape = scrapeByUrl.get(sourceUrl);
+      const winningScrape = scrapeByUrl.get(sourceUrl) ?? globalScrapeByUrl.get(sourceUrl) ?? null;
       if (!winningScrape) {
         throw new Error(
           `No scrape result found for source URL "${sourceUrl}" on field "${def.key}" — this is a bug`
         );
       }
-      const winningDiscovered = discoveredByUrl.get(sourceUrl);
+      const winningDiscovered =
+        discoveredByUrl.get(sourceUrl) ??
+        globalDiscoveredUrls.find((u) => u.url === sourceUrl) ??
+        null;
       if (!winningDiscovered) {
         throw new Error(
           `No discovered URL entry found for source URL "${sourceUrl}" on field "${def.key}" — this is a bug`
         );
       }
 
-      // Stage 3: Validate against the winning scrape's content
       const validation = await validate.execute(extraction, winningScrape);
 
-      // Stage 4: Cross-check against tier-2 source, or synthesise a no-op result
-      let crossCheck: CrossCheckResult;
-      let crossCheckOutcome: CrossCheckOutcome;
+      const crossCheck: CrossCheckResult = {
+        agrees: true,
+        tier2Url: '',
+        notes: 'Cross-check removed — extraction uses all sources',
+      };
+      const crossCheckOutcome: CrossCheckOutcome = 'not_checked';
 
-      if (effectiveTier2Scrape !== null) {
-        crossCheck = await crossCheckStage.execute(extraction, effectiveTier2Scrape);
-        crossCheckOutcome = crossCheck.agrees ? 'agree' : 'disagree';
-      } else {
-        crossCheck = { agrees: true, tier2Url: '', notes: 'No Tier 2 source discovered' };
-        crossCheckOutcome = 'not_checked';
-      }
-
-      // Auto-approval gate — four explicit conditions per canary run spec
       const isAutoApproved =
         extraction.extractionConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD &&
         validation.isValid &&
-        validation.validationConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD &&
-        (crossCheck.agrees || crossCheckOutcome === 'not_checked');
+        validation.validationConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD;
 
-      // Stage 5: Human review — enqueue only; awaitDecision is Phase 4 scope
       if (!isAutoApproved) {
         await humanReview.enqueue(extraction, validation, crossCheck);
         fieldsQueued++;
         continue;
       }
 
-      // Stage 6: Publish auto-approved value with full provenance
       const provenance: ProvenanceRecord = {
         sourceUrl,
         geographicLevel: winningDiscovered.geographicLevel,
@@ -169,7 +253,7 @@ export const extractSingleProgram = task({
         validationModel: validation.validationModel,
         validationConfidence: validation.validationConfidence,
         crossCheckResult: crossCheckOutcome,
-        crossCheckUrl: effectiveTier2Scrape?.url ?? null,
+        crossCheckUrl: null,
         reviewedBy: 'auto',
         reviewedAt: new Date(),
         methodologyVersion: METHODOLOGY_VERSION,
@@ -191,7 +275,7 @@ export const extractSingleProgram = task({
     return {
       programId,
       urlsDiscovered: discoveryResult.discoveredUrls.length,
-      urlsScraped: scrapeResults.length,
+      urlsScraped: scrapeResults.length + globalScrapeResults.length,
       fieldsExtracted,
       fieldsAutoApproved,
       fieldsQueued,

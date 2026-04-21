@@ -12,6 +12,29 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { eq, and } from 'drizzle-orm';
 import { methodologyV1 } from './methodology-v1';
+import { RUBRIC_SCORES } from './rubric-scores';
+
+function applyRubricScores(
+  key: string,
+  rubric: { categories: Array<{ value: string; description?: string }> } | null
+): { categories: Array<{ value: string; description?: string; score: number }> } | null {
+  if (!rubric) return rubric;
+  const scores = RUBRIC_SCORES[key];
+  if (!scores) {
+    throw new Error(
+      `Field "${key}" has a categorical rubric but no scores defined in rubric-scores.ts`
+    );
+  }
+  const enriched = rubric.categories.map((c) => {
+    if (!(c.value in scores)) {
+      throw new Error(
+        `Field "${key}" rubric has category "${c.value}" with no score in rubric-scores.ts`
+      );
+    }
+    return { ...c, score: scores[c.value] };
+  });
+  return { categories: enriched };
+}
 
 async function seed() {
   console.log('Starting database seed...');
@@ -176,7 +199,7 @@ async function seed() {
         subFactor: ind.subFactor,
         weightWithinSubFactor: String(ind.weightWithinSubFactor),
         extractionPromptMd: ind.extractionPromptMd,
-        scoringRubricJsonb: ind.scoringRubricJsonb,
+        scoringRubricJsonb: applyRubricScores(ind.key, ind.scoringRubricJsonb),
         normalizationFn: ind.normalizationFn,
         direction: ind.direction,
         sourceTierRequired: ind.sourceTierRequired,
@@ -191,7 +214,7 @@ async function seed() {
           subFactor: ind.subFactor,
           weightWithinSubFactor: String(ind.weightWithinSubFactor),
           extractionPromptMd: ind.extractionPromptMd,
-          scoringRubricJsonb: ind.scoringRubricJsonb,
+          scoringRubricJsonb: applyRubricScores(ind.key, ind.scoringRubricJsonb),
           normalizationFn: ind.normalizationFn,
           direction: ind.direction,
           sourceTierRequired: ind.sourceTierRequired,
