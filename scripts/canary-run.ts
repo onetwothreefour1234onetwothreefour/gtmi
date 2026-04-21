@@ -24,6 +24,7 @@ import {
   ISO3_TO_ISO2,
 } from './country-sources';
 import { and, eq, ilike } from 'drizzle-orm';
+import { createHash } from 'crypto';
 
 const METHODOLOGY_VERSION = '1.0.0';
 const AUTO_APPROVE_CONFIDENCE_THRESHOLD = 0.85;
@@ -202,15 +203,26 @@ async function main() {
     const discoveredByUrl = new Map<string, DiscoveredUrl>();
     for (const du of discoveryResult.discoveredUrls) discoveredByUrl.set(du.url, du);
 
+    const hasUsableContent = (sr: ScrapeResult): boolean =>
+      sr.httpStatus >= 200 && sr.httpStatus < 400 && sr.contentMarkdown.trim().length > 0;
+
     const tier1Scrapes = scrapeResults
       .filter((sr) => discoveredByUrl.get(sr.url)?.tier === 1)
+      .filter(hasUsableContent)
       .slice(0, 5);
 
     // Collect all unique scrapes: tier 1 program-specific + all global sources
-    // (deduped by URL so the same page isn't sent twice)
+    // (deduped by URL so the same page isn't sent twice). Drop any scrape that
+    // failed or returned empty content so extraction never sees garbage.
     const allScrapeUrls = new Set(tier1Scrapes.map((s) => s.url));
     const allUniqueScrapes: ScrapeResult[] = [...tier1Scrapes];
     for (const sr of globalScrapeResults) {
+      if (!hasUsableContent(sr)) {
+        console.log(
+          `  [Extract gate] Skipping empty/failed scrape: ${sr.url} (HTTP ${sr.httpStatus}, ${sr.contentMarkdown.length} chars)`
+        );
+        continue;
+      }
       if (!allScrapeUrls.has(sr.url)) {
         allScrapeUrls.add(sr.url);
         allUniqueScrapes.push(sr);
@@ -250,11 +262,13 @@ async function main() {
           notes: 'Direct World Bank API source — no LLM extraction needed',
         };
         const wgiProvenance: ProvenanceRecord = {
-          sourceUrl: `https://api.worldbank.org/v2/country/${ISO3_TO_ISO2[countryArg]}/indicator/GE.EST?format=json&mrv=1&source=3`,
+          sourceUrl: `https://api.worldbank.org/v2/country/${ISO3_TO_ISO2[countryArg]}/indicator/GOV_WGI_GE.EST?format=json&mrv=1&source=3`,
           geographicLevel: 'global',
           sourceTier: 1,
           scrapeTimestamp: new Date().toISOString(),
-          contentHash: '',
+          contentHash: createHash('sha256')
+            .update(`wgi:${wgiResult.score}:${wgiResult.year}:${wgiResult.countryName}`)
+            .digest('hex'),
           sourceSentence: wgiExtraction.sourceSentence,
           characterOffsets: { start: 0, end: 0 },
           extractionModel: 'world-bank-api-direct',
@@ -384,9 +398,16 @@ async function main() {
         reviewDecision: 'approve',
       };
 
-      await publish.execute(extraction, validation, provenance);
-      fieldsAutoApproved++;
-      console.log(`  Published field "${def.key}"`);
+      try {
+        await publish.execute(extraction, validation, provenance);
+        fieldsAutoApproved++;
+        console.log(`  Published field "${def.key}"`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`  ↳ Publish failed for ${def.key}: ${msg} — queuing for review instead`);
+        await humanReview.enqueue(extraction, validation, crossCheck);
+        fieldsQueued++;
+      }
     }
 
     console.log(`\n--- Canary Run Summary: ${programName} (${countryIso}) ---`);

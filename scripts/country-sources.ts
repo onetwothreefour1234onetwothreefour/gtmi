@@ -8,13 +8,6 @@ export interface CountryLevelSource {
 
 export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
   {
-    url: 'https://info.worldbank.org/governance/wgi/',
-    tier: 1,
-    geographicLevel: 'global',
-    reason: 'Government effectiveness, rule of law scores by country',
-    fieldKeys: ['E.3.2'],
-  },
-  {
     url: 'https://www.oecd.org/en/topics/policy-issues/international-migration.html',
     tier: 1,
     geographicLevel: 'global',
@@ -192,7 +185,7 @@ export async function fetchWgiScore(
     console.warn(`[WGI] No ISO2 mapping found for ${countryIso3}`);
     return null;
   }
-  const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/GE.EST?format=json&mrv=1&source=3`;
+  const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/GOV_WGI_GE.EST?format=json&mrv=1&source=3`;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
