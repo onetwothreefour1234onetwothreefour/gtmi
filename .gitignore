@@ -50,3 +50,9 @@ logs/
 
 # vercel
 .vercel
+
+# claude code local state
+.claude/
+
+# trigger.dev compiled artifacts
+jobs/.trigger/
