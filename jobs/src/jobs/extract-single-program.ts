@@ -51,7 +51,7 @@ export const extractSingleProgram = task({
     if (missingVars.length > 0) {
       throw new Error(
         `Missing required environment variables: ${missingVars.join(', ')}. ` +
-          `Set them in the Trigger.dev dashboard under Project → Environment Variables.`
+          `Set them in the Trigger.dev dashboard under Project → Environment Variables.`,
       );
     }
 
@@ -67,7 +67,7 @@ export const extractSingleProgram = task({
     const discover = new DiscoverStageImpl();
     const discoveryResult = await discover.execute(programId, programName, country);
     console.log(
-      `Stage 0 complete for ${programId}: ${discoveryResult.discoveredUrls.length} URLs discovered`
+      `Stage 0 complete for ${programId}: ${discoveryResult.discoveredUrls.length} URLs discovered`,
     );
 
     // --- Stage 1: Scrape discovered URLs + global country-level sources ---
@@ -76,7 +76,7 @@ export const extractSingleProgram = task({
     console.log(`Stage 1 complete for ${programId}: ${scrapeResults.length} URLs scraped`);
 
     const applicableGlobalSources = COUNTRY_LEVEL_SOURCES.filter(
-      (s) => !s.country || s.country === country
+      (s) => !s.country || s.country === country,
     );
     const globalDiscoveredUrls: DiscoveredUrl[] = applicableGlobalSources.map((s) => ({
       url: s.url,
@@ -106,18 +106,22 @@ export const extractSingleProgram = task({
     const discoveredByUrl = new Map<string, DiscoveredUrl>();
     for (const du of discoveryResult.discoveredUrls) discoveredByUrl.set(du.url, du);
 
-    const tier1Scrapes = scrapeResults.filter(
-      (sr) => sr.contentMarkdown.length > 0 && discoveredByUrl.get(sr.url)?.tier === 1
+    const hasUsableContent = (sr: ScrapeResult) =>
+      sr.httpStatus >= 200 && sr.httpStatus < 400 && sr.contentMarkdown.trim().length > 0;
+
+    const tier1Scrapes = scrapeResults
+      .filter((sr) => hasUsableContent(sr) && discoveredByUrl.get(sr.url)?.tier === 1)
+      .slice(0, 5);
+    const tier2Scrapes = scrapeResults.filter(
+      (sr) => hasUsableContent(sr) && discoveredByUrl.get(sr.url)?.tier === 2,
     );
-    const extractionScrapes = (
-      tier1Scrapes.length > 0
-        ? tier1Scrapes
-        : scrapeResults.filter((sr) => sr.contentMarkdown.length > 0)
-    ).slice(0, 5);
+    const extractionScrapes =
+      tier1Scrapes.length > 0 ? tier1Scrapes : scrapeResults.filter(hasUsableContent).slice(0, 5);
 
     const allUniqueScrapeUrls = new Set(extractionScrapes.map((s) => s.url));
     const allUniqueScrapes: ScrapeResult[] = [...extractionScrapes];
     for (const sr of globalScrapeResults) {
+      if (!hasUsableContent(sr)) continue;
       if (!allUniqueScrapeUrls.has(sr.url)) {
         allUniqueScrapeUrls.add(sr.url);
         allUniqueScrapes.push(sr);
@@ -126,11 +130,11 @@ export const extractSingleProgram = task({
 
     if (allUniqueScrapes.length === 0) {
       throw new Error(
-        `No usable scrape results for program ${programId} — all ${scrapeResults.length} program scrapes and ${globalScrapeResults.length} global scrapes returned empty content`
+        `No usable scrape results for program ${programId} — all ${scrapeResults.length} program scrapes and ${globalScrapeResults.length} global scrapes returned empty content`,
       );
     }
     console.log(
-      `  [Pipeline] Using ${allUniqueScrapes.length} scrapes (${extractionScrapes.length} program, ${globalScrapeResults.length} global)`
+      `  [Pipeline] Using ${allUniqueScrapes.length} scrapes (${extractionScrapes.length} program, ${globalScrapeResults.length} global)`,
     );
 
     const extract = new ExtractStageImpl(fieldPrompts);
@@ -204,8 +208,35 @@ export const extractSingleProgram = task({
       llmFields,
       programId,
       programName,
-      country
+      country,
     );
+
+    // Tier-2 fallback: retry fields that yielded no value from tier-1 + global sources.
+    const missingLlmFields = llmFields.filter((f) => {
+      const r = allExtractionResults.get(f.key);
+      return !r || r.output.valueRaw === '';
+    });
+    if (missingLlmFields.length > 0 && tier2Scrapes.length > 0) {
+      console.log(
+        `[Tier-2 fallback] ${missingLlmFields.length} fields missing — retrying with ${tier2Scrapes.length} tier-2 URLs`,
+      );
+      for (const sr of tier2Scrapes) scrapeByUrl.set(sr.url, sr);
+      try {
+        const tier2Results = await extract.executeAllFields(
+          tier2Scrapes,
+          missingLlmFields,
+          programId,
+          programName,
+          country,
+        );
+        for (const [key, result] of tier2Results) {
+          if (result.output.valueRaw !== '') allExtractionResults.set(key, result);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[Tier-2 fallback] batch failed: ${msg}`);
+      }
+    }
 
     // --- Per-field validate + publish ---
     for (const def of allFieldDefs.filter((d) => d.key !== 'E.3.2')) {
@@ -220,7 +251,7 @@ export const extractSingleProgram = task({
       const winningScrape = scrapeByUrl.get(sourceUrl) ?? globalScrapeByUrl.get(sourceUrl) ?? null;
       if (!winningScrape) {
         throw new Error(
-          `No scrape result found for source URL "${sourceUrl}" on field "${def.key}" — this is a bug`
+          `No scrape result found for source URL "${sourceUrl}" on field "${def.key}" — this is a bug`,
         );
       }
       const winningDiscovered =
@@ -229,7 +260,7 @@ export const extractSingleProgram = task({
         null;
       if (!winningDiscovered) {
         throw new Error(
-          `No discovered URL entry found for source URL "${sourceUrl}" on field "${def.key}" — this is a bug`
+          `No discovered URL entry found for source URL "${sourceUrl}" on field "${def.key}" — this is a bug`,
         );
       }
 
@@ -282,7 +313,7 @@ export const extractSingleProgram = task({
       `Pipeline complete for ${programId}: ` +
         `${fieldsExtracted} extracted, ` +
         `${fieldsAutoApproved} auto-approved, ` +
-        `${fieldsQueued} queued for review`
+        `${fieldsQueued} queued for review`,
     );
 
     return {
