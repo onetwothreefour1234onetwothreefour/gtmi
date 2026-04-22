@@ -71,7 +71,7 @@ async function main() {
   const countryArg = countryArgIdx !== -1 ? process.argv[countryArgIdx + 1] : undefined;
   if (!countryArg) {
     console.error(
-      'Usage: npx tsx scripts/run-paq-score.ts --country <AUS|SGP> [--programId <uuid>]'
+      'Usage: npx tsx scripts/run-paq-score.ts --country <AUS|SGP> [--programId <uuid>]',
     );
     process.exit(1);
   }
@@ -93,30 +93,28 @@ async function main() {
     }
     programId = rows.id;
     programName = rows.name;
-  } else if (countryArg === 'AUS') {
-    const rows = await db.query.programs.findFirst({
-      where: (p, { and, eq, ilike }) =>
-        and(eq(p.countryIso, 'AUS'), ilike(p.name, '%Skills in Demand%')),
-    });
-    if (!rows) {
-      console.error('No AUS Skills in Demand program found');
-      process.exit(1);
-    }
-    programId = rows.id;
-    programName = rows.name;
-  } else if (countryArg === 'SGP') {
-    const rows = await db.query.programs.findFirst({
-      where: (p, { and, eq, ilike }) => and(eq(p.countryIso, 'SGP'), ilike(p.name, '%S Pass%')),
-    });
-    if (!rows) {
-      console.error('No SGP S Pass program found');
-      process.exit(1);
-    }
-    programId = rows.id;
-    programName = rows.name;
   } else {
-    console.error(`Unknown country: ${countryArg}`);
-    process.exit(1);
+    const defaultKeywords: Record<string, string> = {
+      AUS: 'skills in demand',
+      SGP: 's pass',
+      CAN: 'express entry',
+      GBR: 'skilled worker visa',
+    };
+    const keyword = defaultKeywords[countryArg!];
+    const allForCountry = await db.query.programs.findMany({
+      where: (p, { eq }) => eq(p.countryIso, countryArg!),
+      columns: { id: true, name: true },
+    });
+    if (allForCountry.length === 0) {
+      console.error(`No programs found for country_iso="${countryArg}"`);
+      process.exit(1);
+    }
+    const matched = keyword
+      ? allForCountry.filter((r) => r.name.toLowerCase().includes(keyword))
+      : [];
+    const selected = (matched.length > 0 ? matched : allForCountry)[0]!;
+    programId = selected.id;
+    programName = selected.name;
   }
 
   console.log(`\nProgram: ${programName} (${programId})`);
@@ -204,7 +202,7 @@ async function main() {
   for (const d of scoredDefs) {
     const fv = approvedFVs.find((fv) => fv.fieldDefinitionId === d.id);
     console.log(
-      `  ${d.key.padEnd(8)} ${d.normalizationFn.padEnd(12)} → normalized: ${JSON.stringify(fv?.valueNormalized)}`
+      `  ${d.key.padEnd(8)} ${d.normalizationFn.padEnd(12)} → normalized: ${JSON.stringify(fv?.valueNormalized)}`,
     );
   }
 
@@ -226,7 +224,7 @@ async function main() {
   console.log(`CME Score:        ${output.cmeScore.toFixed(2)}`);
   console.log(`Composite Score:  ${output.compositeScore.toFixed(2)}`);
   console.log(
-    `Coverage:         ${output.populatedFieldCount}/${output.activeFieldCount} Wave-1 fields (${((output.populatedFieldCount / Math.max(1, output.activeFieldCount)) * 100).toFixed(1)}%)`
+    `Coverage:         ${output.populatedFieldCount}/${output.activeFieldCount} Wave-1 fields (${((output.populatedFieldCount / Math.max(1, output.activeFieldCount)) * 100).toFixed(1)}%)`,
   );
   console.log(`Flagged (insufficient disclosure): ${output.flaggedInsufficientDisclosure}`);
   console.log('\nData coverage by pillar:');
@@ -285,10 +283,10 @@ async function main() {
   console.log(`\nWritten to scores table — id: ${inserted[0]?.id}`);
   if (output.flaggedInsufficientDisclosure) {
     console.log(
-      '\n⚠  FLAGGED: insufficient disclosure (data coverage < 70% in one or more pillars)'
+      '\n⚠  FLAGGED: insufficient disclosure (data coverage < 70% in one or more pillars)',
     );
     console.log(
-      '   This is expected for Phase 2 with a single program and partial field coverage.'
+      '   This is expected for Phase 2 with a single program and partial field coverage.',
     );
     console.log('   Scores are deterministic and repeatable — engine is working correctly.');
   }

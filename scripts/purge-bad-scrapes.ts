@@ -46,7 +46,7 @@ function checkContent(content: string, httpStatus: number): Rejection | null {
 
 async function main() {
   const dryRun = !process.argv.includes('--execute');
-  const sql = postgres(DB_URL, { ssl: 'require' });
+  const sql = postgres(DB_URL!, { ssl: 'require' });
 
   const rows = await sql<
     Array<{ url: string; content_markdown: string; http_status: number }>

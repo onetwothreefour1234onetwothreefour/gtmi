@@ -32,7 +32,7 @@ async function main() {
   const programsFilter =
     programsArgIdx !== -1 ? process.argv[programsArgIdx + 1]?.split(',') : undefined;
 
-  const sql = postgres(DB_URL, { ssl: 'require' });
+  const sql = postgres(DB_URL!, { ssl: 'require' });
 
   const rows = await sql<
     Array<{ field_key: string; value_normalized: number; country_iso: string }>

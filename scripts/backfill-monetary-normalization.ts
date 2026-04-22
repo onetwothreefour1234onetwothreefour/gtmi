@@ -51,7 +51,7 @@ function stripCurrencyAndParse(raw: string): { value: number; currency: string }
 
 async function main() {
   const dryRun = !process.argv.includes('--execute');
-  const sql = postgres(DB_URL, { ssl: 'require' });
+  const sql = postgres(DB_URL!, { ssl: 'require' });
 
   const rows = await sql<
     Array<{

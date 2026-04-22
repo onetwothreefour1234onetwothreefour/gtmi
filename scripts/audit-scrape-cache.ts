@@ -41,7 +41,7 @@ const ERROR_MARKERS = [
 ];
 
 async function main() {
-  const sql = postgres(DB_URL, { ssl: 'require' });
+  const sql = postgres(DB_URL!, { ssl: 'require' });
   const rows = await sql<
     Array<{
       url: string;

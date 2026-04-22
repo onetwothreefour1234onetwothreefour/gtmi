@@ -23,6 +23,9 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.58.2"
   },
+  "pnpm": {
+    "shamefullyHoist": true
+  },
   "lint-staged": {
     "*.{ts,tsx}": [
       "eslint --fix",

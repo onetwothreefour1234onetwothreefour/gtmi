@@ -71,6 +71,90 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
   // to the relevant family sub-docs. If family fields remain empty after next canary run,
   // the DOHA URL structure has changed again and we need to navigate the live site manually.
 
+  // CAN national-level sources — Express Entry / Federal Skilled Worker.
+  {
+    url: 'https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/eligibility/federal-skilled-workers.html',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'FSW eligibility: salary, points, experience requirements — A.1.1, A.2.2, A.2.3',
+    fieldKeys: ['A.1.1', 'A.2.2', 'A.2.3'],
+    country: 'CAN',
+  },
+  {
+    url: 'https://www.canada.ca/en/immigration-refugees-citizenship/services/application/check-processing-times.html',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'IRCC processing times — B.1.1 (processing days)',
+    fieldKeys: ['B.1.1'],
+    country: 'CAN',
+  },
+  {
+    url: 'https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/apply-permanent-residence/fees.html',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'Express Entry fee schedule — B.2.1 (principal fees)',
+    fieldKeys: ['B.2.1', 'B.2.2'],
+    country: 'CAN',
+  },
+  {
+    url: 'https://www.canada.ca/en/immigration-refugees-citizenship/services/new-immigrants/new-life-canada/health-care-card.html',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'Provincial health card eligibility for PR/work permit holders — C.3.1',
+    fieldKeys: ['C.3.1'],
+    country: 'CAN',
+  },
+  {
+    url: 'https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-citizenship/become-canadian-citizen/eligibility.html',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'Citizenship eligibility: 3 years physical presence in 5 — D.1.2, D.2.2',
+    fieldKeys: ['D.1.2', 'D.2.2'],
+    country: 'CAN',
+  },
+
+  // GBR national-level sources — Skilled Worker Visa.
+  {
+    url: 'https://www.gov.uk/skilled-worker-visa/your-job',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'Skilled Worker salary thresholds and job eligibility — A.1.1, A.2.1, A.2.3',
+    fieldKeys: ['A.1.1', 'A.2.1', 'A.2.3'],
+    country: 'GBR',
+  },
+  {
+    url: 'https://www.gov.uk/skilled-worker-visa/fees',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'Skilled Worker visa fees and Immigration Health Surcharge — B.2.1, B.2.2',
+    fieldKeys: ['B.2.1', 'B.2.2'],
+    country: 'GBR',
+  },
+  {
+    url: 'https://www.gov.uk/skilled-worker-visa/family-members',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'Skilled Worker dependant rights: work, study, healthcare — C.1.x, C.2.x, C.3.x',
+    fieldKeys: ['C.1.1', 'C.1.2', 'C.1.4', 'C.2.1', 'C.2.2', 'C.2.3', 'C.3.1', 'C.3.2'],
+    country: 'GBR',
+  },
+  {
+    url: 'https://www.gov.uk/indefinite-leave-to-remain/skilled-worker-visa',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'ILR (PR) eligibility from Skilled Worker — D.1.2 (years to PR)',
+    fieldKeys: ['D.1.2'],
+    country: 'GBR',
+  },
+  {
+    url: 'https://www.gov.uk/british-citizenship',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'British citizenship — D.2.2 (years from arrival to citizenship)',
+    fieldKeys: ['D.2.2'],
+    country: 'GBR',
+  },
+
   // SGP national-level sources — S Pass program.
   // HEAD-checked 2026-04-22.
   {
@@ -285,7 +369,7 @@ export const ISO3_TO_ISO2: Record<string, string> = {
 };
 
 export async function fetchWgiScore(
-  countryIso3: string
+  countryIso3: string,
 ): Promise<{ score: string; year: string; countryName: string } | null> {
   const iso2 = ISO3_TO_ISO2[countryIso3];
   if (!iso2) {
@@ -296,8 +380,14 @@ export async function fetchWgiScore(
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    const json = await res.json();
-    const record = json?.[1]?.[0];
+    const json = (await res.json()) as unknown[];
+    const record = (json?.[1] as unknown[])?.[0] as
+      | {
+          value?: number | null;
+          date?: string;
+          country?: { value?: string };
+        }
+      | undefined;
     if (!record || record.value === null || record.value === undefined) return null;
     return {
       score: String(Math.round(record.value * 100) / 100),
@@ -310,7 +400,7 @@ export async function fetchWgiScore(
 }
 
 export async function fetchAllWgiScores(
-  countryIsos: string[]
+  countryIsos: string[],
 ): Promise<Map<string, { score: string; year: string; countryName: string }>> {
   const results = new Map<string, { score: string; year: string; countryName: string }>();
   for (const iso3 of countryIsos) {
