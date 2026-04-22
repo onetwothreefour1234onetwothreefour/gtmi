@@ -1,0 +1,32 @@
+{
+  "name": "@gtmi/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gtmi/db": "workspace:*",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "clsx": "^2.1.1",
+    "next": "^15.5.15",
+    "postgres": "^3.4.9",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwind-merge": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.39",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.10",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3"
+  }
+}

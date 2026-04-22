@@ -1,0 +1,52 @@
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# testing
+coverage
+.nyc_output
+
+# next.js
+.next/
+out/
+
+# production
+build
+dist
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# turbo
+.turbo
+
+# typescript
+*.tsbuildinfo
+
+# supabase
+supabase/.branches
+supabase/.temp
+
+# scrape audit output
+scrape-audit.txt
+replacements.txt
+
+# logs
+logs/
+
+# vercel
+.vercel

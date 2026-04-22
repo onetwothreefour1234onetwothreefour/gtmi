@@ -1,0 +1,141 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { getReviewDetail } from '@/lib/review-queries';
+import { approveFieldValue, rejectFieldValue } from '@/app/review/actions';
+
+export const dynamic = 'force-dynamic';
+
+export default async function ReviewDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const row = await getReviewDetail(id);
+  if (!row) notFound();
+
+  async function approve(fd: FormData): Promise<void> {
+    'use server';
+    const edited = fd.get('editedRaw') as string | null;
+    await approveFieldValue(id, edited ?? undefined);
+  }
+
+  async function reject(): Promise<void> {
+    'use server';
+    await rejectFieldValue(id);
+  }
+
+  return (
+    <main className="mx-auto max-w-4xl p-8">
+      <div className="mb-4 text-sm">
+        <Link href="/review" className="text-blue-600 hover:underline">
+          ← Review Queue
+        </Link>
+      </div>
+
+      <header className="mb-6">
+        <p className="text-sm text-gray-500">
+          {row.countryName} — {row.programName}
+        </p>
+        <h1 className="text-2xl font-bold">
+          <span className="font-mono">{row.fieldKey}</span>
+        </h1>
+        <p className="mt-1 text-xs text-gray-500">{row.fieldLabel}</p>
+      </header>
+
+      <section className="mb-6 rounded border border-gray-200 p-4">
+        <h2 className="mb-2 text-sm font-semibold text-gray-700">Raw value</h2>
+        <p className="whitespace-pre-wrap rounded bg-gray-50 p-3 text-sm">
+          {row.valueRaw ?? <em className="text-gray-400">(no raw value)</em>}
+        </p>
+
+        <div className="mt-3">
+          <details>
+            <summary className="cursor-pointer text-xs text-gray-500">
+              Normalized value (JSON)
+            </summary>
+            <pre className="mt-2 overflow-auto rounded bg-gray-50 p-3 text-xs">
+              {JSON.stringify(row.valueNormalized, null, 2)}
+            </pre>
+          </details>
+        </div>
+
+        <div className="mt-3">
+          <details>
+            <summary className="cursor-pointer text-xs text-gray-500">Provenance</summary>
+            <pre className="mt-2 overflow-auto rounded bg-gray-50 p-3 text-xs">
+              {JSON.stringify(row.provenance, null, 2)}
+            </pre>
+          </details>
+        </div>
+      </section>
+
+      {row.sourceUrl && (
+        <section className="mb-6 rounded border border-gray-200 p-4">
+          <h2 className="mb-2 text-sm font-semibold text-gray-700">Source</h2>
+          <a
+            href={row.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all text-sm text-blue-600 hover:underline"
+          >
+            {row.sourceUrl}
+          </a>
+          {row.sourceTier && <p className="mt-1 text-xs text-gray-500">Tier {row.sourceTier}</p>}
+        </section>
+      )}
+
+      <section className="mb-6">
+        <h2 className="mb-2 text-sm font-semibold text-gray-700">Decision</h2>
+        <div className="flex flex-col gap-3">
+          <form action={approve}>
+            <label className="text-sm font-medium text-gray-700">
+              Edit raw value before approving <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              name="editedRaw"
+              defaultValue={row.valueRaw ?? ''}
+              className="mt-1 w-full rounded border border-gray-300 p-2 font-mono text-sm"
+            />
+            <p className="text-xs text-gray-500">Leave unchanged to approve as-is.</p>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="mt-2 rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
+              >
+                Approve
+              </button>
+            </div>
+          </form>
+
+          <form action={reject}>
+            <button
+              type="submit"
+              className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+            >
+              Reject
+            </button>
+          </form>
+        </div>
+      </section>
+
+      {row.extractionPromptMd && (
+        <section className="mb-6">
+          <details>
+            <summary className="cursor-pointer text-sm text-gray-500">Extraction prompt</summary>
+            <pre className="mt-2 overflow-auto rounded bg-gray-50 p-3 text-xs">
+              {row.extractionPromptMd}
+            </pre>
+          </details>
+        </section>
+      )}
+
+      {!!row.scoringRubricJsonb && (
+        <section className="mb-6">
+          <details>
+            <summary className="cursor-pointer text-sm text-gray-500">Scoring rubric</summary>
+            <pre className="mt-2 overflow-auto rounded bg-gray-50 p-3 text-xs">
+              {JSON.stringify(row.scoringRubricJsonb, null, 2)}
+            </pre>
+          </details>
+        </section>
+      )}
+    </main>
+  );
+}

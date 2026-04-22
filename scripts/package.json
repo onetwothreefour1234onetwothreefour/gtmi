@@ -1,0 +1,17 @@
+{
+  "name": "@gtmi/scripts",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.39",
+    "tsx": "^4.19.4",
+    "typescript": "^5.9.3"
+  }
+}

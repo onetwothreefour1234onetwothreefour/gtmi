@@ -1,0 +1,20 @@
+{
+  "name": "@gtmi/jobs",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "npx trigger.dev@latest dev",
+    "deploy": "npx trigger.dev@latest deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gtmi/db": "workspace:*",
+    "@gtmi/extraction": "workspace:*",
+    "@trigger.dev/sdk": "^3.3.17",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
