@@ -2,6 +2,7 @@ import { db, scrapeCache } from '@gtmi/db';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import type { DiscoveredUrl, ScrapeResult } from '../types/extraction';
 import type { ScrapeStage } from '../types/pipeline';
+import { checkScrapeContent } from '../scrape-guards';
 
 const SCRAPE_CACHE_TTL_HOURS = 24;
 
@@ -183,6 +184,18 @@ export class ScrapeStageImpl implements ScrapeStage {
     if (result.layer && result.layer !== 'playwright') {
       console.log(`  [Scrape] ${discovered.url} served via fallback layer: ${result.layer}`);
     }
+    const guard = checkScrapeContent(content, data.http_status);
+    if (!guard.ok) {
+      console.warn(`  [Scrape] Rejected ${discovered.url}: ${guard.reason}`);
+      return {
+        url: discovered.url,
+        contentMarkdown: '',
+        contentHash: '',
+        scrapedAt: new Date(data.scraped_at),
+        httpStatus: data.http_status,
+      };
+    }
+
     await this.writeScrapeCache(result);
     return result;
   }

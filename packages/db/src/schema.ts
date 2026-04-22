@@ -412,6 +412,9 @@ export const scrapeCache = pgTable(
     httpStatus: integer('http_status').notNull(),
     scrapedAt: timestamp('scraped_at').notNull(),
     expiresAt: timestamp('expires_at').notNull(),
+    status: text('status').default('ok'),
+    failureReason: text('failure_reason'),
+    retryAfter: timestamp('retry_after', { withTimezone: true }),
   },
   () => [
     pgPolicy('Team members can write scrape_cache', {
