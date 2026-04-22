@@ -20,4 +20,6 @@ export interface ProvenanceRecord {
   reviewedAt: Date | null;
   methodologyVersion: string;
   reviewDecision: ReviewDecision;
+  /** ISO 4217 currency code detected in valueRaw before normalization (e.g. "AUD", "SGD"). */
+  valueCurrency?: string;
 }

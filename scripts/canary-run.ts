@@ -56,7 +56,11 @@ async function main() {
   // --- Phase 1: scrape global/country-level sources once (shared across targets) ---
   console.log('\nPhase 1: Loading global/country-level sources');
 
-  const globalDiscoveredUrls: DiscoveredUrl[] = COUNTRY_LEVEL_SOURCES.map((s) => ({
+  // Include global sources + country-specific national sources for this run's country.
+  const applicableGlobalSources = COUNTRY_LEVEL_SOURCES.filter(
+    (s) => !s.country || s.country === countryArg
+  );
+  const globalDiscoveredUrls: DiscoveredUrl[] = applicableGlobalSources.map((s) => ({
     url: s.url,
     tier: s.tier,
     geographicLevel: s.geographicLevel,
@@ -82,7 +86,7 @@ async function main() {
 
   const globalSourcesByField = new Map<string, ScrapeResult[]>();
   for (const def of allFieldDefs) {
-    const sources = getCountryLevelSources(def.key);
+    const sources = getCountryLevelSources(def.key, countryArg);
     if (sources.length === 0) continue;
     const scrapes = sources
       .map((s) => globalScrapeByUrl.get(s.url))

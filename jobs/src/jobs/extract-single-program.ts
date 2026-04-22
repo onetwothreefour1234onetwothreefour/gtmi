@@ -1,4 +1,5 @@
 import { task } from '@trigger.dev/sdk/v3';
+import { REQUIRED_ENV_VARS } from '../../trigger.config';
 import {
   DiscoverStageImpl,
   ExtractStageImpl,
@@ -45,6 +46,15 @@ export const extractSingleProgram = task({
   }): Promise<PipelineResult> => {
     const { programId, programName, country } = payload;
 
+    // Fail fast if any required env var is missing — surfaces config issues early.
+    const missingVars = REQUIRED_ENV_VARS.filter((v: string) => !process.env[v]);
+    if (missingVars.length > 0) {
+      throw new Error(
+        `Missing required environment variables: ${missingVars.join(', ')}. ` +
+          `Set them in the Trigger.dev dashboard under Project → Environment Variables.`
+      );
+    }
+
     let allFieldDefs = await db.select().from(fieldDefinitions);
     const fieldPrompts = new Map<string, string>();
     for (const def of allFieldDefs) fieldPrompts.set(def.key, def.extractionPromptMd);
@@ -65,7 +75,10 @@ export const extractSingleProgram = task({
     const scrapeResults = await scrape.execute(discoveryResult.discoveredUrls);
     console.log(`Stage 1 complete for ${programId}: ${scrapeResults.length} URLs scraped`);
 
-    const globalDiscoveredUrls: DiscoveredUrl[] = COUNTRY_LEVEL_SOURCES.map((s) => ({
+    const applicableGlobalSources = COUNTRY_LEVEL_SOURCES.filter(
+      (s) => !s.country || s.country === country
+    );
+    const globalDiscoveredUrls: DiscoveredUrl[] = applicableGlobalSources.map((s) => ({
       url: s.url,
       tier: s.tier,
       geographicLevel: s.geographicLevel,

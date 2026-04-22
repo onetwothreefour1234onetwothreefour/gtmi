@@ -4,6 +4,8 @@ export interface CountryLevelSource {
   geographicLevel: 'global' | 'continental' | 'national';
   reason: string;
   fieldKeys: string[];
+  /** ISO3 country code — if set, source is only used for this country. Omit for global sources. */
+  country?: string;
 }
 
 export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
@@ -28,10 +30,50 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     reason: 'Cross-country immigration policy tracking and changes',
     fieldKeys: ['E.1.1'],
   },
+  // AUS national-level sources — only scraped for Australian programs
+  {
+    url: 'https://www.servicesaustralia.gov.au/who-can-enrol-in-medicare',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'Medicare enrolment eligibility for visa holders — public healthcare access for C.3.1',
+    fieldKeys: ['C.3.1'],
+    country: 'AUS',
+  },
+  {
+    url: 'https://www.education.gov.au/school-age-requirements-and-enrolment',
+    tier: 1,
+    geographicLevel: 'national',
+    reason:
+      'Public school enrolment rights and age requirements for children of visa holders — C.3.2',
+    fieldKeys: ['C.3.2'],
+    country: 'AUS',
+  },
+  {
+    url: 'https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skills-in-demand-visa-subclass-482/core-skills-stream/who-can-be-included-in-your-application',
+    tier: 1,
+    geographicLevel: 'national',
+    reason:
+      'Official DOHA page: secondary applicants, spouse work rights, dependent children, parent inclusion',
+    fieldKeys: ['C.2.1', 'C.2.2', 'C.2.3'],
+    country: 'AUS',
+  },
+  {
+    url: 'https://immi.homeaffairs.gov.au/visas/permanent-resident/options-for-permanent-residency',
+    tier: 1,
+    geographicLevel: 'national',
+    reason:
+      'PR and citizenship pathway options from temporary visas — minimum years to PR/citizenship',
+    fieldKeys: ['D.1.2', 'D.2.2'],
+    country: 'AUS',
+  },
 ];
 
-export function getCountryLevelSources(fieldKey: string): CountryLevelSource[] {
-  return COUNTRY_LEVEL_SOURCES.filter((s) => s.fieldKeys.includes(fieldKey));
+export function getCountryLevelSources(fieldKey: string, country?: string): CountryLevelSource[] {
+  return COUNTRY_LEVEL_SOURCES.filter((s) => {
+    if (!s.fieldKeys.includes(fieldKey)) return false;
+    if (s.country && s.country !== country) return false;
+    return true;
+  });
 }
 
 export const ISO3_TO_ISO2: Record<string, string> = {

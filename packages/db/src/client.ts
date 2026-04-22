@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-// Resolve .env relative to this file so it works regardless of CWD.
-// packages/db/src/client.ts → ../../../.env == monorepo root
+// In local dev: load .env from monorepo root (packages/db/src → ../../../).
+// In cloud (Trigger.dev, Cloud Run): env vars are injected directly — dotenv
+// returns silently if the file is missing, leaving injected values intact.
 dotenv.config({ path: join(__dirname, '../../../.env') });
 
 const connectionString = process.env['DATABASE_URL'];
