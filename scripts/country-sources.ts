@@ -39,33 +39,9 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     fieldKeys: ['C.3.1'],
     country: 'AUS',
   },
-  {
-    url: 'https://www.education.gov.au/school-age-requirements-and-enrolment',
-    tier: 1,
-    geographicLevel: 'national',
-    reason:
-      'Public school enrolment rights and age requirements for children of visa holders — C.3.2',
-    fieldKeys: ['C.3.2'],
-    country: 'AUS',
-  },
-  {
-    url: 'https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skills-in-demand-visa-subclass-482/core-skills-stream/who-can-be-included-in-your-application',
-    tier: 1,
-    geographicLevel: 'national',
-    reason:
-      'Official DOHA page: secondary applicants, spouse work rights, dependent children, parent inclusion',
-    fieldKeys: ['C.2.1', 'C.2.2', 'C.2.3'],
-    country: 'AUS',
-  },
-  {
-    url: 'https://immi.homeaffairs.gov.au/visas/permanent-resident/options-for-permanent-residency',
-    tier: 1,
-    geographicLevel: 'national',
-    reason:
-      'PR and citizenship pathway options from temporary visas — minimum years to PR/citizenship',
-    fieldKeys: ['D.1.2', 'D.2.2'],
-    country: 'AUS',
-  },
+  // TODO: C.3.2 (education), C.2.1/C.2.2/C.2.3 (family members), D.2.2 (citizenship years)
+  // need verified AUS national URLs — guessed sub-page paths returned 404 on 2026-04-22.
+  // These fields remain ABSENT until correct DOHA/education.gov.au URLs are confirmed.
 ];
 
 export function getCountryLevelSources(fieldKey: string, country?: string): CountryLevelSource[] {
