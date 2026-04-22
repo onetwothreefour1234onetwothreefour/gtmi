@@ -241,6 +241,7 @@ export const scores = pgTable(
     subFactorScores: jsonb('sub_factor_scores'),
     dataCoveragePct: decimal('data_coverage_pct', { precision: 5, scale: 2 }),
     flaggedInsufficientDisclosure: boolean('flagged_insufficient_disclosure').default(false),
+    metadata: jsonb('metadata'),
   },
   (table) => [
     index('idx_scores_prog_methodology').on(table.programId, table.methodologyVersionId),

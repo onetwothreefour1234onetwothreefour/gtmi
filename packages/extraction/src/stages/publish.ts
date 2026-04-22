@@ -88,6 +88,19 @@ export class PublishStageImpl implements PublishStage {
     const rawAsString =
       typeof extraction.valueRaw === 'string' ? extraction.valueRaw : String(extraction.valueRaw);
 
+    // Coverage-gap sentinels — LLM returned a "not found" marker instead of real data.
+    // Skip persistence entirely: treat the field as ABSENT so scoring coverage math
+    // is honest (absence of evidence must not be scored as evidence).
+    if (
+      fieldDef.normalizationFn === 'categorical' &&
+      (rawAsString === 'not_addressed' || rawAsString === 'not_found')
+    ) {
+      console.log(
+        `  [${extraction.fieldDefinitionKey}] Skipped publish — value "${rawAsString}" is a coverage-gap sentinel, not data.`
+      );
+      return;
+    }
+
     // For numeric fields, detect and preserve currency code before normalization strips it.
     let rawForNormalization = rawAsString;
     let valueCurrency: string | undefined;

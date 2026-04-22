@@ -30,7 +30,8 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     reason: 'Cross-country immigration policy tracking and changes',
     fieldKeys: ['E.1.1'],
   },
-  // AUS national-level sources — only scraped for Australian programs
+  // AUS national-level sources — only scraped for Australian programs.
+  // All URLs HEAD-checked 2026-04-22. 404s were removed.
   {
     url: 'https://www.servicesaustralia.gov.au/who-can-enrol-in-medicare',
     tier: 1,
@@ -39,9 +40,36 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     fieldKeys: ['C.3.1'],
     country: 'AUS',
   },
-  // TODO: C.3.2 (education), C.2.1/C.2.2/C.2.3 (family members), D.2.2 (citizenship years)
-  // need verified AUS national URLs — guessed sub-page paths returned 404 on 2026-04-22.
-  // These fields remain ABSENT until correct DOHA/education.gov.au URLs are confirmed.
+  {
+    url: 'https://immi.homeaffairs.gov.au/citizenship/become-a-citizen/permanent-resident',
+    tier: 1,
+    geographicLevel: 'national',
+    reason:
+      'Citizenship from PR — residency/time requirements for D.2.2 (years to citizenship eligibility)',
+    fieldKeys: ['D.2.2'],
+    country: 'AUS',
+  },
+  {
+    url: 'https://immi.homeaffairs.gov.au/visas/already-have-a-visa/check-visa-details-and-conditions/see-your-visa-conditions?product=482',
+    tier: 1,
+    geographicLevel: 'national',
+    reason:
+      'Visa conditions detail page for 482 — covers family members, work/study rights (C.1.x, C.2.x)',
+    fieldKeys: ['C.1.1', 'C.1.2', 'C.1.4', 'C.2.1', 'C.2.2', 'C.2.3'],
+    country: 'AUS',
+  },
+  {
+    url: 'https://www.studyaustralia.gov.au/en/plan-your-studies',
+    tier: 2,
+    geographicLevel: 'national',
+    reason: 'Education access for visa holders and dependants — C.3.2',
+    fieldKeys: ['C.3.2'],
+    country: 'AUS',
+  },
+  // NOTE: Dedicated "including family" DOHA sub-pages for 482 Core/Specialist returned 404.
+  // Family-inclusion data is instead reached via the visa-conditions page above, which links
+  // to the relevant family sub-docs. If family fields remain empty after next canary run,
+  // the DOHA URL structure has changed again and we need to navigate the live site manually.
 ];
 
 export function getCountryLevelSources(fieldKey: string, country?: string): CountryLevelSource[] {

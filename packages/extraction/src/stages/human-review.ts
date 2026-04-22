@@ -1,4 +1,5 @@
 import { db, fieldDefinitions, fieldValues, reviewQueue } from '@gtmi/db';
+import { normalizeRawValue, ScoringError } from '@gtmi/scoring';
 import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -79,9 +80,9 @@ export class HumanReviewStageImpl implements HumanReviewStage {
   ): Promise<string> {
     const reasons = this.reviewReasons(extraction, validation, crossCheck);
 
-    // Resolve field definition id from key.
+    // Resolve field definition from key — need full record for eager normalization.
     const fieldDefRows = await db
-      .select({ id: fieldDefinitions.id })
+      .select()
       .from(fieldDefinitions)
       .where(eq(fieldDefinitions.key, extraction.fieldDefinitionKey))
       .limit(1);
@@ -90,7 +91,22 @@ export class HumanReviewStageImpl implements HumanReviewStage {
         `HumanReview.enqueue: no field_definition found with key "${extraction.fieldDefinitionKey}"`
       );
     }
-    const fieldDefinitionId = fieldDefRows[0]!.id;
+    const fieldDef = fieldDefRows[0]!;
+    const fieldDefinitionId = fieldDef.id;
+
+    // Eager normalization: try to compute valueNormalized now so the reviewer sees
+    // the parsed value alongside raw, and so approval flow doesn't defer this work.
+    // If normalization throws, record the reason in provenance and leave value_normalized
+    // null — the reviewer can correct the raw before approval.
+    const rawAsString =
+      typeof extraction.valueRaw === 'string' ? extraction.valueRaw : String(extraction.valueRaw);
+    let valueNormalized: number | string | boolean | null = null;
+    let normalizationError: string | null = null;
+    try {
+      valueNormalized = normalizeRawValue(rawAsString, fieldDef);
+    } catch (err) {
+      normalizationError = err instanceof ScoringError ? err.message : String(err);
+    }
 
     // Upsert field_values with status=pending_review. If an approved row already
     // exists for this (program, field) pair, leave it untouched and link the
@@ -112,6 +128,19 @@ export class HumanReviewStageImpl implements HumanReviewStage {
       // Don't overwrite approved data — reviewer will compare new extraction against it.
       fieldValueId = existingRows[0]!.id;
     } else {
+      const pendingProvenance: Record<string, unknown> = {
+        sourceSentence: extraction.sourceSentence,
+        characterOffsets: extraction.characterOffsets,
+        extractionModel: extraction.extractionModel,
+        extractionConfidence: extraction.extractionConfidence,
+        validationModel: validation.validationModel,
+        validationConfidence: validation.validationConfidence,
+        validationNotes: validation.notes,
+      };
+      if (normalizationError) {
+        pendingProvenance.normalizationError = normalizationError;
+      }
+
       // Insert or update pending_review row.
       const upserted = await db
         .insert(fieldValues)
@@ -120,33 +149,19 @@ export class HumanReviewStageImpl implements HumanReviewStage {
           programId: extraction.programId,
           fieldDefinitionId,
           valueRaw: extraction.valueRaw,
+          valueNormalized,
           status: 'pending_review',
           extractedAt: extraction.extractedAt,
-          provenance: {
-            sourceSentence: extraction.sourceSentence,
-            characterOffsets: extraction.characterOffsets,
-            extractionModel: extraction.extractionModel,
-            extractionConfidence: extraction.extractionConfidence,
-            validationModel: validation.validationModel,
-            validationConfidence: validation.validationConfidence,
-            validationNotes: validation.notes,
-          },
+          provenance: pendingProvenance,
         })
         .onConflictDoUpdate({
           target: [fieldValues.programId, fieldValues.fieldDefinitionId],
           set: {
             valueRaw: extraction.valueRaw,
+            valueNormalized,
             status: 'pending_review',
             extractedAt: extraction.extractedAt,
-            provenance: {
-              sourceSentence: extraction.sourceSentence,
-              characterOffsets: extraction.characterOffsets,
-              extractionModel: extraction.extractionModel,
-              extractionConfidence: extraction.extractionConfidence,
-              validationModel: validation.validationModel,
-              validationConfidence: validation.validationConfidence,
-              validationNotes: validation.notes,
-            },
+            provenance: pendingProvenance,
           },
         })
         .returning({ id: fieldValues.id });

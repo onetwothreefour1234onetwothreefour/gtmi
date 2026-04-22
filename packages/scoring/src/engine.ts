@@ -88,6 +88,12 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
     defById.set(def.id, def);
   }
 
+  // Restrict scope when activeFieldKeys is provided.
+  const activeSet = input.activeFieldKeys ? new Set(input.activeFieldKeys) : null;
+  const activeDefs = activeSet
+    ? input.fieldDefinitions.filter((d) => activeSet.has(d.key))
+    : input.fieldDefinitions;
+
   const valueByDefId = new Map<string, unknown>();
   for (const fv of input.fieldValues) {
     if (fv.valueNormalized !== null && fv.valueNormalized !== undefined) {
@@ -95,9 +101,9 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
     }
   }
 
-  // Step 3: Score each present indicator
+  // Step 3: Score each present indicator (only within active scope)
   const indicatorResults: IndicatorResult[] = [];
-  for (const def of input.fieldDefinitions) {
+  for (const def of activeDefs) {
     const valueNormalized = valueByDefId.get(def.id);
     if (valueNormalized === undefined) continue; // missing — excluded
     const score = scoreIndicator(def, valueNormalized, input);
@@ -111,9 +117,9 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
   }
 
   // Step 4: Aggregate to sub-factor scores
-  // Group defs by subFactor for total counts
+  // Group active defs by subFactor for total counts (denominator respects active scope)
   const defsBySubFactor = new Map<string, FieldDefinitionRecord[]>();
-  for (const def of input.fieldDefinitions) {
+  for (const def of activeDefs) {
     const group = defsBySubFactor.get(def.subFactor) ?? [];
     group.push(def);
     defsBySubFactor.set(def.subFactor, group);
@@ -138,8 +144,12 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
 
     subFactorCoverage.set(subFactor, { present, total, pillar });
 
+    // Sub-factors with no active fields in scope are excluded from scoring entirely
+    // (handled downstream at pillar aggregation). Skip here so we don't emit a 0.
+    if (total === 0) continue;
+
     if (present === 0) {
-      // All indicators missing — propagate as 0 with full penalty; the pillar
+      // All in-scope indicators missing — propagate as 0 with full penalty; the pillar
       // coverage check will flag insufficient_disclosure if needed.
       subFactorScores[subFactor] = 0;
       continue;
@@ -180,28 +190,45 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
     (coverage) => coverage < INSUFFICIENT_DISCLOSURE_THRESHOLD
   );
 
-  // Step 7: Aggregate sub-factors → pillar scores
+  // Step 7: Aggregate sub-factors → pillar scores (re-normalize when sub-factors are
+  // out of scope so in-scope weights sum to 1.0 within the pillar).
   const pillarScores: Record<string, number> = {};
   for (const pillar of Object.keys(PILLAR_WEIGHTS)) {
     const sfWeights = SUB_FACTOR_WEIGHTS[pillar];
     if (!sfWeights) {
       throw new ScoringError(`No sub-factor weights defined for pillar "${pillar}"`);
     }
-    const items = Object.entries(sfWeights)
-      .filter(([sf]) => subFactorScores[sf] !== undefined)
-      .map(([sf, weight]) => ({ score: subFactorScores[sf] ?? 0, weight }));
+    const scoped = Object.entries(sfWeights).filter(([sf]) => subFactorScores[sf] !== undefined);
+    if (scoped.length === 0) {
+      pillarScores[pillar] = 0;
+      continue;
+    }
+    const weightSum = scoped.reduce((acc, [, w]) => acc + w, 0);
+    const items = scoped.map(([sf, w]) => ({
+      score: subFactorScores[sf] ?? 0,
+      weight: weightSum > 0 ? w / weightSum : 0,
+    }));
     pillarScores[pillar] = aggregateWeightedMean(items);
   }
 
-  // Step 8: PAQ score
-  const paqItems = Object.entries(PILLAR_WEIGHTS).map(([pillar, weight]) => ({
-    score: pillarScores[pillar] ?? 0,
-    weight,
+  // Step 8: PAQ score — re-normalize pillar weights over pillars that have at least
+  // one in-scope sub-factor, so PAQ is not diluted by entirely-out-of-scope pillars.
+  const pillarsInScope = Object.keys(PILLAR_WEIGHTS).filter((p) =>
+    Object.keys(SUB_FACTOR_WEIGHTS[p] ?? {}).some((sf) => subFactorScores[sf] !== undefined)
+  );
+  const pillarWeightSum = pillarsInScope.reduce((s, p) => s + (PILLAR_WEIGHTS[p] ?? 0), 0);
+  const paqItems = pillarsInScope.map((p) => ({
+    score: pillarScores[p] ?? 0,
+    weight: pillarWeightSum > 0 ? (PILLAR_WEIGHTS[p] ?? 0) / pillarWeightSum : 0,
   }));
   const paqScore = aggregateWeightedMean(paqItems);
 
   // Step 9: Composite score
   const compositeScore = CME_WEIGHT * input.cmeScore + PAQ_WEIGHT * paqScore;
+
+  // Step 10: Coverage counts (denominator = active scope)
+  const activeFieldCount = activeDefs.length;
+  const populatedFieldCount = indicatorResults.length;
 
   return {
     programId: input.programId,
@@ -214,5 +241,7 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
     subFactorScores,
     dataCoverageByPillar,
     flaggedInsufficientDisclosure,
+    activeFieldCount,
+    populatedFieldCount,
   };
 }

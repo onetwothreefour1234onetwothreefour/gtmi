@@ -123,7 +123,8 @@ export const RUBRIC_SCORES: Record<string, Record<string, number>> = {
     published_current: 90,
     published_historical_only: 60,
     exists_undisclosed: 20,
-    not_addressed: 10,
+    // "not_addressed" intentionally removed — represents coverage gap, not data.
+    // Publish stage routes valueRaw === "not_addressed" to ABSENT (no row written).
   },
   'E.2.3': {
     comprehensive: 100,

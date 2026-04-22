@@ -66,6 +66,16 @@ export interface ScoringInput {
   fieldValues: FieldValueRecord[];
   fieldDefinitions: FieldDefinitionRecord[];
   normalizationParams: NormalizationParams;
+  /**
+   * Optional: restrict scoring scope to these field keys (e.g. Wave 1 only).
+   * When provided:
+   *   - Sub-factor denominators use only keys intersecting the active set.
+   *   - Sub-factors with no active keys are excluded from pillar aggregation,
+   *     and the pillar's sub-factor weights are re-normalized accordingly.
+   *   - Coverage percentages use only active-set keys.
+   * When omitted, all fieldDefinitions count toward denominators (Phase 3 behavior).
+   */
+  activeFieldKeys?: string[];
 }
 
 export interface ScoringOutput {
@@ -79,6 +89,10 @@ export interface ScoringOutput {
   subFactorScores: Record<string, number>;
   dataCoverageByPillar: Record<string, number>;
   flaggedInsufficientDisclosure: boolean;
+  /** Total active fields in scope (denominator for data_coverage_pct). */
+  activeFieldCount: number;
+  /** Populated fields in scope (numerator for data_coverage_pct). */
+  populatedFieldCount: number;
 }
 
 export class ScoringError extends Error {

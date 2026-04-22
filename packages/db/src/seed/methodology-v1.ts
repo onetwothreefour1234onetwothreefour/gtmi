@@ -427,7 +427,9 @@ Allowed values:
 Edge cases:
 
 If document does not characterize demand-vs-supply, default to "moderate_quota" when a number is published without context.
-Record the raw cap number in notes or in cap_number where published.`,
+Record the raw cap number in notes or in cap_number where published.
+
+If the document is silent on quotas entirely, return the universal "not found in source" response ({"value": null, ...}) — DO NOT return a category value. Only the five allowed values above are valid; any other token will be rejected.`,
       scoringRubricJsonb: {
         categories: [
           { value: 'no_quota', description: 'no annual cap on this program.' },
@@ -1537,12 +1539,13 @@ Allowed values:
 "published_current": cap exists and current period's number is published in this document.
 "published_historical_only": cap exists, only past years' numbers published; current undisclosed.
 "exists_undisclosed": cap exists, number not published.
-"not_addressed": document silent on whether a cap exists.
+
+If the document is silent on whether a cap exists, return the universal "not found in source" response ({"value": null, ...}) — DO NOT guess and DO NOT return a category value.
 
 Edge cases:
 
 cap_number populated only for "published_current" or "published_historical_only".
-"no_cap" requires affirmative statement. Absence of mention = "not_addressed".
+"no_cap" requires affirmative statement. Absence of mention → return null.
 Sub-caps on specific streams qualify as published caps.`,
       scoringRubricJsonb: {
         categories: [
@@ -1559,10 +1562,6 @@ Sub-caps on specific streams qualify as published caps.`,
             description: "cap exists, only past years' numbers published; current undisclosed.",
           },
           { value: 'exists_undisclosed', description: 'cap exists, number not published.' },
-          {
-            value: 'not_addressed',
-            description: 'document silent on whether a cap exists.',
-          },
         ],
       },
       normalizationFn: 'categorical',

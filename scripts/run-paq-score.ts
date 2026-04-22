@@ -4,9 +4,17 @@
  * Reads approved field_values for a program, runs the scoring engine, and
  * writes the result to the scores table.
  *
- * Normalization params are Phase 2 placeholders (global benchmark ranges).
- * Cross-program normalization from real distribution data will replace these
- * in Phase 3 once we have ≥5 programs scored.
+ *  ⚠️  PHASE 2 PLACEHOLDER RANGES — NOT PUBLICATION-READY
+ *
+ * The NORMALIZATION_PARAMS below are engineer-chosen ranges used to unblock
+ * Phase 2 end-to-end scoring. They are NOT calibrated against real cross-program
+ * distribution data. Every score written by this script is tagged with
+ * `provenance.phase2Placeholder = true` in the scores row so downstream
+ * consumers can refuse to publish until Phase 3 replaces these with real
+ * distribution stats from ≥5 scored programs.
+ *
+ * Scope: Wave 1 fields only (via WAVE_1_FIELD_CODES). Out-of-scope fields do
+ * not contribute to denominators or weight re-normalization.
  *
  * Usage:
  *   npx tsx scripts/run-paq-score.ts --country AUS [--programId <uuid>]
@@ -16,6 +24,7 @@ import { db, fieldDefinitions, fieldValues, methodologyVersions, scores } from '
 import { runScoringEngine } from '@gtmi/scoring';
 import type { NormalizationParams, ScoringInput } from '@gtmi/scoring';
 import { eq, and } from 'drizzle-orm';
+import { WAVE_1_FIELD_CODES } from './wave-config';
 
 // ---------------------------------------------------------------------------
 // Phase 2 placeholder normalization params (global benchmark ranges)
@@ -185,6 +194,7 @@ async function main() {
       direction: d.direction as import('@gtmi/scoring').Direction,
     })),
     normalizationParams: NORMALIZATION_PARAMS,
+    activeFieldKeys: WAVE_1_FIELD_CODES,
   };
 
   // Print which fields will be scored
@@ -215,6 +225,9 @@ async function main() {
   console.log(`PAQ Score:        ${output.paqScore.toFixed(2)}`);
   console.log(`CME Score:        ${output.cmeScore.toFixed(2)}`);
   console.log(`Composite Score:  ${output.compositeScore.toFixed(2)}`);
+  console.log(
+    `Coverage:         ${output.populatedFieldCount}/${output.activeFieldCount} Wave-1 fields (${((output.populatedFieldCount / Math.max(1, output.activeFieldCount)) * 100).toFixed(1)}%)`
+  );
   console.log(`Flagged (insufficient disclosure): ${output.flaggedInsufficientDisclosure}`);
   console.log('\nData coverage by pillar:');
   for (const [pillar, coverage] of Object.entries(output.dataCoverageByPillar)) {
@@ -228,6 +241,16 @@ async function main() {
   }
 
   // --- 9. Write to scores table ---
+  const coveragePct = (output.populatedFieldCount / Math.max(1, output.activeFieldCount)) * 100;
+  const metadata = {
+    phase2Placeholder: true,
+    placeholderReason:
+      'NORMALIZATION_PARAMS are engineer-chosen ranges, not calibrated from real distribution data. Do not publish publicly.',
+    wave: 1,
+    activeFieldCount: output.activeFieldCount,
+    populatedFieldCount: output.populatedFieldCount,
+  };
+
   const inserted = await db
     .insert(scores)
     .values({
@@ -239,8 +262,9 @@ async function main() {
       compositeScore: String(output.compositeScore),
       pillarScores: output.pillarScores,
       subFactorScores: output.subFactorScores,
-      dataCoveragePct: String(((approvedFVs.length / allDefs.length) * 100).toFixed(2)),
+      dataCoveragePct: coveragePct.toFixed(2),
       flaggedInsufficientDisclosure: output.flaggedInsufficientDisclosure,
+      metadata,
     })
     .onConflictDoUpdate({
       target: [scores.programId, scores.methodologyVersionId],
@@ -251,8 +275,9 @@ async function main() {
         compositeScore: String(output.compositeScore),
         pillarScores: output.pillarScores,
         subFactorScores: output.subFactorScores,
-        dataCoveragePct: String(((approvedFVs.length / allDefs.length) * 100).toFixed(2)),
+        dataCoveragePct: coveragePct.toFixed(2),
         flaggedInsufficientDisclosure: output.flaggedInsufficientDisclosure,
+        metadata,
       },
     })
     .returning({ id: scores.id });
