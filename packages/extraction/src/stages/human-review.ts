@@ -1,6 +1,7 @@
 import { db, fieldDefinitions, fieldValues, reviewQueue } from '@gtmi/db';
 import { normalizeRawValue, ScoringError } from '@gtmi/scoring';
 import { and, eq } from 'drizzle-orm';
+import { detectCurrency } from '../utils/currency';
 import { randomUUID } from 'node:crypto';
 import type {
   CrossCheckResult,
@@ -103,7 +104,21 @@ export class HumanReviewStageImpl implements HumanReviewStage {
     let valueNormalized: number | string | boolean | null = null;
     let normalizationError: string | null = null;
     try {
-      valueNormalized = normalizeRawValue(rawAsString, fieldDef);
+      // Strip currency prefix for numeric fields before normalization, mirroring publish.ts.
+      let rawForNorm = rawAsString;
+      let detectedCurrency: string | undefined;
+      if (fieldDef.normalizationFn === 'min_max' || fieldDef.normalizationFn === 'z_score') {
+        const detected = detectCurrency(rawAsString);
+        if (detected) {
+          detectedCurrency = detected.code;
+          rawForNorm = detected.stripped;
+        }
+      }
+      valueNormalized = normalizeRawValue(rawForNorm, fieldDef);
+      if (detectedCurrency) {
+        // Stash detected currency so it's visible in the review UI.
+        (extraction as unknown as Record<string, unknown>)['detectedCurrency'] = detectedCurrency;
+      }
     } catch (err) {
       normalizationError = err instanceof ScoringError ? err.message : String(err);
     }

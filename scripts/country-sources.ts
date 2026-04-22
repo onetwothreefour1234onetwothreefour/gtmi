@@ -70,6 +70,67 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
   // Family-inclusion data is instead reached via the visa-conditions page above, which links
   // to the relevant family sub-docs. If family fields remain empty after next canary run,
   // the DOHA URL structure has changed again and we need to navigate the live site manually.
+
+  // SGP national-level sources — S Pass program.
+  // HEAD-checked 2026-04-22.
+  {
+    url: 'https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility',
+    tier: 1,
+    geographicLevel: 'national',
+    reason:
+      'S Pass eligibility: min salary SGD 3,150/mo, diploma-equivalent qualifications — A.1.1, A.2.2, A.3.2, B.1.1',
+    fieldKeys: ['A.1.1', 'A.2.2', 'A.3.2', 'B.1.1'],
+    country: 'SGP',
+  },
+  {
+    url: 'https://www.mom.gov.sg/passes-and-permits/s-pass/bringing-your-family-to-singapore',
+    tier: 1,
+    geographicLevel: 'national',
+    reason:
+      'S Pass dependent pass rights — who qualifies, work/study rights for family (C.1.x, C.2.x)',
+    fieldKeys: ['C.1.1', 'C.1.2', 'C.1.4', 'C.2.1', 'C.2.2', 'C.2.3'],
+    country: 'SGP',
+  },
+  {
+    url: 'https://www.mom.gov.sg/passes-and-permits/s-pass/quota-and-levy',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'S Pass employer levy and quota — employer cost proxy for B.2.2',
+    fieldKeys: ['B.2.2'],
+    country: 'SGP',
+  },
+  {
+    url: 'https://www.iras.gov.sg/taxes/individual-income-tax/basics-of-individual-income-tax/tax-residency-and-tax-rates/individual-income-tax-rates',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'Singapore personal income tax rates — B.2.1 (effective tax burden)',
+    fieldKeys: ['B.2.1'],
+    country: 'SGP',
+  },
+  {
+    url: 'https://www.ica.gov.sg/reside/PR/apply',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'Singapore PR application — eligibility, years of work required (D.2.2)',
+    fieldKeys: ['D.2.2'],
+    country: 'SGP',
+  },
+  {
+    url: 'https://www.moh.gov.sg/cost-financing/healthcare-schemes-subsidies/medisave',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'Medisave scheme — public healthcare access for work pass holders (C.3.1)',
+    fieldKeys: ['C.3.1'],
+    country: 'SGP',
+  },
+  {
+    url: 'https://www.moe.gov.sg/primary/admissions/register-for-primary-1',
+    tier: 1,
+    geographicLevel: 'national',
+    reason: 'MOE school registration for dependants — C.3.2 (public education access)',
+    fieldKeys: ['C.3.2'],
+    country: 'SGP',
+  },
 ];
 
 export function getCountryLevelSources(fieldKey: string, country?: string): CountryLevelSource[] {
