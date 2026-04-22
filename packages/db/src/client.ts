@@ -1,10 +1,12 @@
 import * as dotenv from 'dotenv';
 import { drizzle } from 'drizzle-orm/postgres-js';
+import { join } from 'node:path';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-// Load .env from monorepo root — needed when scripts import @gtmi/db directly
-dotenv.config({ path: '../../.env' });
+// Resolve .env relative to this file so it works regardless of CWD.
+// packages/db/src/client.ts → ../../../.env == monorepo root
+dotenv.config({ path: join(__dirname, '../../../.env') });
 
 const connectionString = process.env['DATABASE_URL'];
 if (!connectionString) {

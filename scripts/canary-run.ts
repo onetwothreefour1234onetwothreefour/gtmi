@@ -211,6 +211,10 @@ async function main() {
       .filter(hasUsableContent)
       .slice(0, 5);
 
+    const tier2Scrapes = scrapeResults
+      .filter((sr) => discoveredByUrl.get(sr.url)?.tier === 2)
+      .filter(hasUsableContent);
+
     // Collect all unique scrapes: tier 1 program-specific + all global sources
     // (deduped by URL so the same page isn't sent twice). Drop any scrape that
     // failed or returned empty content so extraction never sees garbage.
@@ -310,6 +314,42 @@ async function main() {
       allExtractionResults = new Map();
     }
     console.log(`Batch extraction complete: ${allExtractionResults.size} fields with values`);
+
+    // ── Tier-2 fallback: retry fields that got no result from tier-1 + global ─
+    const missingLlmFields = llmFields.filter((f) => {
+      const r = allExtractionResults.get(f.key);
+      return !r || r.output.valueRaw === '';
+    });
+    if (missingLlmFields.length > 0 && tier2Scrapes.length > 0) {
+      console.log(
+        `\n[Tier-2 fallback] ${missingLlmFields.length} fields missing — retrying with ${tier2Scrapes.length} tier-2 URLs`
+      );
+      // Extend lookup maps so provenance resolution works for tier-2 sources.
+      for (const sr of tier2Scrapes) scrapeByUrl.set(sr.url, sr);
+      try {
+        const tier2Results = await extract.executeAllFields(
+          tier2Scrapes,
+          missingLlmFields,
+          programId,
+          programName,
+          countryIso
+        );
+        let tier2Fills = 0;
+        for (const [key, result] of tier2Results) {
+          if (result.output.valueRaw !== '') {
+            allExtractionResults.set(key, result);
+            tier2Fills++;
+            console.log(`  [Tier-2 fill] ${key} — value from ${result.sourceUrl}`);
+          }
+        }
+        console.log(
+          `[Tier-2 fallback] filled ${tier2Fills}/${missingLlmFields.length} missing fields`
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[Tier-2 fallback] batch failed: ${msg}`);
+      }
+    }
 
     // ── Per-field validation + publish ───────────────────────────────────────
     for (const def of allFieldDefs.filter((d) => d.key !== 'E.3.2')) {

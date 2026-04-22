@@ -200,9 +200,7 @@ export const fieldValues = pgTable(
     extractedAt: timestamp('extracted_at').defaultNow(),
     reviewedBy: uuid('reviewed_by'),
     reviewedAt: timestamp('reviewed_at'),
-    methodologyVersionId: uuid('methodology_version_id')
-      .notNull()
-      .references(() => methodologyVersions.id),
+    methodologyVersionId: uuid('methodology_version_id').references(() => methodologyVersions.id),
   },
   (table) => [
     uniqueIndex('idx_field_values_prog_def').on(table.programId, table.fieldDefinitionId),
@@ -341,6 +339,9 @@ export const reviewQueue = pgTable(
     assignedTo: uuid('assigned_to'),
     status: varchar('status', { length: 50 }).notNull(),
     resolvedAt: timestamp('resolved_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    extractionSnapshot: jsonb('extraction_snapshot'),
+    validationSnapshot: jsonb('validation_snapshot'),
   },
   (table) => [
     index('idx_review_queue_field_val').on(table.fieldValueId),
