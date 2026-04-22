@@ -4,14 +4,14 @@ import {
   ScoringError,
   ScoringInput,
   ScoringOutput,
-} from './types.ts';
+} from './types';
 import {
   normalizeBoolean,
   normalizeCategorical,
   normalizeMinMax,
   normalizeZScore,
   parseIndicatorValue,
-} from './normalize.ts';
+} from './normalize';
 import {
   INSUFFICIENT_DISCLOSURE_THRESHOLD,
   CME_WEIGHT,
@@ -22,7 +22,7 @@ import {
   applyMissingDataPenalty,
   computeDataCoverage,
   reNormalizeWeights,
-} from './score.ts';
+} from './score';
 
 const KNOWN_NORMALIZATION_FNS = new Set<NormalizationFn>([
   'min_max',
@@ -42,7 +42,7 @@ interface IndicatorResult {
 function scoreIndicator(
   def: FieldDefinitionRecord,
   valueNormalized: unknown,
-  input: ScoringInput
+  input: ScoringInput,
 ): number {
   const parsed = parseIndicatorValue(valueNormalized, def.normalizationFn);
   const params = input.normalizationParams[def.key] ?? {};
@@ -55,7 +55,7 @@ function scoreIndicator(
     case 'categorical': {
       if (!def.scoringRubricJsonb) {
         throw new ScoringError(
-          `Field "${def.key}" uses categorical normalization but has no scoringRubricJsonb`
+          `Field "${def.key}" uses categorical normalization but has no scoringRubricJsonb`,
         );
       }
       return normalizeCategorical(parsed as string, def.scoringRubricJsonb);
@@ -70,14 +70,14 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
   for (const fv of input.fieldValues) {
     if (fv.status !== 'approved') {
       throw new ScoringError(
-        `FieldValue ${fv.id} has status "${fv.status}" — only approved values may be scored`
+        `FieldValue ${fv.id} has status "${fv.status}" — only approved values may be scored`,
       );
     }
   }
   for (const def of input.fieldDefinitions) {
     if (!KNOWN_NORMALIZATION_FNS.has(def.normalizationFn)) {
       throw new ScoringError(
-        `Unknown normalizationFn "${def.normalizationFn}" on field "${def.key}"`
+        `Unknown normalizationFn "${def.normalizationFn}" on field "${def.key}"`,
       );
     }
   }
@@ -187,7 +187,7 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
 
   // Step 6: Flag insufficient disclosure
   const flaggedInsufficientDisclosure = Object.values(dataCoverageByPillar).some(
-    (coverage) => coverage < INSUFFICIENT_DISCLOSURE_THRESHOLD
+    (coverage) => coverage < INSUFFICIENT_DISCLOSURE_THRESHOLD,
   );
 
   // Step 7: Aggregate sub-factors → pillar scores (re-normalize when sub-factors are
@@ -214,7 +214,7 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
   // Step 8: PAQ score — re-normalize pillar weights over pillars that have at least
   // one in-scope sub-factor, so PAQ is not diluted by entirely-out-of-scope pillars.
   const pillarsInScope = Object.keys(PILLAR_WEIGHTS).filter((p) =>
-    Object.keys(SUB_FACTOR_WEIGHTS[p] ?? {}).some((sf) => subFactorScores[sf] !== undefined)
+    Object.keys(SUB_FACTOR_WEIGHTS[p] ?? {}).some((sf) => subFactorScores[sf] !== undefined),
   );
   const pillarWeightSum = pillarsInScope.reduce((s, p) => s + (PILLAR_WEIGHTS[p] ?? 0), 0);
   const paqItems = pillarsInScope.map((p) => ({

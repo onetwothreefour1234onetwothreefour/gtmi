@@ -5,7 +5,7 @@ import {
   NormalizationParamSet,
   ScoringError,
   rubricToScoreMap,
-} from './types.ts';
+} from './types';
 
 /**
  * Abramowitz & Stegun approximation 26.2.17.
@@ -24,7 +24,7 @@ function phi(z: number): number {
 export function normalizeMinMax(
   value: number,
   params: NormalizationParamSet,
-  direction: Direction
+  direction: Direction,
 ): number {
   if (params.min === undefined || params.max === undefined) {
     throw new ScoringError('min_max normalization requires min and max in NormalizationParams');
@@ -42,7 +42,7 @@ export function normalizeMinMax(
 export function normalizeZScore(
   value: number,
   params: NormalizationParamSet,
-  direction: Direction
+  direction: Direction,
 ): number {
   if (params.mean === undefined || params.stddev === undefined) {
     throw new ScoringError('z_score normalization requires mean and stddev in NormalizationParams');
@@ -59,7 +59,7 @@ export function normalizeCategorical(value: string, rubric: CategoricalRubric): 
   const scoreMap = rubricToScoreMap(rubric);
   if (!(value in scoreMap)) {
     throw new ScoringError(
-      `Categorical value "${value}" not found in rubric. Valid keys: ${Object.keys(scoreMap).join(', ')}`
+      `Categorical value "${value}" not found in rubric. Valid keys: ${Object.keys(scoreMap).join(', ')}`,
     );
   }
   return scoreMap[value];
@@ -78,12 +78,12 @@ export function normalizeBoolean(value: boolean, direction: Direction): number {
  */
 export function parseIndicatorValue(
   valueNormalized: unknown,
-  fn: NormalizationFn
+  fn: NormalizationFn,
 ): number | string | boolean {
   if (fn === 'min_max' || fn === 'z_score') {
     if (typeof valueNormalized !== 'number') {
       throw new ScoringError(
-        `Expected JSON number for normalizationFn "${fn}", got ${typeof valueNormalized}`
+        `Expected JSON number for normalizationFn "${fn}", got ${typeof valueNormalized}`,
       );
     }
     return valueNormalized;
@@ -91,7 +91,7 @@ export function parseIndicatorValue(
   if (fn === 'categorical') {
     if (typeof valueNormalized !== 'string') {
       throw new ScoringError(
-        `Expected JSON string for normalizationFn "categorical", got ${typeof valueNormalized}`
+        `Expected JSON string for normalizationFn "categorical", got ${typeof valueNormalized}`,
       );
     }
     return valueNormalized;
@@ -99,7 +99,7 @@ export function parseIndicatorValue(
   if (fn === 'boolean') {
     if (typeof valueNormalized !== 'boolean') {
       throw new ScoringError(
-        `Expected JSON boolean for normalizationFn "boolean", got ${typeof valueNormalized}`
+        `Expected JSON boolean for normalizationFn "boolean", got ${typeof valueNormalized}`,
       );
     }
     return valueNormalized;

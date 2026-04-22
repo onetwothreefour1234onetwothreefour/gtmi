@@ -1,4 +1,4 @@
-import { ScoringError } from './types.ts';
+import { ScoringError } from './types';
 
 export const PILLAR_WEIGHTS: Record<string, number> = {
   A: 0.28,
@@ -32,7 +32,7 @@ export function aggregateWeightedMean(items: { score: number; weight: number }[]
 export function reNormalizeWeights(
   allWeights: Record<string, number>,
   presentKeys: Set<string>,
-  subFactor: string
+  subFactor: string,
 ): Record<string, number> {
   if (presentKeys.size === 0) {
     throw new ScoringError(`No indicators present for sub-factor ${subFactor} — cannot score`);
@@ -40,7 +40,7 @@ export function reNormalizeWeights(
   const totalWeight = Array.from(presentKeys).reduce((sum, key) => sum + (allWeights[key] ?? 0), 0);
   if (totalWeight === 0) {
     throw new ScoringError(
-      `Present indicators for sub-factor ${subFactor} have total weight 0 — cannot score`
+      `Present indicators for sub-factor ${subFactor} have total weight 0 — cannot score`,
     );
   }
   const result: Record<string, number> = {};

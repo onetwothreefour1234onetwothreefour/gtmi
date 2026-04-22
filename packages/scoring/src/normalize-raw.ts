@@ -4,7 +4,7 @@ import {
   ScoringError,
   WrappedCategoricalRubric,
   rubricToScoreMap,
-} from './types.ts';
+} from './types';
 
 export type NormalizedValue = number | string | boolean;
 
@@ -22,7 +22,7 @@ function isWrappedCategoricalRubric(value: unknown): value is WrappedCategorical
     (c) =>
       typeof c === 'object' &&
       c !== null &&
-      typeof (c as Record<string, unknown>)['value'] === 'string'
+      typeof (c as Record<string, unknown>)['value'] === 'string',
   );
 }
 
@@ -53,7 +53,7 @@ function isCategoricalRubric(value: unknown): value is CategoricalRubric {
  */
 export function normalizeRawValue(
   valueRaw: string,
-  def: { normalizationFn: string; scoringRubricJsonb: unknown }
+  def: { normalizationFn: string; scoringRubricJsonb: unknown },
 ): NormalizedValue {
   const { normalizationFn, scoringRubricJsonb } = def;
 
@@ -68,7 +68,7 @@ export function normalizeRawValue(
       const n = parseFloat(cleaned);
       if (!isFinite(n)) {
         throw new ScoringError(
-          `Cannot parse "${valueRaw}" as a number for ${normalizationFn} normalization`
+          `Cannot parse "${valueRaw}" as a number for ${normalizationFn} normalization`,
         );
       }
       return n;
@@ -76,14 +76,14 @@ export function normalizeRawValue(
     case 'categorical': {
       if (!isCategoricalRubric(scoringRubricJsonb)) {
         throw new ScoringError(
-          `Field uses categorical normalization but has no valid scoringRubricJsonb`
+          `Field uses categorical normalization but has no valid scoringRubricJsonb`,
         );
       }
       const scoreMap = rubricToScoreMap(scoringRubricJsonb);
       const trimmed = valueRaw.trim();
       if (!(trimmed in scoreMap)) {
         throw new ScoringError(
-          `Categorical value "${trimmed}" not in rubric. Valid keys: ${Object.keys(scoreMap).join(', ')}`
+          `Categorical value "${trimmed}" not in rubric. Valid keys: ${Object.keys(scoreMap).join(', ')}`,
         );
       }
       return trimmed;
@@ -93,7 +93,7 @@ export function normalizeRawValue(
       if (lower === 'yes' || lower === 'true' || lower === '1') return true;
       if (lower === 'no' || lower === 'false' || lower === '0') return false;
       throw new ScoringError(
-        `Cannot parse "${valueRaw}" as boolean. Expected yes/no/true/false/1/0`
+        `Cannot parse "${valueRaw}" as boolean. Expected yes/no/true/false/1/0`,
       );
     }
   }
