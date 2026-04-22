@@ -7,6 +7,12 @@
  *   npx tsx scripts/purge-bad-scrapes.ts --execute
  */
 import postgres from 'postgres';
+import * as dotenv from 'dotenv';
+import { join } from 'node:path';
+
+dotenv.config({ path: join(__dirname, '../.env') });
+const DB_URL = process.env['DATABASE_URL'];
+if (!DB_URL) throw new Error('DATABASE_URL not set — add it to .env at the monorepo root');
 
 const SOFT_404_PATTERNS: RegExp[] = [
   /\b404\b.*\bnot found\b/i,
@@ -37,9 +43,6 @@ function checkContent(content: string, httpStatus: number): Rejection | null {
   if (vLen < MIN_VISIBLE_TEXT) return { reason: `short_content(visible=${vLen})` };
   return null;
 }
-
-const DB_URL =
-  'postgresql://postgres.xvcrfgovlcencngjxgiw:TTRgroup1234!@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres';
 
 async function main() {
   const dryRun = !process.argv.includes('--execute');

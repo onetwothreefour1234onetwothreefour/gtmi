@@ -12,9 +12,12 @@
  * meaningful. Run once that threshold is met; until then this is informational only.
  */
 import postgres from 'postgres';
+import * as dotenv from 'dotenv';
+import { join } from 'node:path';
 
-const DB_URL =
-  'postgresql://postgres.xvcrfgovlcencngjxgiw:TTRgroup1234!@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres';
+dotenv.config({ path: join(__dirname, '../.env') });
+const DB_URL = process.env['DATABASE_URL'];
+if (!DB_URL) throw new Error('DATABASE_URL not set — add it to .env at the monorepo root');
 
 function percentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
@@ -55,10 +58,10 @@ async function main() {
   }
 
   console.log(
-    `\nNormalization parameter candidates (n=${[...byField.values()].reduce((a, b) => a + b.length, 0)} observations across ${rows.length > 0 ? new Set(rows.map((r) => r.country_iso)).size : 0} countries):`
+    `\nNormalization parameter candidates (n=${[...byField.values()].reduce((a, b) => a + b.length, 0)} observations across ${rows.length > 0 ? new Set(rows.map((r) => r.country_iso)).size : 0} countries):`,
   );
   console.log(
-    `⚠  Use these only when ≥5 programs are approved. Current count: ${new Set(rows.map((r) => r.country_iso)).size}`
+    `⚠  Use these only when ≥5 programs are approved. Current count: ${new Set(rows.map((r) => r.country_iso)).size}`,
   );
   console.log('\n// Paste into NORMALIZATION_PARAMS in packages/scoring/src/engine.ts:\n');
 
@@ -74,7 +77,7 @@ async function main() {
       n: sorted.length,
     };
     console.log(
-      `  '${key}': { min: ${params[key]!.p10}, max: ${params[key]!.p90} },  // n=${params[key]!.n}, raw range [${params[key]!.min}, ${params[key]!.max}]`
+      `  '${key}': { min: ${params[key]!.p10}, max: ${params[key]!.p90} },  // n=${params[key]!.n}, raw range [${params[key]!.min}, ${params[key]!.max}]`,
     );
   }
 

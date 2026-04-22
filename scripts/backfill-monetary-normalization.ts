@@ -6,9 +6,12 @@
  * min_max or z_score normalization. Dry-run by default; pass --execute to apply.
  */
 import postgres from 'postgres';
+import * as dotenv from 'dotenv';
+import { join } from 'node:path';
 
-const DB_URL =
-  'postgresql://postgres.xvcrfgovlcencngjxgiw:TTRgroup1234!@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres';
+dotenv.config({ path: join(__dirname, '../.env') });
+const DB_URL = process.env['DATABASE_URL'];
+if (!DB_URL) throw new Error('DATABASE_URL not set — add it to .env at the monorepo root');
 
 const CURRENCY_PATTERNS: Array<{ code: string; re: RegExp }> = [
   { code: 'AUD', re: /^(?:AUD|A\$)\s*/i },
@@ -99,7 +102,7 @@ async function main() {
     console.log('\nRows to fix:');
     for (const u of updates) {
       console.log(
-        `  [${u.key}] raw="${u.raw}" → ${u.value}${u.currency ? ` (${u.currency})` : ''}`
+        `  [${u.key}] raw="${u.raw}" → ${u.value}${u.currency ? ` (${u.currency})` : ''}`,
       );
     }
   }

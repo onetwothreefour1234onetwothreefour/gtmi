@@ -4,9 +4,12 @@
  */
 import postgres from 'postgres';
 import { writeFileSync } from 'fs';
+import * as dotenv from 'dotenv';
+import { join } from 'node:path';
 
-const DB_URL =
-  'postgresql://postgres.xvcrfgovlcencngjxgiw:TTRgroup1234!@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres';
+dotenv.config({ path: join(__dirname, '../.env') });
+const DB_URL = process.env['DATABASE_URL'];
+if (!DB_URL) throw new Error('DATABASE_URL not set — add it to .env at the monorepo root');
 
 const ERROR_MARKERS = [
   'access denied',
