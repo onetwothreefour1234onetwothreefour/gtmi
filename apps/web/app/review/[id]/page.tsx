@@ -45,6 +45,38 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
           {row.valueRaw ?? <em className="text-gray-400">(no raw value)</em>}
         </p>
 
+        {row.sourceSentence && (
+          <div className="mt-3">
+            <p className="mb-1 text-xs font-medium text-gray-500">Source sentence</p>
+            <blockquote className="border-l-2 border-gray-300 pl-3 text-sm italic text-gray-700">
+              {row.sourceSentence}
+            </blockquote>
+          </div>
+        )}
+
+        <div className="mt-3 flex gap-4 text-xs text-gray-500">
+          {row.extractionConfidence !== null && (
+            <span>
+              Extraction confidence:{' '}
+              <span
+                className={row.extractionConfidence >= 0.85 ? 'text-green-600' : 'text-amber-600'}
+              >
+                {(row.extractionConfidence * 100).toFixed(0)}%
+              </span>
+            </span>
+          )}
+          {row.validationConfidence !== null && (
+            <span>
+              Validation confidence:{' '}
+              <span
+                className={row.validationConfidence >= 0.85 ? 'text-green-600' : 'text-amber-600'}
+              >
+                {(row.validationConfidence * 100).toFixed(0)}%
+              </span>
+            </span>
+          )}
+        </div>
+
         <div className="mt-3">
           <details>
             <summary className="cursor-pointer text-xs text-gray-500">

@@ -1,6 +1,6 @@
 import 'server-only';
 import { db, fieldValues, fieldDefinitions, programs, countries, sources } from '@gtmi/db';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 
 export type ReviewListRow = {
   id: string;
@@ -19,6 +19,9 @@ export type ReviewListRow = {
 export type ReviewDetailRow = ReviewListRow & {
   valueNormalized: unknown;
   provenance: unknown;
+  sourceSentence: string | null;
+  extractionConfidence: number | null;
+  validationConfidence: number | null;
   sourceUrl: string | null;
   sourceTier: number | null;
   extractionPromptMd: string;
@@ -65,6 +68,13 @@ export async function getReviewDetail(id: string): Promise<ReviewDetailRow | nul
       valueRaw: fieldValues.valueRaw,
       valueNormalized: fieldValues.valueNormalized,
       provenance: fieldValues.provenance,
+      sourceSentence: sql<string | null>`(${fieldValues.provenance}->>'sourceSentence')`,
+      extractionConfidence: sql<
+        number | null
+      >`(${fieldValues.provenance}->>'extractionConfidence')::float`,
+      validationConfidence: sql<
+        number | null
+      >`(${fieldValues.provenance}->>'validationConfidence')::float`,
       extractedAt: fieldValues.extractedAt,
       sourceUrl: sources.url,
       sourceTier: sources.tier,
