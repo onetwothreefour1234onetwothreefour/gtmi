@@ -1,0 +1,31 @@
+Country ISO,Country Name,Region,IMD Rank,IMD Appeal Score,IMD Appeal Score CME Normalized
+CHE,Switzerland,Europe,1,93.07,100.00
+NLD,Netherlands,Europe,2,74.22,52.89
+IRL,Ireland,Europe,3,74.14,52.69
+LUX,Luxembourg,Europe,4,69.63,41.39
+ISL,Iceland,Europe,5,67.72,36.61
+DEU,Germany,Europe,6,67.21,35.34
+CAN,Canada,Americas,7,66.87,34.49
+SWE,Sweden,Europe,8,64.07,27.49
+SGP,Singapore,Asia,9,62.73,24.14
+BEL,Belgium,Europe,10,62.52,23.61
+AUT,Austria,Europe,11,62.37,23.23
+ARE,UAE,Middle East,12,62.16,22.71
+AUS,Australia,Oceania,13,62.09,22.53
+JPN,Japan,Asia,14,60.92,19.61
+NOR,Norway,Europe,15,59.40,15.81
+TWN,Taiwan,Asia,16,58.96,14.71
+LTU,Lithuania,Europe,17,58.26,13.96
+USA,USA,Americas,18,57.11,10.08
+FIN,Finland,Europe,19,57.01,9.83
+HKG,Hong Kong,Asia,20,56.57,8.73
+MYS,Malaysia,Asia,21,56.51,8.58
+CHL,Chile,Americas,22,56.34,8.15
+SAU,Saudi Arabia,Middle East,23,56.34,8.15
+NAM,Namibia,Africa,24,55.51,6.08
+FRA,France,Europe,25,55.06,4.95
+GBR,United Kingdom,Europe,26,54.81,4.33
+EST,Estonia,Europe,27,54.16,2.70
+NZL,New Zealand,Oceania,28,53.56,1.20
+BHR,Bahrain,Middle East,29,53.44,0.90
+OMN,Oman,Middle East,30,53.08,0.00
