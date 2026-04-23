@@ -1,0 +1,21 @@
+# Normalize line endings to LF in the repository for all text files
+* text=auto eol=lf
+
+# Explicit text files — always LF
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.jsx  text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.md   text eol=lf
+*.sql  text eol=lf
+*.csv  text eol=lf
+
+# Binary files — no line-ending conversion, no diff
+*.xlsx binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.pdf  binary
