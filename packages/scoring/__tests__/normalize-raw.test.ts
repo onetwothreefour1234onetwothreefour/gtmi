@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeRawValue } from '../src/normalize-raw.ts';
-import { ScoringError } from '../src/types.ts';
+import { normalizeRawValue } from '../src/normalize-raw';
+import { ScoringError } from '../src/types';
 
 const minMaxDef = { normalizationFn: 'min_max', scoringRubricJsonb: null };
 const zScoreDef = { normalizationFn: 'z_score', scoringRubricJsonb: null };

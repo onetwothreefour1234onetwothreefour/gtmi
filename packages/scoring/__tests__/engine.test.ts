@@ -5,7 +5,7 @@ import {
   normalizeMinMax,
   normalizeZScore,
   parseIndicatorValue,
-} from '../src/normalize.ts';
+} from '../src/normalize';
 import {
   CME_WEIGHT,
   INSUFFICIENT_DISCLOSURE_THRESHOLD,
@@ -16,9 +16,9 @@ import {
   applyMissingDataPenalty,
   computeDataCoverage,
   reNormalizeWeights,
-} from '../src/score.ts';
-import { runScoringEngine } from '../src/engine.ts';
-import { ScoringError, ScoringInput } from '../src/types.ts';
+} from '../src/score';
+import { runScoringEngine } from '../src/engine';
+import { ScoringError, ScoringInput } from '../src/types';
 
 // ---------------------------------------------------------------------------
 // Weight integrity
