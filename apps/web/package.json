@@ -11,7 +11,10 @@
   },
   "dependencies": {
     "@gtmi/db": "workspace:*",
+    "@gtmi/scoring": "workspace:*",
     "@radix-ui/react-slot": "^1.2.4",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.104.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",

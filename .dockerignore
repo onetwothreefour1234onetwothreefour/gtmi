@@ -1,0 +1,22 @@
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/coverage
+**/.cache
+**/.DS_Store
+
+.git
+.github
+.vscode
+.idea
+
+.env
+.env.*
+!.env.example
+
+# Services built separately with their own context.
+scraper
+
+**/*.log
+**/.eslintcache
