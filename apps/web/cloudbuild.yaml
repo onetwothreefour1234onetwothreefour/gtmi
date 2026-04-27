@@ -1,6 +1,29 @@
 # Cloud Build config for @gtmi/web → Cloud Run.
 # Build context: the monorepo root. Dockerfile: apps/web/Dockerfile.
-# Run from repo root: gcloud builds submit --config apps/web/cloudbuild.yaml .
+#
+# This file describes the BUILD PIPELINE. The TRIGGER that fires this
+# pipeline on push to `main` lives in Cloud Console → Cloud Build →
+# Triggers → `gtmi-web-main` (project gtmi-494008, region europe-west1).
+# Recreating the trigger? See docs/runbook.md.
+#
+# The trigger watches these globs only — a docs-only commit will NOT
+# fire a 6-minute Docker rebuild. Update both lists in lockstep when
+# adding a new build input:
+#
+#   apps/web/**
+#   packages/db/**
+#   packages/scoring/**
+#   packages/extraction/**
+#   packages/shared/**
+#   pnpm-lock.yaml
+#   pnpm-workspace.yaml
+#   package.json
+#   .npmrc
+#
+# Manual fallback (no trigger needed):
+#   apps\web\deploy.cmd      (Windows, from a developer machine)
+# or:
+#   gcloud builds submit --config apps/web/cloudbuild.yaml .
 
 steps:
   - name: gcr.io/cloud-builders/docker
