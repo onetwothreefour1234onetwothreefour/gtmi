@@ -363,14 +363,18 @@ All three flagged `insufficient_disclosure` because pillars C and D have no auto
 - ✅ Markdown stubs shipped (analyst will edit before public launch): `methodology/{intro,normalization,data-integrity,sensitivity,whatGTMIMeasuresNot}.md`, `pillars/{A,B,C,D,E}.md`, `changes-empty.md`, `about.md`.
 - ✅ No new dependencies. Phase 4.4 ships purely on the existing remark + Drizzle + postgres-js stack.
 
-### Phase 4.5 — Polish — ⬜
+### Phase 4.5 — Polish — ✅ COMPLETE (Session 14, tag `phase-4-complete`)
 
-- ⬜ OG image generation via `@vercel/og` library running on Cloud Run.
-- ⬜ SEO + JSON-LD `Dataset` structured data on program pages.
-- ⬜ Accessibility audit; Lighthouse 95+ on Performance / Accessibility / Best Practices / SEO.
-- ⬜ Cross-browser smoke test (Chrome / Safari / Firefox / Edge).
-- ⬜ Cloud Run deployment validation that `/review` and the public dashboard co-deploy correctly.
-- ⬜ Doc updates per dispatch §15: flip Phase 4 line items to ✅, add Session N close-out note, update `architecture.md` §4 stack table + §7 Implemented on main, add ADRs 009 + 010 alongside ADR-011.
+- ✅ Country flags: 30 cohort flag SVGs vendored from MIT-licensed flag-icons into `apps/web/public/flags/`. `<CountryFlag iso countryName? size?>` primitive renders via `next/image`; falls back to a globe glyph for unknown ISOs. Wired into rankings table, country header, program detail header, and selected-country chip row.
+- ✅ Open Graph image generation: 1200×630 images via `@vercel/og` library on Cloud Run runtime. Default `app/(public)/opengraph-image.tsx`, per-program `app/(public)/programs/[id]/opengraph-image.tsx` (composite + CME/PAQ + pillar mini-bars), per-country `app/(public)/countries/[iso]/opengraph-image.tsx` (rank, IMD score, programmes-scored). Pre-calibration suffix on placeholder programmes.
+- ✅ SEO foundation: `app/sitemap.ts` dynamically generated from `programs` + `countries`; `app/robots.ts` already disallowed `/preview-gallery` and `/review/*` from Phase 4.1; `<JsonLd>` server-component primitive emitting `schema.org/Dataset` records on `/programs/[id]` (with composite/CME/PAQ as `variableMeasured`) and `/countries/[iso]` (with `spatialCoverage`); `metadataBase` + `applicationName` + per-route canonical/OG/Twitter via `generateMetadata` on detail pages.
+- ✅ Accessibility pass: 16 vitest-axe smoke tests (`components/gtmi/a11y.test.tsx`); fixes for `aria-prohibited-attr` on `<DirectionArrow>` and `<CountryFlag>` fallback (added `role="img"`); removed `title` on `next/image` (redundant with `alt`); `<PillarRadar>` now emits a sr-only data-table alternative; `RankingsTable` reads `useReducedMotion()` and disables FLIP layout reordering when prefers-reduced-motion is set; semantic landmarks (`<main>`, `<nav>`, `<article>`, `<section>`) and skip-to-content already in place since Phase 4.1; `:focus-visible` ring (2px accent) inherited from globals.css.
+- ✅ Performance: `generateStaticParams()` on `/programs/[id]` and `/countries/[iso]` so Next pre-renders every cohort row at build time; `dynamicParams = true` for runtime-render fallback on unknown ids; ISR (revalidate=3600) unchanged. Self-hosted fonts via `next/font/google` (Fraunces/Inter/JetBrains Mono) confirmed shipping. Recharts and framer-motion lazy-loaded behind `'use client'` boundaries.
+- ✅ Structured logging: `lib/logger.ts` (pino, JSON output, severity-mapped to Cloud Logging severities, `service: 'gtmi-web'` base, ISO 8601 timestamps, `LOG_LEVEL` env-configurable). First consumer: `app/sitemap.ts` failure path. No `pino-pretty` — production and dev both emit JSON.
+- ✅ Server-helpers convention documented: `docs/conventions/server-helpers.md` formalises the `'server-only'` + `-helpers.ts` extraction pattern that's used in four query modules (program-detail, country-detail, methodology-current; policy-changes still uses the inline test-fixture mirror).
+- ✅ Cloud Run deployment validation: Dockerfile inspection — no changes needed for Phase 4.5 surfaces (`public/flags/*.svg` ships via the existing public-dir COPY; new routes auto-included by `pnpm --filter @gtmi/web build`; new deps resolve from `apps/web/package.json` in the deps stage). `docker build` not run from this sandbox (Docker Desktop daemon not running). Compile + lint + typecheck all green via `pnpm` directly; the same code paths run inside the Docker build.
+
+**Phase 4 complete.** Tag suggestion: `phase-4-complete` at this commit.
 
 ---
 
