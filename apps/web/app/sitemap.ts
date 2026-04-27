@@ -3,6 +3,7 @@ import type { MetadataRoute } from 'next';
 import { db } from '@gtmi/db';
 import { sql } from 'drizzle-orm';
 import { SITE_URL } from '@/lib/site-url';
+import { logger } from '@/lib/logger';
 
 interface ProgramRow {
   id: string;
@@ -67,10 +68,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ];
   } catch (err) {
     // If the DB is unreachable at build/sitemap-render time we still want
-    // the static routes to ship. Logged via console so Cloud Logging captures
-    // the issue without breaking sitemap generation entirely.
-
-    console.error('sitemap: dynamic-route fetch failed', err);
+    // the static routes to ship. Logged structured to Cloud Logging.
+    logger.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      'sitemap_dynamic_fetch_failed'
+    );
   }
 
   return [...staticEntries, ...dynamicEntries];
