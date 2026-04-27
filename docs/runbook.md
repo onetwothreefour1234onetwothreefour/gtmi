@@ -221,6 +221,24 @@ Exits 1 on any miss — suitable for CI gating once we choose to wire it.
 
 ---
 
+## Coverage strategy in one paragraph
+
+GTMI does not target 100% indicator coverage as a quality metric. The
+realistic per-programme ceiling, post the Phase 5 coverage push, is
+**42–44/48 (43 average)**. The remaining 4–6 indicators are either
+methodology gaps or country-level transparency gaps (e.g. Bahrain,
+Saudi Arabia, UAE don't publish admission statistics in any structured
+form). The credibility play is "publish only what we can defensibly
+source, surface what's missing per programme, let the reader apply
+their own credibility weighting" — not 100% coverage with fudged
+values. The `insufficient_disclosure` flag (programs <70% pillar
+coverage withheld from public ranking) is the safety net. Full framing
+in [METHODOLOGY.md §7.5.1](METHODOLOGY.md). Six Phase 5 work-streams
+that drive coverage from today's 30–34/48 baseline toward the ceiling
+are sequenced in [IMPLEMENTATION_PLAN.md §Phase 5](IMPLEMENTATION_PLAN.md).
+
+---
+
 ## Linked documentation
 
 - [BRIEF.md](BRIEF.md) — canonical product specification

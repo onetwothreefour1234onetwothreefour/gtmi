@@ -453,9 +453,22 @@ Both flagged `insufficient_disclosure` (auto-approved coverage below pillar thre
 
 ### Phase 4 (public dashboard) — PENDING
 
-### Phase 5 (living index) — PENDING
+### Phase 5 (living index + coverage push) — PENDING [NEW v6]
+
+Expanded scope from the original "weekly re-scrape only" framing. Phase 5 also addresses the Phase 2 retrospective finding that AUS+SGP+CAN converge at 30–34/48 today — driven by source-discovery gaps, not pipeline failure. Six sub-phases ranked by leverage:
+
+- **5.1 Living-index policy monitoring** — weekly re-scrape, hash-diff, severity classification, Wayback archival (per ADR-008), Tier 3 news-signal ingestion via Exa, Resend alerts on material/breaking changes. Unlocks Pillar E.1.x cohort-wide.
+- **5.2 V-Dem direct-API** — `fetchVdemRuleOfLawScore(iso3)` mirroring the World Bank API path already in production. Closes Pillar E.3 cohort-wide. ~1 day engineering.
+- **5.3 Cross-departmental discovery audit** — per-country source-department registry expansion (immigration, tax, statistics bureau, gazette, regional). Discovery prompt rewritten to enumerate the cross-departmental set explicitly and re-prompt on missing departments. Unlocks Pillar D.3.x tax fields and E.2.x transparency fields cohort-wide. Re-canary the 5-country pilot.
+- **5.4 Cohort-wide prompt sweep** — systematic LLM_MISS triage and prompt revision until LLM_MISS converges to 0 across the cohort. Six prompts hinted in Session 10; the remaining 42 haven't had a serious revision pass since Phase 1.
+- **5.5 Tier 2 backfill methodology revision (ADR-013)** — relaxed the Tier-1-only rule for selected indicators outside the scoring core, with `sourceTier: 2` flag visible in provenance. Unlocks ~2–3 fields per programme where Tier 1 truly has nothing.
+- **5.6 Methodology v2 indicator review (ADR-014)** — audit indicators that return `not_addressed` on >50% of the cohort post-5.3 + 5.4. Decide per-indicator: keep, drop and re-normalize sub-factor weights, restructure as boolean, or country-substitute. Methodology v2.0.0 published; existing scores keep their v1 stamp.
+
+**Realistic per-programme coverage target after 5.1–5.6: 42–44/48 (43 average).** The remaining 4–6 indicators are either methodology gaps (the indicator we defined doesn't correspond to data anyone publishes) or country-specific transparency gaps (e.g. Bahrain, Saudi Arabia, UAE don't publish admission statistics in any structured form; E.2.1 is permanently null for those countries). The credibility play is "publish only what we can defensibly source, surface what's missing per programme" — not 100% coverage with fudged values. The `insufficient_disclosure` flag is the safety net for programmes below 70% coverage on any pillar.
 
 ### Phase 6 (scale and enrichment) — PENDING
+
+Onboard the remaining 60 programmes to reach the full 85-programme cohort across IMD Top 30. OECD tax treaty database supplements Pillar D.3. Annual IMD Appeal refresh job. Methodology whitepaper published. Open internal beta to TTR Group strategy clients.
 
 ---
 

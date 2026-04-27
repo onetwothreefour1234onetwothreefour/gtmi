@@ -397,6 +397,20 @@ Wayback Machine archival co-located with the re-scrape diff path (Phase 5) — s
 - **Phase 2 placeholder flag**: scores computed with engineer-chosen normalization ranges (rather than calibrated p10/p90 percentiles from a real distribution) carry `metadata.phase2Placeholder = true` on the `scores` row and must not be published publicly. Calibration is the first scoring step in Phase 3 once ≥5 programs are scored, after which the flag clears [NEW v4].
 - **Stability Edge Case (E.1.1)**: programs younger than 3 years use within-country cohort mean substitution for E.1.1, falling back to global cohort mean if fewer than two mature programs exist in country. Flagged in provenance record.
 
+### 7.5.1 Coverage philosophy and realistic ceiling [NEW v5]
+
+GTMI does not target 100% indicator coverage as a quality metric. Some indicators we defined do not correspond to data any government publishes (e.g. several E.2.x transparency indicators are permanently null for jurisdictions that don't publish admission statistics in structured form — Bahrain, Saudi Arabia, UAE). The credibility design is:
+
+> publish only what we can defensibly source, surface what's missing per programme, and let the reader apply their own credibility weighting via the `insufficient_disclosure` flag.
+
+The realistic per-programme ceiling, post the Phase 5 coverage push, is **42–44/48 (43 average)**. The remaining 4–6 unfilled indicators per programme fall into three categories, each with a designed handling:
+
+1. **Genuine country-level transparency gaps** — the country does not publish the underlying data. Indicator stays null; sub-factor missing-data penalty applies; if pillar coverage drops below 70%, the program is `insufficient_disclosure`-flagged and withheld from the public ranking. No methodology change required.
+2. **Indicators that do not correspond to publishable data anywhere** — methodology v2 review (Phase 5.6, ADR-014) decides per indicator whether to drop, restructure as boolean, or country-substitute. Methodology weights re-normalize at v2; existing v1 scores keep their v1 stamp (no retroactive recomputation).
+3. **Indicators outside the Pillar A-D scoring core where Tier 1 is silent but Tier 2 covers the gap** — methodology v3 review (Phase 5.5, ADR-013) authorises Tier 2 backfill for the allowlisted indicators, with `sourceTier: 2` flag visible in the provenance display so the reader sees the credibility tradeoff.
+
+Phase 5 (`docs/IMPLEMENTATION_PLAN.md` §Phase 5) sequences the six work-streams that drive coverage from today's 30–34/48 baseline (AUS, SGP, CAN canaries) toward the 42–44/48 ceiling: living-index policy monitoring, V-Dem direct API, cross-departmental discovery audit, cohort-wide prompt sweep, Tier 2 backfill ADR, methodology v2 review.
+
 ### 7.6 LLM use boundaries
 
 LLMs are used for:

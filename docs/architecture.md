@@ -194,8 +194,19 @@ Missing indicator data is not imputed. An absent indicator is excluded from its 
 ### Stubbed or not yet implemented
 
 - **Calibration of normalization params**: `compute-normalization-params.ts` returned only 4 numeric fields with approved observations across the AUS+SGP cohort and 3 had n=1 — too thin to swap in. Calibration runs as the first scoring step in Phase 3 once ≥5 programs are scored, after which `phase2Placeholder` clears.
-- **URL drift monitoring**: 4 of the discovered Tier-1 URLs (2 AUS, 2 SGP) returned 0-char soft-404s during the Phase 2 close-out runs. A monthly HEAD-check job is scheduled into Phase 5 living-index work or sooner if Phase 3 fans out first.
-- **Wayback Machine archival**: deferred to Phase 5 per [ADR-008](decisions/008-defer-wayback-archival-to-phase-5.md). The Phase 2 line-item is marked moved (🚚) in `IMPLEMENTATION_PLAN.md`.
+- **URL drift monitoring**: 4 of the discovered Tier-1 URLs (2 AUS, 2 SGP) returned 0-char soft-404s during the Phase 2 close-out runs. A monthly HEAD-check job is scheduled into Phase 5.1 living-index work.
 - **Lighthouse 95+ verification**: structurally complete (SSG + ISR, OG images, sitemap, JSON-LD, a11y assertions). Actual Lighthouse score capture requires a live deploy; the close-out report enumerates each route's expected posture.
 - **Sensitivity analyses**: Phase 3 deliverable; runner not yet implemented.
-- **News signal ingestion (Tier 3) and policy-change diff detection**: Phase 5.
+
+### Phase 5 — six work-streams, ranked by leverage
+
+Expanded from the original "Living Index" framing to address the Phase 2 retrospective finding that AUS+SGP+CAN converge at 30–34/48 today — driven by source-discovery gaps, not pipeline failure. Realistic per-programme coverage target: **42–44/48 (43 average)**. Full per-sub-phase line items in `IMPLEMENTATION_PLAN.md` Phase 5.
+
+- **5.1 Living-index policy monitoring** — weekly re-scrape, hash-diff, severity classification, Wayback archival (per [ADR-008](decisions/008-defer-wayback-archival-to-phase-5.md)), Tier 3 news-signal ingestion via Exa, Resend alerts. Unlocks Pillar E.1.x cohort-wide. The `policy_changes` table populates; the `<PolicyTimeline>` component on `/programs/[id]` and the disabled-filter UI on `/changes` already wired in Phase 4 — both light up with zero code change.
+- **5.2 V-Dem direct-API** — `fetchVdemRuleOfLawScore(iso3)` mirroring the World Bank API path shipped in Phase 2 for E.3.2. Closes Pillar E.3 cohort-wide. ~1 day engineering.
+- **5.3 Cross-departmental discovery audit** — per-country source-department registry expansion (immigration, tax, statistics bureau, gazette, regional). Discovery prompt rewritten to enumerate the cross-departmental set explicitly and re-prompt on missing departments. Unlocks D.3.x tax fields and E.2.x transparency fields cohort-wide. Re-canary the 5-country pilot.
+- **5.4 Cohort-wide prompt sweep** — systematic LLM_MISS triage and prompt revision. `scripts/diag-empty-fields.ts` already classifies empty fields; the work is iterating each prompt in `methodology-v1.ts` until LLM_MISS converges to 0.
+- **5.5 Tier 2 backfill methodology revision** — ADR-013. Relaxes the Tier-1-only rule for selected indicators outside the scoring core, with `sourceTier: 2` flag visible in provenance. The extraction code already supports per-tier selection; enabling it is an indicator-level config change.
+- **5.6 Methodology v2 indicator review** — ADR-014. Audit indicators returning `not_addressed` on >50% of the cohort post-5.3 + 5.4. Decide per-indicator: keep, drop and re-normalize sub-factor weights, restructure as boolean, or country-substitute. Methodology v2.0.0 published; existing scores keep their v1 stamp.
+
+The credibility design is "publish only what we can defensibly source, surface what's missing per programme, let the reader apply their own credibility weighting via the `insufficient_disclosure` flag" — not 100% coverage with fudged values. Per-indicator "Not on government source" placeholder + Pre-calibration / Phase-3 chips already make the gap visible to readers. Methodology framing in `METHODOLOGY.md` §7.5.1.
