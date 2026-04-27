@@ -17,7 +17,11 @@ export type FieldValueStatus = 'draft' | 'approved' | 'rejected' | 'superseded' 
 export interface ProvenanceCoreFields {
   sourceUrl: string;
   geographicLevel: GeographicLevel;
-  sourceTier: SourceTier;
+  /**
+   * `null` is reserved for synthetic country-substitute rows
+   * (Phase 3.5 / ADR-014). Real Tier-1/2/3 sources always set 1, 2, or 3.
+   */
+  sourceTier: SourceTier | null;
   scrapedAt: string;
   contentHash: string;
   sourceSentence: string;
@@ -99,8 +103,14 @@ export function readProvenance(raw: unknown, status: FieldValueStatus): Provenan
   const blob = raw as Record<string, unknown>;
   const missing: string[] = [];
 
+  // Phase 3.5 / ADR-014: sourceTier may be null on synthetic country-substitute
+  // rows. Treat undefined as missing, null as present (presence-only check).
+  const NULLABLE_REQUIRED_KEYS = new Set<string>(['sourceTier']);
   for (const key of PROVENANCE_CORE_KEYS) {
-    if (blob[key] === undefined || blob[key] === null) {
+    const isNullable = NULLABLE_REQUIRED_KEYS.has(key);
+    if (blob[key] === undefined) {
+      missing.push(key);
+    } else if (blob[key] === null && !isNullable) {
       missing.push(key);
     }
   }

@@ -1,12 +1,219 @@
-import { db, fieldDefinitions, fieldValues, methodologyVersions } from '@gtmi/db';
-import { normalizeRawValue, ScoringError } from '@gtmi/scoring';
+import { db, fieldDefinitions, fieldValues, methodologyVersions, programs } from '@gtmi/db';
+import {
+  BOOLEAN_WITH_ANNOTATION_KEYS,
+  getRegionalSubstitute,
+  normalizeRawValue,
+  ScoringError,
+} from '@gtmi/scoring';
+import { createHash } from 'crypto';
 import { eq } from 'drizzle-orm';
 import type { ExtractionOutput, ValidationResult } from '../types/extraction';
 import type { ProvenanceRecord } from '../types/provenance';
 import type { PublishStage } from '../types/pipeline';
 import { detectCurrency } from '../utils/currency';
 
+const COUNTRY_SUBSTITUTE_MODEL = 'country-substitute-regional';
+
+/**
+ * Phase 3.5 / ADR-014 — synthetic provenance sentinels for country-substitute rows.
+ * Every key required by `verify-provenance.ts` is populated; `sourceTier` is
+ * the only nullable required key (null means "no real source").
+ *
+ * Exported for testing.
+ */
+export function buildCountrySubstituteProvenance(args: {
+  fieldKey: string;
+  countryIso: string;
+  region: string;
+  substitutedValue: string;
+  methodologyVersion: string;
+}): ProvenanceRecord {
+  const sentinel = `country-substitute-regional:${args.fieldKey}:${args.countryIso}:${args.region}:${args.substitutedValue}`;
+  return {
+    sourceUrl: `internal:country-substitute-regional/${args.fieldKey}/${args.countryIso}`,
+    geographicLevel: 'regional',
+    sourceTier: null,
+    scrapeTimestamp: new Date().toISOString(),
+    contentHash: createHash('sha256').update(sentinel, 'utf8').digest('hex'),
+    sourceSentence: `Regional default applied for ${args.fieldKey} in ${args.countryIso} (region: ${args.region}); no government source extracted.`,
+    characterOffsets: { start: 0, end: 0 },
+    extractionModel: COUNTRY_SUBSTITUTE_MODEL,
+    extractionConfidence: 1.0,
+    validationModel: COUNTRY_SUBSTITUTE_MODEL,
+    validationConfidence: 1.0,
+    crossCheckResult: 'not_checked',
+    crossCheckUrl: null,
+    reviewedBy: 'auto',
+    reviewedAt: new Date(),
+    methodologyVersion: args.methodologyVersion,
+    reviewDecision: 'approve',
+  };
+}
+
+const ALLOWED_BOOLEAN_ANNOTATION_KEYS = new Set([
+  'hasLevy',
+  'hasMandatoryNonGovCosts',
+  'required',
+  'daysPerYear',
+  'notes',
+]);
+
+/**
+ * Phase 3.5: shape-validate the structured object for boolean_with_annotation
+ * fields BEFORE writing to field_values. The scoring engine will throw if the
+ * primary boolean key is missing — surface that here so the publish error is
+ * specific instead of "Normalization failed".
+ *
+ * Exported for testing.
+ */
+export function validateBooleanWithAnnotationShape(
+  fieldKey: string,
+  parsed: Record<string, unknown>
+): void {
+  const requiredBoolKey = BOOLEAN_WITH_ANNOTATION_KEYS[fieldKey];
+  if (!requiredBoolKey) {
+    throw new Error(
+      `boolean_with_annotation: no boolean key registered for field "${fieldKey}" — methodology-v2 misconfigured`
+    );
+  }
+  if (typeof parsed[requiredBoolKey] !== 'boolean') {
+    throw new Error(
+      `boolean_with_annotation: field "${fieldKey}" expects "${requiredBoolKey}: boolean" — got ${JSON.stringify(parsed[requiredBoolKey])}`
+    );
+  }
+  for (const key of Object.keys(parsed)) {
+    if (!ALLOWED_BOOLEAN_ANNOTATION_KEYS.has(key)) {
+      throw new Error(
+        `boolean_with_annotation: field "${fieldKey}" has unexpected property "${key}" (allowed: ${[...ALLOWED_BOOLEAN_ANNOTATION_KEYS].join(', ')})`
+      );
+    }
+  }
+}
+
 export class PublishStageImpl implements PublishStage {
+  /**
+   * Phase 3.5 / ADR-014 — write a synthetic country-substitute row when the
+   * LLM extraction returned empty for a `country_substitute_regional` field.
+   * No provenance argument: this method builds its own sentinel provenance
+   * and resolves the country from the program record. Auto-approves.
+   *
+   * Returns true if a row was written, false if no regional default exists
+   * for the country (caller should let the missing-data penalty apply).
+   */
+  async executeCountrySubstitute(
+    programId: string,
+    fieldDefinitionKey: string,
+    methodologyVersion: string
+  ): Promise<boolean> {
+    const fieldDefRows = await db
+      .select({
+        id: fieldDefinitions.id,
+        normalizationFn: fieldDefinitions.normalizationFn,
+        scoringRubricJsonb: fieldDefinitions.scoringRubricJsonb,
+      })
+      .from(fieldDefinitions)
+      .where(eq(fieldDefinitions.key, fieldDefinitionKey))
+      .limit(1);
+
+    if (fieldDefRows.length === 0) {
+      throw new Error(
+        `Country-substitute publish failed: no field_definition found with key "${fieldDefinitionKey}"`
+      );
+    }
+    const fieldDef = fieldDefRows[0]!;
+    if (fieldDef.normalizationFn !== 'country_substitute_regional') {
+      throw new Error(
+        `Country-substitute publish refused: field "${fieldDefinitionKey}" has normalizationFn "${fieldDef.normalizationFn}", not "country_substitute_regional"`
+      );
+    }
+
+    const programRows = await db
+      .select({ countryIso: programs.countryIso })
+      .from(programs)
+      .where(eq(programs.id, programId))
+      .limit(1);
+
+    if (programRows.length === 0) {
+      throw new Error(`Country-substitute publish failed: no program found with id "${programId}"`);
+    }
+    const countryIso = programRows[0]!.countryIso;
+
+    const sub = getRegionalSubstitute(countryIso, fieldDefinitionKey);
+    if (sub.score === null || sub.value === null) {
+      console.log(
+        `  [${fieldDefinitionKey}] country_substitute_regional: no regional default for ${countryIso} (region=${sub.region}) — leaving empty so missing-data penalty applies`
+      );
+      return false;
+    }
+
+    const methodologyRows = await db
+      .select({ id: methodologyVersions.id })
+      .from(methodologyVersions)
+      .where(eq(methodologyVersions.versionTag, methodologyVersion))
+      .limit(1);
+    if (methodologyRows.length === 0) {
+      throw new Error(
+        `Country-substitute publish failed: no methodology_version found with version_tag "${methodologyVersion}"`
+      );
+    }
+    const methodologyVersionId = methodologyRows[0]!.id;
+
+    const provenance = buildCountrySubstituteProvenance({
+      fieldKey: fieldDefinitionKey,
+      countryIso,
+      region: sub.region,
+      substitutedValue: sub.value,
+      methodologyVersion,
+    });
+
+    const valueNormalized = {
+      substituted: true,
+      value: sub.value,
+      region: sub.region,
+    };
+
+    const inserted = await db
+      .insert(fieldValues)
+      .values({
+        programId,
+        fieldDefinitionId: fieldDef.id,
+        valueRaw: null,
+        valueNormalized,
+        valueIndicatorScore: String(sub.score),
+        provenance,
+        status: 'approved',
+        extractedAt: new Date(),
+        reviewedAt: provenance.reviewedAt,
+        methodologyVersionId,
+      })
+      .onConflictDoUpdate({
+        target: [fieldValues.programId, fieldValues.fieldDefinitionId],
+        set: {
+          valueRaw: null,
+          valueNormalized,
+          valueIndicatorScore: String(sub.score),
+          provenance,
+          status: 'approved',
+          extractedAt: new Date(),
+          reviewedAt: provenance.reviewedAt,
+          methodologyVersionId,
+        },
+      })
+      .returning({ id: fieldValues.id });
+
+    const insertedId = inserted[0]?.id;
+    if (!insertedId) {
+      throw new Error(
+        `Country-substitute publish failed: insert returned no id for ${fieldDefinitionKey} / ${programId}`
+      );
+    }
+
+    console.log(
+      `Published [${insertedId}] (country-substitute) — program: ${programId}, field: ${fieldDefinitionKey}, region: ${sub.region}, value: ${sub.value}, score: ${sub.score}`
+    );
+    return true;
+  }
+
   async execute(
     extraction: ExtractionOutput,
     _validation: ValidationResult,
@@ -93,6 +300,17 @@ export class PublishStageImpl implements PublishStage {
       const msg = error instanceof ScoringError ? error.message : String(error);
       throw new Error(
         `Normalization failed for field "${extraction.fieldDefinitionKey}" / program "${extraction.programId}": ${msg}`
+      );
+    }
+
+    // Phase 3.5 / ADR-014: validate the structured shape for
+    // boolean_with_annotation BEFORE writing. The scoring engine performs
+    // its own check at score time, but failing here gives a specific
+    // publish-time error (and prevents persisting a malformed object).
+    if (fieldDef.normalizationFn === 'boolean_with_annotation') {
+      validateBooleanWithAnnotationShape(
+        extraction.fieldDefinitionKey,
+        valueNormalized as Record<string, unknown>
       );
     }
 

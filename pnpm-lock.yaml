@@ -211,6 +211,9 @@ importers:
       '@gtmi/scoring':
         specifier: workspace:*
         version: link:../scoring
+      '@gtmi/shared':
+        specifier: workspace:*
+        version: link:../shared
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -258,6 +261,9 @@ importers:
       '@gtmi/scoring':
         specifier: workspace:*
         version: link:../packages/scoring
+      '@gtmi/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2

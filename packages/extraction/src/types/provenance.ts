@@ -5,7 +5,12 @@ export type CrossCheckOutcome = 'agree' | 'disagree' | 'not_checked';
 export interface ProvenanceRecord {
   sourceUrl: string;
   geographicLevel: GeographicLevel;
-  sourceTier: SourceTier;
+  /**
+   * Source tier. `null` is reserved for synthetic rows that did not come
+   * from a real source — currently only `extractionModel === 'country-substitute-regional'`
+   * (Phase 3.5 / ADR-014). Real Tier-1/2/3 sources always set 1, 2, or 3.
+   */
+  sourceTier: SourceTier | null;
   scrapeTimestamp: string;
   contentHash: string;
   sourceSentence: string;

@@ -15,27 +15,8 @@
  */
 
 import { db, fieldValues, fieldDefinitions, programs } from '@gtmi/db';
+import { checkProvenanceRow } from '@gtmi/shared';
 import { eq, inArray, and } from 'drizzle-orm';
-
-// Keys present in every ProvenanceRecord regardless of status.
-const REQUIRED_KEYS_ALWAYS = [
-  'sourceUrl',
-  'geographicLevel',
-  'sourceTier',
-  'scrapeTimestamp',
-  'contentHash',
-  'sourceSentence',
-  'characterOffsets',
-  'extractionModel',
-  'extractionConfidence',
-  'validationModel',
-  'validationConfidence',
-  'crossCheckResult',
-  'methodologyVersion',
-] as const;
-
-// Keys required only when status='approved' — reviewer attribution.
-const REQUIRED_KEYS_APPROVED = ['reviewedBy', 'reviewedAt', 'reviewDecision'] as const;
 
 interface CliArgs {
   country?: string;
@@ -65,50 +46,8 @@ function parseArgs(argv: string[]): CliArgs {
   return out;
 }
 
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
 function checkRow(fvId: string, fieldKey: string, status: string, provenance: unknown): string[] {
-  const issues: string[] = [];
-
-  if (!isObject(provenance)) {
-    return [`provenance is not an object (got ${typeof provenance})`];
-  }
-
-  for (const key of REQUIRED_KEYS_ALWAYS) {
-    if (!(key in provenance) || provenance[key] === undefined || provenance[key] === null) {
-      issues.push(`missing required key: ${key}`);
-    }
-  }
-
-  // Shape checks for fields that are easy to corrupt.
-  const offsets = provenance['characterOffsets'];
-  if (offsets !== undefined && offsets !== null) {
-    if (
-      !isObject(offsets) ||
-      typeof offsets['start'] !== 'number' ||
-      typeof offsets['end'] !== 'number'
-    ) {
-      issues.push('characterOffsets must be { start: number, end: number }');
-    }
-  }
-
-  const tier = provenance['sourceTier'];
-  if (tier !== undefined && tier !== null && typeof tier !== 'number') {
-    issues.push(`sourceTier must be a number (got ${typeof tier})`);
-  }
-
-  if (status === 'approved') {
-    for (const key of REQUIRED_KEYS_APPROVED) {
-      if (!(key in provenance)) {
-        issues.push(`approved row missing reviewer key: ${key}`);
-      }
-    }
-  }
-
-  // Suppress noise: if provenance is wholesale missing, the per-key warnings
-  // are redundant. Caller still sees the headline message.
+  const issues = checkProvenanceRow(provenance, status);
   return issues.map((i) => `[${fvId}] ${fieldKey} (${status}): ${i}`);
 }
 

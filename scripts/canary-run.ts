@@ -29,6 +29,14 @@ import { createHash } from 'crypto';
 const METHODOLOGY_VERSION = '1.0.0';
 const AUTO_APPROVE_CONFIDENCE_THRESHOLD = 0.85;
 
+// Phase 3.4 / ADR-013 + Phase 3-recanary-prep — Tier 2 backfill fallback.
+// Default OFF. When true, the tier-2 fallback pass is restricted to
+// `field_definitions.tier2_allowed = true` fields, results are confidence-
+// capped at 0.85 (so they always route to /review per ADR-013), and the
+// provenance `sourceTier` is set to 2.
+const PHASE3_TIER2_FALLBACK = process.env['PHASE3_TIER2_FALLBACK'] === 'true';
+const TIER2_FALLBACK_CONFIDENCE_CAP = 0.85;
+
 async function main() {
   const countryArgIdx = process.argv.indexOf('--country');
   const countryArg = countryArgIdx !== -1 ? process.argv[countryArgIdx + 1] : undefined;
@@ -312,30 +320,50 @@ async function main() {
       const r = allExtractionResults.get(f.key);
       return !r || r.output.valueRaw === '';
     });
-    if (missingLlmFields.length > 0 && tier2Scrapes.length > 0) {
+
+    // Phase 3.4 / ADR-013 + Phase 3-recanary-prep: when the flag is ON,
+    // restrict tier-2 fallback to indicators with `tier2_allowed = true`
+    // and cap output confidence at 0.85 so every tier-2 row routes to
+    // /review (never auto-approves). When OFF, preserve Phase 2 behaviour
+    // (any missing field can fall through to tier-2 with no cap).
+    let tier2EligibleFields = missingLlmFields;
+    let tier2ConfidenceCap: number | undefined;
+    if (PHASE3_TIER2_FALLBACK) {
+      const tier2AllowedSet = new Set(allFieldDefs.filter((d) => d.tier2Allowed).map((d) => d.key));
+      tier2EligibleFields = missingLlmFields.filter((f) => tier2AllowedSet.has(f.key));
+      tier2ConfidenceCap = TIER2_FALLBACK_CONFIDENCE_CAP;
       console.log(
-        `\n[Tier-2 fallback] ${missingLlmFields.length} fields missing — retrying with ${tier2Scrapes.length} tier-2 URLs`
+        `[Tier-2 fallback] PHASE3_TIER2_FALLBACK=true — restricted to ${tier2EligibleFields.length} of ${missingLlmFields.length} missing fields (tier2_allowed=true; cap=${TIER2_FALLBACK_CONFIDENCE_CAP})`
+      );
+    }
+
+    if (tier2EligibleFields.length > 0 && tier2Scrapes.length > 0) {
+      console.log(
+        `\n[Tier-2 fallback] ${tier2EligibleFields.length} field(s) missing — retrying with ${tier2Scrapes.length} tier-2 URLs`
       );
       // Extend lookup maps so provenance resolution works for tier-2 sources.
       for (const sr of tier2Scrapes) scrapeByUrl.set(sr.url, sr);
       try {
         const tier2Results = await extract.executeAllFields(
           tier2Scrapes,
-          missingLlmFields,
+          tier2EligibleFields,
           programId,
           programName,
-          countryIso
+          countryIso,
+          tier2ConfidenceCap !== undefined ? { confidenceCap: tier2ConfidenceCap } : undefined
         );
         let tier2Fills = 0;
         for (const [key, result] of tier2Results) {
           if (result.output.valueRaw !== '') {
             allExtractionResults.set(key, result);
             tier2Fills++;
-            console.log(`  [Tier-2 fill] ${key} — value from ${result.sourceUrl}`);
+            console.log(
+              `  [Tier-2 fill] ${key} — value from ${result.sourceUrl} (confidence ${result.output.extractionConfidence})`
+            );
           }
         }
         console.log(
-          `[Tier-2 fallback] filled ${tier2Fills}/${missingLlmFields.length} missing fields`
+          `[Tier-2 fallback] filled ${tier2Fills}/${tier2EligibleFields.length} missing fields`
         );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -343,8 +371,41 @@ async function main() {
       }
     }
 
+    // ── Country-substitute fallback: write synthetic rows for empty
+    //    `country_substitute_regional` fields when a regional default exists.
+    //    Phase 3.5 / ADR-014. Auto-approved (no review queue).
+    for (const def of allFieldDefs) {
+      if (def.normalizationFn !== 'country_substitute_regional') continue;
+      const r = allExtractionResults.get(def.key);
+      if (r && r.output.valueRaw !== '') continue; // extracted; no substitution needed
+      try {
+        const written = await publish.executeCountrySubstitute(
+          programId,
+          def.key,
+          METHODOLOGY_VERSION
+        );
+        if (written) {
+          fieldsExtracted++;
+          fieldsAutoApproved++;
+          console.log(`  ↳ [${def.key}] Country-substitute applied — AUTO-APPROVED`);
+        } else {
+          console.log(
+            `  ↳ [${def.key}] Country-substitute skipped — no regional default (missing-data penalty applies)`
+          );
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`  ↳ [${def.key}] Country-substitute failed: ${msg}`);
+      }
+    }
+
     // ── Per-field validation + publish ───────────────────────────────────────
-    for (const def of allFieldDefs.filter((d) => d.key !== 'E.3.2')) {
+    // Phase 3.5: country_substitute_regional fields are published by
+    // executeCountrySubstitute above (or skipped if no regional default).
+    // Exclude them from the standard validate-and-publish loop.
+    for (const def of allFieldDefs.filter(
+      (d) => d.key !== 'E.3.2' && d.normalizationFn !== 'country_substitute_regional'
+    )) {
       console.log(
         `[${allFieldDefs.indexOf(def) + 1}/${allFieldDefs.length}] Processing field: ${def.key} — ${def.label}`
       );

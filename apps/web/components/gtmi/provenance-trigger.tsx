@@ -160,7 +160,8 @@ export function ProvenanceTrigger({
                 View at source
               </a>{' '}
               <span className="text-muted-foreground">
-                · {GEO_LABEL[p.geographicLevel]} · {TIER_LABEL[p.sourceTier]}
+                · {GEO_LABEL[p.geographicLevel]}
+                {p.sourceTier !== null && ` · ${TIER_LABEL[p.sourceTier]}`}
               </span>
             </dd>
 

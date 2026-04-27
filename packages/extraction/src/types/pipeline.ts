@@ -31,7 +31,13 @@ export interface ExtractStage {
     fields: ReadonlyArray<FieldSpec>,
     programId: string,
     programName: string,
-    countryIso: string
+    countryIso: string,
+    /**
+     * Phase 3.5: optional cap on output `extractionConfidence`. When set,
+     * every output's confidence is `min(actual, cap)`. The Tier 2 fallback
+     * pass uses this with cap=0.85 to enforce ADR-013.
+     */
+    options?: { confidenceCap?: number }
   ): Promise<Map<string, { output: ExtractionOutput; sourceUrl: string }>>;
 }
 
@@ -83,6 +89,17 @@ export interface PublishStage {
     validation: ValidationResult,
     provenance: ProvenanceRecord
   ): Promise<void>;
+  /**
+   * Phase 3.5 / ADR-014: write a synthetic country-substitute row when
+   * the LLM extraction returned empty for a `country_substitute_regional`
+   * field. Returns true if a row was written, false if no regional default
+   * exists for the country (caller lets missing-data penalty apply).
+   */
+  executeCountrySubstitute(
+    programId: string,
+    fieldDefinitionKey: string,
+    methodologyVersion: string
+  ): Promise<boolean>;
 }
 
 export interface ExtractionPipeline {

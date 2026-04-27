@@ -458,17 +458,28 @@ export class ExtractStageImpl implements ExtractStage {
   }
 
   // ── All-fields across multiple scrapes: batch per URL, merge by confidence ──
+  // Phase 3.5: optional `confidenceCap` argument lowers any output's
+  // `extractionConfidence` to `min(actual, cap)`. Used by the Tier 2 fallback
+  // pass to enforce the ADR-013 0.85 ceiling so Tier 2 rows always route to
+  // human review (never auto-approve).
   async executeAllFields(
     scrapes: ScrapeResult[],
     fields: ReadonlyArray<FieldSpec>,
     programId: string,
     programName: string,
-    countryIso: string
+    countryIso: string,
+    options: { confidenceCap?: number } = {}
   ): Promise<Map<string, { output: ExtractionOutput; sourceUrl: string }>> {
     if (scrapes.length === 0)
       throw new Error(`No scrape results provided for program ${programId}`);
 
     const best = new Map<string, { output: ExtractionOutput; sourceUrl: string }>();
+    const cap =
+      typeof options.confidenceCap === 'number' &&
+      options.confidenceCap >= 0 &&
+      options.confidenceCap <= 1
+        ? options.confidenceCap
+        : null;
 
     for (let i = 0; i < scrapes.length; i++) {
       if (i > 0) {
@@ -487,9 +498,13 @@ export class ExtractStageImpl implements ExtractStage {
 
       for (const [fieldKey, output] of batchOutput) {
         if (output.valueRaw === '') continue;
+        const capped =
+          cap !== null && output.extractionConfidence > cap
+            ? { ...output, extractionConfidence: cap }
+            : output;
         const existing = best.get(fieldKey);
-        if (!existing || output.extractionConfidence > existing.output.extractionConfidence) {
-          best.set(fieldKey, { output, sourceUrl: scrape.url });
+        if (!existing || capped.extractionConfidence > existing.output.extractionConfidence) {
+          best.set(fieldKey, { output: capped, sourceUrl: scrape.url });
         }
       }
 
