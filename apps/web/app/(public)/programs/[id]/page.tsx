@@ -1,0 +1,235 @@
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import type { Metadata } from 'next';
+import {
+  CompositeScoreDisplay,
+  CoverageChip,
+  PreCalibrationChip,
+  PolicyTimeline,
+  EmptyState,
+  PillarComparison,
+  SubFactorAccordion,
+  DataTableNote,
+} from '@/components/gtmi';
+import { getProgramDetail } from '@/lib/queries/program-detail';
+import { loadContent } from '@/lib/content';
+import type { PillarKey } from '@/lib/theme';
+import { remark } from 'remark';
+import remarkHtml from 'remark-html';
+
+export const revalidate = 3600;
+
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const detail = await getProgramDetail(id);
+  if (!detail) return { title: 'Program not found' };
+  return {
+    title: `${detail.header.programName} — ${detail.header.countryName}`,
+    description: detail.header.programDescriptionMd ?? undefined,
+  };
+}
+
+const FIELDS_TOTAL = 48;
+
+function indicatorCountsByPillar(fieldValues: { pillar: PillarKey }[]): Record<PillarKey, number> {
+  const counts: Record<PillarKey, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+  for (const fv of fieldValues) counts[fv.pillar] += 1;
+  return counts;
+}
+
+/**
+ * Resolve the editorial-summary file for this program. Pattern:
+ *   apps/web/content/programs/<countryIso-lower>-<slug-of-name>.md
+ *
+ * Slug normalises whitespace + punctuation to dashes and lowercases. If
+ * the file is missing or empty, loadContent returns "" and the page
+ * renders the "Summary forthcoming" placeholder.
+ */
+function narrativeFileFor(countryIso: string, programName: string): string {
+  const slug = programName
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+  return `programs/${countryIso.toLowerCase()}-${slug}.md`;
+}
+
+async function renderMarkdown(md: string): Promise<string> {
+  const file = await remark().use(remarkHtml).process(md);
+  return String(file);
+}
+
+export default async function ProgramDetailPage({ params }: PageProps) {
+  const { id } = await params;
+  const detail = await getProgramDetail(id);
+  if (!detail) notFound();
+
+  const populated = detail.fieldValues.filter(
+    (fv) => fv.valueRaw !== null && fv.valueRaw !== '' && fv.status === 'approved'
+  ).length;
+
+  const indicatorCounts = indicatorCountsByPillar(detail.fieldValues);
+
+  const isScored = detail.score !== null;
+  const isPlaceholder = detail.score?.phase2Placeholder === true;
+
+  // Editorial summary: prefer DB column, fall back to content/programs/*.md
+  // for the seeded AUS/SGP stubs. Empty bodies render the placeholder.
+  const summaryFromDb = detail.longSummary.bodyMd?.trim();
+  const summaryFromFile = await loadContent(
+    narrativeFileFor(detail.header.countryIso, detail.header.programName)
+  );
+  const summaryHtml = summaryFromDb ? await renderMarkdown(summaryFromDb) : summaryFromFile;
+
+  return (
+    <>
+      <header className="mx-auto max-w-page px-6 pt-12">
+        <p className="text-data-sm uppercase tracking-widest text-muted-foreground">
+          <Link href="/programs" className="hover:text-foreground">
+            Programs
+          </Link>
+          {' / '}
+          <Link href={`/countries/${detail.header.countryIso}`} className="hover:text-foreground">
+            {detail.header.countryName}
+          </Link>
+        </p>
+        <h1 className="mt-2 font-serif text-display-lg text-ink">{detail.header.programName}</h1>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-data-sm text-muted-foreground">
+          <span className="rounded-button bg-muted px-2 py-0.5 font-medium">
+            {detail.header.programCategory}
+          </span>
+          <span className="rounded-button bg-muted px-2 py-0.5">{detail.header.programStatus}</span>
+          {isScored && <CoverageChip populated={populated} total={FIELDS_TOTAL} />}
+          {isPlaceholder && <PreCalibrationChip size="md" />}
+        </div>
+      </header>
+
+      {isPlaceholder && (
+        <section className="mx-auto mt-8 max-w-page px-6">
+          <div
+            role="note"
+            className="rounded-card border-l-2 border-precalib-fg bg-precalib-bg/50 px-4 py-3 text-data-md text-foreground"
+          >
+            This score uses Phase 2 pre-calibration normalisation. Calibration against the full
+            pilot cohort completes in Phase 3; absolute values will shift, relative methodology
+            application is correct.
+          </div>
+        </section>
+      )}
+
+      <section className="mx-auto mt-10 max-w-page px-6">
+        {detail.score && detail.score.pillarScores ? (
+          <CompositeScoreDisplay
+            composite={detail.score.composite}
+            cme={detail.score.cme}
+            paq={detail.score.paq}
+            phase2Placeholder={isPlaceholder}
+            rank={null}
+            scoredCount={detail.cohort.scoredCount}
+          />
+        ) : (
+          <EmptyState
+            title="Awaiting Phase 3 scoring"
+            body="This programme is seeded but has no field values or scores yet. Phase 3 will score the full 5-country pilot — see the methodology page for what each pillar measures."
+            ctaHref="/methodology"
+            ctaLabel="See methodology"
+          />
+        )}
+      </section>
+
+      {detail.score?.pillarScores && (
+        <section className="mx-auto mt-12 max-w-page px-6">
+          <PillarComparison
+            programLabel={detail.header.programName}
+            programPillarScores={detail.score.pillarScores}
+            cohortMedian={detail.cohort.medianPillarScores}
+            cohortScoredCount={detail.cohort.scoredCount}
+            compareCandidates={detail.cohort.compareCandidates}
+            indicatorCounts={indicatorCounts}
+          />
+        </section>
+      )}
+
+      {isScored && (
+        <section className="mx-auto mt-12 max-w-page px-6">
+          <SubFactorAccordion
+            fieldValues={detail.fieldValues}
+            subFactorScores={detail.score?.subFactorScores ?? null}
+            phase2Placeholder={isPlaceholder}
+          />
+        </section>
+      )}
+
+      <section className="mx-auto mt-12 max-w-page px-6">
+        <h2 className="font-serif text-display-md text-ink">What this means</h2>
+        {summaryHtml ? (
+          <div
+            className="prose prose-neutral mt-4 max-w-prose text-foreground"
+            dangerouslySetInnerHTML={{ __html: summaryHtml }}
+          />
+        ) : (
+          <p className="mt-4 max-w-prose text-data-md text-muted-foreground">
+            Summary forthcoming. The editorial &ldquo;What this means&rdquo; panel is being drafted.
+          </p>
+        )}
+        {detail.longSummary.updatedAt && (
+          <p className="mt-2 text-data-sm text-muted-foreground">
+            Last edited{' '}
+            <time dateTime={detail.longSummary.updatedAt}>
+              {detail.longSummary.updatedAt.slice(0, 10)}
+            </time>
+            {detail.longSummary.reviewer && ' · reviewed'}
+          </p>
+        )}
+      </section>
+
+      <section className="mx-auto mt-12 max-w-page px-6">
+        <h2 className="font-serif text-display-md text-ink">Policy change timeline</h2>
+        <div className="mt-4">
+          <PolicyTimeline events={detail.policyChanges} />
+        </div>
+      </section>
+
+      <section className="mx-auto mt-12 max-w-page px-6">
+        <h2 className="font-serif text-display-md text-ink">Government sources</h2>
+        {detail.sources.length === 0 ? (
+          <p className="mt-4 text-data-md text-muted-foreground">
+            No sources tracked for this programme yet.
+          </p>
+        ) : (
+          <ul className="mt-4 flex flex-col gap-2 text-data-md">
+            {detail.sources.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-baseline justify-between gap-3 border-b border-border pb-2 last:border-b-0"
+              >
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-accent underline-offset-4 hover:underline"
+                >
+                  {s.url}
+                </a>
+                <span className="font-mono text-data-sm text-muted-foreground">
+                  Tier {s.tier} · {s.sourceCategory}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="mx-auto mt-12 max-w-page px-6 pb-24">
+        <DataTableNote>
+          Every numeric value above is sourced from a Tier 1 government page, extracted by an LLM,
+          validated by an independent LLM call, and queued for human review when confidence falls
+          below 0.85. Hover any number to see the exact source sentence.
+        </DataTableNote>
+      </section>
+    </>
+  );
+}

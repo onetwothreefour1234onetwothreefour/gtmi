@@ -17,3 +17,7 @@ export { RankingsTable } from './rankings-table';
 export { RankingsFilters } from './rankings-filters';
 export { AdvisorModeToggle } from './advisor-mode-toggle';
 export { RankingsExplorer } from './rankings-explorer';
+export { IndicatorRow } from './indicator-row';
+export { SubFactorAccordion } from './sub-factor-accordion';
+export { PillarBreakdownTable } from './pillar-breakdown-table';
+export { PillarComparison } from './pillar-comparison';
