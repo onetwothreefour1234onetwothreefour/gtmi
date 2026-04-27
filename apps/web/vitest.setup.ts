@@ -1,4 +1,8 @@
 import '@testing-library/jest-dom/vitest';
+import { expect } from 'vitest';
+import * as axeMatchers from 'vitest-axe/matchers';
+
+expect.extend(axeMatchers);
 
 // jsdom doesn't ship matchMedia (next-themes uses it). Stub for tests.
 if (typeof window !== 'undefined' && !window.matchMedia) {

@@ -38,6 +38,7 @@ export function CountryFlag({ iso, countryName, size = 'sm', className }: Countr
   if (!iso2) {
     return (
       <span
+        role="img"
         title={alt}
         aria-label={alt}
         className={cn(
@@ -56,7 +57,6 @@ export function CountryFlag({ iso, countryName, size = 'sm', className }: Countr
     <Image
       src={`/flags/${iso2}.svg`}
       alt={alt}
-      title={alt}
       width={dims.w}
       height={dims.h}
       unoptimized

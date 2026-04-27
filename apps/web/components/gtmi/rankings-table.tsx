@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { scoreColor, type PillarKey } from '@/lib/theme';
 import { formatScore, formatRank } from '@/lib/format';
@@ -99,6 +99,7 @@ export function RankingsTable({
   advisorWeights = null,
   className,
 }: RankingsTableProps) {
+  const reduceMotion = useReducedMotion();
   const orderedRows = React.useMemo(() => {
     if (!advisorWeights) return rows;
     return sortRowsForAdvisor(rows, advisorWeights, sort.field, sort.direction);
@@ -164,8 +165,8 @@ export function RankingsTable({
             return (
               <motion.tr
                 key={row.programId}
-                layout
-                transition={{ duration: 0.2, ease: 'easeOut' }}
+                layout={reduceMotion ? false : true}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
                 className="border-b border-border last:border-b-0 hover:bg-muted/40"
               >
                 <td className="px-3 py-3 font-mono text-data-sm tnum text-muted-foreground">

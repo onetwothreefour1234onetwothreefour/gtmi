@@ -53,6 +53,27 @@ export function PillarRadar({
 
   return (
     <div className={className} data-testid="pillar-radar">
+      {/* Screen-reader text-alternative table — visually hidden, exposed to AT */}
+      <table className="sr-only" aria-label={`Pillar scores for ${programLabel}`}>
+        <thead>
+          <tr>
+            <th>Pillar</th>
+            <th>{programLabel}</th>
+            {cohortMedian && <th>Cohort median</th>}
+            {compareTo && <th>{compareTo.label}</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {ORDER.map((k) => (
+            <tr key={k}>
+              <th scope="row">{LABEL[k]}</th>
+              <td>{program[k].toFixed(2)}</td>
+              {cohortMedian && <td>{cohortMedian[k].toFixed(2)}</td>}
+              {compareTo && <td>{compareTo.scores[k].toFixed(2)}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
       <ResponsiveContainer width="100%" height={360}>
         <RadarChart data={data} outerRadius={120}>
           <PolarGrid stroke="hsl(var(--border))" />

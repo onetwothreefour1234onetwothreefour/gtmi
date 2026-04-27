@@ -15,6 +15,7 @@ export function DirectionArrow({ direction, className }: DirectionArrowProps) {
   const isUp = direction === 'higher_is_better';
   return (
     <span
+      role="img"
       title={isUp ? 'Higher is better' : 'Lower is better'}
       aria-label={isUp ? 'Higher is better' : 'Lower is better'}
       className={cn('inline-block text-muted-foreground', className)}
