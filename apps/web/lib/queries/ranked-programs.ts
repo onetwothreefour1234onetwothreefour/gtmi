@@ -55,7 +55,11 @@ function toPillarScores(raw: unknown): PillarScores | null {
   return out as PillarScores;
 }
 
-function buildOrderBy(field: SortField, direction: 'asc' | 'desc', hasSearch: boolean) {
+function buildOrderBy(
+  field: SortField,
+  direction: 'asc' | 'desc',
+  searchRank: ReturnType<typeof sql> | null
+) {
   const dir = direction === 'asc' ? sql`ASC` : sql`DESC`;
   // Unscored programs always sort to the bottom regardless of secondary sort.
   // NULLS LAST handles this for score-derived columns; for name/country we
@@ -74,8 +78,11 @@ function buildOrderBy(field: SortField, direction: 'asc' | 'desc', hasSearch: bo
       return sql`countries.name ${dir}, ${tiebreakerByCompositeNullsLast}, programs.name ASC`;
     case 'name':
     default:
-      return hasSearch
-        ? sql`search_rank DESC NULLS LAST, programs.name ${dir}`
+      // When searching, fall back to relevance order. Reference the
+      // expression directly rather than the SELECT alias — alias names
+      // double-quoted in camelCase do not resolve from unquoted ORDER BY.
+      return searchRank
+        ? sql`${searchRank} DESC NULLS LAST, programs.name ${dir}`
         : sql`${tiebreakerByCompositeNullsLast}, programs.name ${dir}`;
   }
 }
@@ -124,7 +131,7 @@ async function fetchRankedPrograms(query: RankedProgramsQuery): Promise<RankedPr
 
   const whereClause = wheres.length > 0 ? sql`WHERE ${sql.join(wheres, sql` AND `)}` : sql``;
 
-  const orderBy = buildOrderBy(sortField, sortDir, !!searchPred);
+  const orderBy = buildOrderBy(sortField, sortDir, searchRank);
   const searchRankSelect = searchRank ? sql`${searchRank}` : sql`NULL::float`;
 
   // Single SELECT with two correlated subqueries: latest scores + approved

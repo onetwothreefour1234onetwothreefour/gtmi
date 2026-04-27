@@ -13,3 +13,5 @@ export { EmptyState } from './empty-state';
 export { DirectionArrow } from './direction-arrow';
 export { SectionHeader } from './section-header';
 export { DataTableNote } from './data-table-note';
+export { RankingsTable } from './rankings-table';
+export { RankingsFilters } from './rankings-filters';
