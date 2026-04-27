@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getReviewDetail } from '@/lib/review-queries';
-import { approveFieldValue, rejectFieldValue } from '@/app/review/actions';
+import { approveFieldValue, rejectFieldValue } from '@/app/(internal)/review/actions';
 
 export const dynamic = 'force-dynamic';
 
