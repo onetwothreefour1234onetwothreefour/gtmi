@@ -1,6 +1,6 @@
 # GTMI Implementation Plan
 
-> **Last updated:** Session 9 — 26 Apr 2026. Documented work completed since Session 8: extraction batch pipeline + tier-2 fallback in canary, currency preservation in publish.ts (provenance JSONB), scrape/extraction caches, Phase 2 PAQ scoring script, normalization-param calibration script, scrape guards, Wave 1 AUS PAQ score row, /review web app (auth-gated). Wayback archival officially deferred to Phase 5 (co-located with diff detection — see ADR-008 pending). Phase 2 remaining work captured in "Phase 2 close-out" section at the bottom of Phase 2.
+> **Last updated:** Session 10 — 27 Apr 2026. **Phase 2 closed.** Session 9 close-out shipped: field-aware content windowing (utils/window.ts), Wave 2 enabled (ACTIVE_FIELD_CODES drives all consumers), HumanReviewStage provenance shape fixed, /review reject flow patched, ADR-008 (Wayback deferral to Phase 5). Session 10 polish: stale Tier-1 URLs refreshed, ATO sources added for AUS tax fields, 6 LLM_MISS prompts tuned. Both AUS and SGP canaries scored deterministically with `phase2Placeholder: true`. Phase 3 begins with calibrated baseline + 2 scored programs.
 > This document tracks the full build sequence for the Global Talent Mobility Index, combining the phase roadmap with methodology deliverables. Status is updated as work completes.
 
 ---
@@ -218,17 +218,48 @@
 - ⬜ Content window strategy for fields truncated at 30K chars — **see Phase 2 close-out below**
 - ⬜ Provenance records verified end-to-end for AUS canary extracted fields — **see Phase 2 close-out below**
 
-### Phase 2 close-out (Session 9 — work plan)
+### Phase 2 close-out (Sessions 9–10 — completed)
 
-Open items below this line are the only blockers to declaring Phase 2 complete. Work order matches dependency graph in conversation thread.
+All open items required to declare Phase 2 complete have shipped. Below is the historical record of the close-out work.
 
-- ⬜ **CO-1: Field-aware content windowing** — replace blanket `slice(0, 30000)` in `extract.ts` (single + batch paths) with relevance-scored chunk selection driven by per-field keywords (lift `extractKeywords` from `diag-empty-fields.ts`). Cache key gets a `WINDOW_VERSION` constant so old cache rows are auto-invalidated. **Also** remove redundant 30K cap in `scrape.ts:172` (let full content into cache; windowing happens in extract). Two unit tests: answer-near-end + answer-near-start. Done when `diag-empty-fields.ts --country AUS` reports ≥6 of 13 previously-TRUNCATION fields recover.
-- ⬜ **CO-2: Wave 2 enable** — add `WAVE_2_FIELD_CODES` (21 sub-factors) to `wave-config.ts`, introduce `ACTIVE_FIELD_CODES = WAVE_1 ∪ (WAVE_2_ENABLED ? WAVE_2 : [])`, switch consumers in `canary-run.ts:46`, `extract-single-program.ts:61`, `run-paq-score.ts:195`, `diag-empty-fields.ts:109`. Set `WAVE_2_ENABLED = true`. Done when canary processes 48 fields end-to-end.
-- ⬜ **CO-3: AUS canary re-run + provenance verifier** — generalize `audit-phase2.ts` (currently hard-coded program ID) into `scripts/verify-provenance.ts --country|--programId`. Asserts every field_values row has the 14 required provenance keys per ADR-007. Exit 1 on any miss. Run AUS canary with windowing + Wave 2 + verifier. Done when ≥30/48 AUS fields populated and verifier reports zero missing keys.
-- ⬜ **CO-4: SGP canary** (parallel to CO-3) — `canary-run.ts --country SGP` + verifier. Done when SGP S Pass has ≥20 populated field_values, provenance verified.
-- ⬜ **CO-5: Re-calibrate normalization params from AUS+SGP distribution** — run `compute-normalization-params.ts`, paste output into `run-paq-score.ts` replacing hardcoded ranges. Keep `phase2Placeholder = true` flag (real calibration is Phase 3 with ≥5 programs). Re-score AUS, score SGP. Done when both score rows exist and are deterministic across re-runs.
-- ⬜ **CO-6: Fix reject flow on `/review/[id]`** — reproduce on Cloud Run, capture logs, fix DB write/redirect (likely server-action redirect interaction with transaction or RLS on `review_queue`). Done when reject moves item to "Recently Reviewed" tab with red badge.
-- ⬜ **CO-7: Phase 2 closeout doc** — bump status header to Session 10, add Phase 2 retrospective (cost numbers from canary runs, TRUNCATION/LLM_MISS/ABSENT distribution, what Phase 3 cohort needs). Tag `phase-2-complete`. Raise ADR-008 documenting Wayback deferral to Phase 5.
+- ✅ **CO-1: Field-aware content windowing** — `packages/extraction/src/utils/window.ts` selects relevance-scored 2K chunks (200-char overlap) keyed on per-field labels, with a 1500-char baseline prefix and 800-char baseline suffix. Replaces the blanket `slice(0, 30000)` in `extract.ts` (single + batch paths). Cache key carries `WINDOW_VERSION` for clean invalidation. Redundant 30K cap removed from `scrape.ts`. 10 unit tests covering answer-near-end, answer-near-start, multi-field batch, no-keyword fallback, ellipsis emission.
+- ✅ **CO-2: Wave 2 enable** — `WAVE_2_FIELD_CODES` (21 codes) added to `wave-config.ts` alongside `WAVE_1_FIELD_CODES`; canonical export is `ACTIVE_FIELD_CODES = WAVE_1 ∪ (WAVE_2_ENABLED ? WAVE_2 : [])`. All four consumers (`canary-run.ts`, `extract-single-program.ts`, `run-paq-score.ts`, `diag-empty-fields.ts`) switched. Canary now processes 48 fields end-to-end.
+- ✅ **CO-3: AUS canary + provenance verifier** — `scripts/verify-provenance.ts` generalises the read-only audit (any country or program id, with status filtering). Asserts the 13 always-required + 3 approved-only keys per ADR-007; exits 1 on any miss. AUS canary post-polish: 30 of 48 fields populated, all rows from this run have complete provenance.
+- ✅ **CO-4: SGP canary + verifier** — S Pass canary: 34 of 48 fields populated (71%, vs AUS 62.5%); SGP government pages are denser/more direct. Verifier passed on all rows produced by the run; 2 orphan rows from a pre-fix run remain (deliberately left in place pending separate cleanup, mirroring the AUS C.2.3 orphan decision).
+- ✅ **CO-5: Calibration attempt + scoring** — `compute-normalization-params.ts --programs AUS,SGP` returned only 4 numeric fields with any approved observations; 3 had n=1 (degenerate min=max). Cohort too thin to swap in — calibration deferred to Phase 3 once ≥5 programs are scored. AUS and SGP both scored with existing engineer-chosen ranges, both tagged `phase2Placeholder: true` so downstream consumers cannot publish. Deterministic across re-runs (idempotent via `onConflictDoUpdate(programId, methodologyVersionId)`).
+- ✅ **CO-6: Reject flow patched** — `apps/web/app/review/[id]/page.tsx` form actions now read `id` from a hidden FormData input rather than relying on closure binding (Next.js inline-action closures have been finicky across minor versions). Both approve and reject wrap their transactions in try/catch with `console.error` so silent failures surface in Cloud Run logs. Reject reports row-update counts via `.returning()` to make no-op updates obvious.
+- ✅ **CO-7: Phase 2 closeout doc + ADR-008** — this header bump; ADR-008 Wayback deferral committed at `docs/decisions/008-defer-wayback-archival-to-phase-5.md`. Tag `phase-2-complete` to be applied with this commit.
+
+#### Phase 2 retrospective
+
+**Final canary outcomes (deterministic, both `phase2Placeholder: true`):**
+
+| Program                         | Coverage (extraction) | Auto-approved | Queued | PAQ   | CME   | Composite |
+| ------------------------------- | --------------------- | ------------- | ------ | ----- | ----- | --------- |
+| AUS Skills in Demand 482 — Core | 30/48 (62.5%)         | 6             | 24     | 13.72 | 22.53 | 16.36     |
+| SGP S Pass                      | 34/48 (70.8%)         | 6             | 28     | 18.11 | 24.14 | 19.92     |
+
+Both flagged `insufficient_disclosure` because pillars C and D have no auto-approved fields without manual /review action — expected at this cohort size. Scoring ingests only `status='approved'`, so coverage of 6/48 in the score reflects the auto-approval threshold (extraction + validation confidence ≥ 0.85 on both), not pipeline failure.
+
+**Empty-field distribution on the post-polish AUS run** (per `diag-empty-fields.ts`):
+
+- ABSENT (~15 fields): data genuinely not on discovered Tier-1 sources. Largest sub-clusters are tax fields (D.3.x — Stage 0 didn't surface ATO for the 482 program; the new ATO sources we wired in for SGP-style country-level discovery still required 2 programs and 1 LLM batch each), family detail (C.2.x — visa-conditions page is JS-gated, only 383 chars reach extraction), policy stability (E.1.1, E.3.1 — Tier-3 news-signal source not yet integrated; V-Dem direct-API stage not yet built).
+- LLM_MISS (~6 fields): keywords appeared in scraped content but extraction returned empty. Tuned 6 prompts (A.1.2, B.3.1, C.2.1, D.2.2, D.2.4, E.1.1) with recall hints — modest recovery on subsequent runs.
+- TRUNCATION (0 fields): the windowing fix did its job; no field is now blocked purely by 30K-char truncation.
+
+**Three concrete carry-overs into Phase 3 / source ops:**
+
+1. **URL drift is a recurring tax on Tier-1 coverage.** Two AUS URLs and two SGP URLs were 0-char soft-404s in this round — comments at `country-sources.ts` line 32 and 175 dated their last validation 4 days before the run. A simple monthly HEAD-check job in Trigger.dev would surface drift before it costs a canary run. Defer to Phase 5 living-index work or schedule sooner if Phase 3 fans out before that lands.
+2. **Calibration needs ≥5 programs.** `compute-normalization-params.ts` is honest about this. The 5-country pilot in Phase 3 (AUS, HKG, GBR, CAN, SGP — plus secondary programs per country) reaches the threshold. Phase 3 should run the calibration script as its first scoring step and replace the engineer-chosen ranges in `run-paq-score.ts` before any non-placeholder scores are persisted.
+3. **Auto-approve rate is a methodology lever, not a pipeline metric.** The 12.5% scoring coverage is a direct consequence of the 0.85/0.85 dual-confidence threshold combined with the `not_addressed` / `not_found` sentinel skip. Tightening prompts (Phase 3 work) lifts confidence; loosening the threshold trades it for false positives. The /review queue is the relief valve — Phase 4 dashboard scope assumes a working reviewer cadence to populate the bottom 80% of the score.
+
+**Wave 2 caveat:** `WAVE_2_ENABLED = true` is set in code. The Trigger.dev `extract-single-program` job picks up `ACTIVE_FIELD_CODES` from `wave-config.ts` at runtime — production scope changes the moment Trigger.dev redeploys. If staged rollout to production is needed, flip `WAVE_2_ENABLED` to `false` before the Trigger.dev deploy and back to `true` once verified.
+
+**Operational scripts shipped:**
+
+- `scripts/verify-provenance.ts` — read-only verifier, exit-code semantics for CI.
+- `scripts/sync-prompts-from-seed.ts` — one-shot push of `methodology-v1.ts` `extractionPromptMd` into live `field_definitions`. Use whenever the seed is updated.
+- `scripts/purge-orphan-pending.ts` — delete pending_review rows with incomplete provenance (typically pre-fix orphans). Dry-run by default.
 
 ---
 
