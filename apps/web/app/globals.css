@@ -1,3 +1,129 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * GTMI editorial color tokens.
+ * Light = warm off-white paper, dark = near-black with cool surface.
+ * HSL values chosen so Tailwind utilities (bg-paper, text-ink, etc.) work
+ * via the hsl(var(--token)) indirection in tailwind.config.ts.
+ *
+ * Source colors (resolved):
+ *   ink        light #0A0A0B  /  dark #F5F5F5
+ *   paper      light #FAFAF7  /  dark #0E0E10
+ *   surface    light #FFFFFF  /  dark #171719
+ *   border     light #E5E5E0  /  dark #28282C
+ *   accent     #0F4C5C deep teal (interactive, GTMI mark, used sparingly)
+ *   precalib   #A66A00 on #FFF6E6 (light) / #FFC971 on #33260D (dark)
+ */
+
+@layer base {
+  :root {
+    --ink: 240 6% 5%;
+    --paper: 50 23% 98%;
+    --surface: 0 0% 100%;
+    --border: 50 11% 89%;
+    --input: 50 11% 89%;
+    --ring: 192 71% 21%;
+
+    --background: 50 23% 98%;
+    --foreground: 240 6% 5%;
+
+    --muted: 50 11% 95%;
+    --muted-foreground: 240 4% 40%;
+
+    --accent: 192 71% 21%;
+    --accent-foreground: 0 0% 100%;
+
+    --primary: 192 71% 21%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 50 11% 95%;
+    --secondary-foreground: 240 6% 5%;
+
+    --destructive: 0 65% 38%;
+    --destructive-foreground: 0 0% 100%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 5%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 5%;
+
+    --precalib-fg: 36 100% 33%;
+    --precalib-bg: 40 100% 95%;
+  }
+
+  .dark {
+    --ink: 0 0% 96%;
+    --paper: 240 6% 6%;
+    --surface: 240 4% 9%;
+    --border: 240 5% 16%;
+    --input: 240 5% 16%;
+    --ring: 192 50% 60%;
+
+    --background: 240 6% 6%;
+    --foreground: 0 0% 96%;
+
+    --muted: 240 4% 12%;
+    --muted-foreground: 240 4% 65%;
+
+    --accent: 192 50% 60%;
+    --accent-foreground: 240 6% 6%;
+
+    --primary: 192 50% 60%;
+    --primary-foreground: 240 6% 6%;
+
+    --secondary: 240 4% 12%;
+    --secondary-foreground: 0 0% 96%;
+
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 240 6% 6%;
+
+    --popover: 240 4% 9%;
+    --popover-foreground: 0 0% 96%;
+
+    --card: 240 4% 9%;
+    --card-foreground: 0 0% 96%;
+
+    --precalib-fg: 36 100% 72%;
+    --precalib-bg: 36 60% 13%;
+  }
+
+  html {
+    /* Tabular numerals + stylistic alternates for clearer 6/9/0 in tables. */
+    font-feature-settings: 'tnum' 1, 'cv11' 1;
+  }
+
+  body {
+    @apply bg-paper text-ink antialiased;
+    font-family:
+      var(--font-sans),
+      system-ui,
+      -apple-system,
+      sans-serif;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-paper;
+  }
+
+  /* Reduced motion: drop all animations + transitions globally. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+}
