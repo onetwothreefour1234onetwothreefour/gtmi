@@ -1,8 +1,8 @@
-# PROJECT: Global Talent Mobility Index (GTMI) — Build Specification v4
+# PROJECT: Global Talent Mobility Index (GTMI) — Build Specification v6
 
-> **Document status:** Canonical build specification v5. Supersedes v4 — incorporating Session 8 architectural changes. Changes from v4 are marked with `[NEW v5]`. ADRs 002–007 approved and documented 2026-04-19.
+> **Document status:** Canonical build specification v6. Supersedes v5 — incorporating Phase 2 close-out (Sessions 9–10). Changes from v5 are marked with `[NEW v6]`. ADRs 002–008 approved and documented (008 = Wayback deferral, 2026-04-26).
 
-> **Last updated:** Session 8 — 21 Apr 2026. Stage 0 switched from Claude to Perplexity API (`sonar`); Firecrawl replaced by custom Python/Playwright scraper service; E.3.2 now fetched directly from World Bank API; cross-check bypassed in canary; extract rate-limit retry added; inter-scrape delay 2s→5s; canary per-field delay 3s→25s.
+> **Last updated:** Session 10 — 27 Apr 2026. **Phase 2 closed (tag `phase-2-complete`).** AUS Skills in Demand 482 — Core (PAQ 13.72 / CME 22.53 / Composite 16.36) and SGP S Pass (PAQ 18.11 / CME 24.14 / Composite 19.92) scored deterministically, both `phase2Placeholder: true`. Field-aware content windowing replaces head-slice. Wave 2 enabled — full 48-field coverage. Currency code preserved in provenance. Batch extraction + extraction cache + scrape cache shipped. Tier-1 URLs refreshed (ATO added for AUS tax fields), six LLM_MISS prompts retuned. /review UI deployed to Cloud Run with Supabase magic-link auth. Wayback archival deferred to Phase 5 (ADR-008).
 
 ---
 
@@ -90,7 +90,8 @@ Daily 15-minute sync or async in Slack. Architectural decisions captured as ADRs
 - **Enrichment**: Exa for semantic search of law firm and news commentary. Direct API for World Bank, V-Dem. Scrape (respectfully, with rate limits) for Numbeo, QS, Henley Passport Index. OECD tax treaty database accessed via published PDFs parsed and cached.
 - **Email**: Resend for policy change alerts.
 - **Archival**: Wayback Machine Save Page Now API for legal defensibility of source snapshots.
-- **Deployment**: Vercel for Next.js, Supabase cloud, Trigger.dev cloud.
+- **Deployment**: Cloud Run for Next.js (`apps/web`) and Python scraper (`scraper/`) — `Dockerfile` + `cloudbuild.yaml` + `deploy.cmd`; Supabase cloud; Trigger.dev cloud. Vercel is not used. [NEW v6]
+- **Auth**: Supabase Auth (magic link). `apps/web/middleware.ts` enforces auth on `/review`. `NEXT_PUBLIC_APP_URL` carries the canonical origin so callbacks resolve correctly behind Cloud Run. [NEW v6]
 - **Monorepo**: pnpm workspaces + Turborepo.
 - **Observability**: Sentry for errors, OpenTelemetry traces exported to a cloud provider (suggest Axiom or Better Stack), cost dashboard via a custom Supabase view.
 
@@ -112,7 +113,11 @@ Stage 5 — Human review → queue for values below confidence threshold or with
 Stage 6 — Publish     → approved values written to field_values with full provenance
 ```
 
-**Wave field configuration:** `scripts/wave-config.ts` exports `WAVE_1_FIELD_CODES` (27 sub-factor codes), `WAVE_2_FIELD_CODES` (the remaining 21), and `ACTIVE_FIELD_CODES = WAVE_1 ∪ (WAVE_2_ENABLED ? WAVE_2 : [])`. With `WAVE_2_ENABLED = true` (the Phase 2 close-out default), the canary runner, Trigger.dev jobs, scoring script, and diagnostic all run against the full 48-field methodology. Rollback to Wave 1 only = set `WAVE_2_ENABLED = false`.
+**Wave field configuration:** `scripts/wave-config.ts` exports `WAVE_1_FIELD_CODES` (27 sub-factor codes), `WAVE_2_FIELD_CODES` (the remaining 21), and `ACTIVE_FIELD_CODES = WAVE_1 ∪ (WAVE_2_ENABLED ? WAVE_2 : [])`. `WAVE_2_ENABLED = true` is the Phase 2 close-out default; the canary runner, Trigger.dev `extract-single-program`, `run-paq-score.ts`, and `diag-empty-fields.ts` all run against the full 48-field methodology. Rollback to Wave 1 only = set `WAVE_2_ENABLED = false`. **Note:** Trigger.dev picks up `ACTIVE_FIELD_CODES` at runtime, so production scope changes the moment Trigger.dev redeploys — staged production rollouts must flip the flag to `false` before deploy and back after verification.
+
+**Field-aware content windowing [NEW v6]:** `packages/extraction/src/utils/window.ts` (`selectContentWindow`) replaces the previous `slice(0, 30000)` head-slice. The batch extraction path scores 2K-char chunks (200-char overlap) by per-field keyword match against `field_definitions.label`, then greedily fills a 30K budget while preserving a 1500-char baseline prefix and 800-char baseline suffix. Cache key in `extract.ts` includes a `WINDOW_VERSION` constant so windowing changes invalidate stale `extraction_cache` rows cleanly. Post-fix TRUNCATION = 0 in `diag-empty-fields.ts`.
+
+**Batch extraction + caching [NEW v6]:** `executeBatch` extracts all fields for a single scrape in one LLM call (8K max-tokens, JSON array response). `executeAllFields` iterates batches across URLs and merges by highest confidence per field, with a 30s inter-batch delay and an early-exit once every field reaches confidence ≥ 0.9. The `extraction_cache` table (migration `00004_extraction_caches`) memoizes results keyed by `sha256(contentHash + fieldKey + promptHash + WINDOW_VERSION)`; cache hits skip the LLM entirely. The `scrape_cache` table memoizes scrape responses for 24h; `scrape-guards.ts` rejects empty / HTML-error / anti-bot bodies before they enter extraction.
 
 ### 6.2 Stage 0 — URL Discovery [NEW v5: Perplexity replaces Claude]
 
@@ -246,7 +251,7 @@ Seven stages per field value (updated from six — Stage 0 and Scrape separated)
 
 ### 8.3 Provenance chain
 
-Every published value carries: source URL, geographic level, source tier, scrape timestamp, content hash, exact source sentence, character offsets, extraction model, extraction confidence, validation confidence, cross-check result, reviewer, review timestamp, methodology version.
+Every published value carries: source URL, geographic level, source tier, scrape timestamp, content hash, exact source sentence, character offsets, extraction model, extraction confidence, validation confidence, cross-check result, reviewer, review timestamp, methodology version. Monetary fields additionally store the original ISO 4217 currency code in `provenance.valueCurrency` so the numeric `valueNormalized` can be FX-converted at scoring time without losing the source unit [NEW v6]. `scripts/verify-provenance.ts` asserts the 13 always-required + 3 approved-only keys (per ADR-007) on every row and exits non-zero on any miss — used in CI and post-canary checks.
 
 ### 8.4 Policy change detection
 
@@ -359,7 +364,16 @@ gtmi/
 - CI green: lint, typecheck, migration dry-run, schema tests, methodology unit test.
 - Extraction package scaffold: Anthropic and Firecrawl client factories, all pipeline stage interfaces, Trigger.dev stub job.
 
-### Phase 2 (extraction canary) — IN PROGRESS
+### Phase 2 (extraction canary) — ✅ COMPLETE (tag `phase-2-complete`, 2026-04-27)
+
+**Final canary outcomes (deterministic, both `phase2Placeholder: true`):**
+
+| Program                         | Coverage (extraction) | Auto-approved | Queued | PAQ   | CME   | Composite |
+| ------------------------------- | --------------------- | ------------- | ------ | ----- | ----- | --------- |
+| AUS Skills in Demand 482 — Core | 30/48 (62.5%)         | 6             | 24     | 13.72 | 22.53 | 16.36     |
+| SGP S Pass                      | 34/48 (70.8%)         | 6             | 28     | 18.11 | 24.14 | 19.92     |
+
+Both flagged `insufficient_disclosure` (auto-approved coverage below pillar threshold, expected until /review backfill). Calibration of normalization params deferred to Phase 3 (cohort too thin: 4 numeric fields with approved values, 3 with n=1).
 
 **Completed in Phase 2:**
 
@@ -409,14 +423,31 @@ gtmi/
 - `canary-run.ts` per-field rate-limit delay increased from 3s to 25s (multi-scrape inputs push close to 30K token/min limit) [NEW v5]
 - `country-sources.ts` additions: `ISO3_TO_ISO2` mapping table; `fetchWgiScore(countryIso3)`; `fetchAllWgiScores(countryIsos)` [NEW v5]
 
-**Remaining in Phase 2:**
+**Phase 2 close-out (Sessions 9–10) — all shipped [NEW v6]:**
 
-- Singapore S Pass canary run (ready to execute — `pnpm --filter @gtmi/db exec tsx ../../scripts/canary-run.ts --country SGP`)
-- Currency preservation in `publish.ts` (store ISO currency code + numeric value separately)
-- Content window strategy for fields truncated at 30K chars (13 AUS Wave 1 fields returned no value)
-- Human review dashboard functional (basic UI)
-- Provenance records verified for AUS canary extracted fields
-- PAQ score produced and verified deterministic for AUS canary program
+- Field-aware content windowing (`packages/extraction/src/utils/window.ts`) replaces 30K head-slice. 10 unit tests; TRUNCATION = 0 post-fix.
+- Wave 2 enabled — `WAVE_2_ENABLED = true`, `ACTIVE_FIELD_CODES` covers all 48 methodology fields, all four consumers switched.
+- AUS + SGP canaries: 30/48 and 34/48 fields populated respectively; provenance verifier passed on every row from these runs.
+- Currency preservation: `utils/currency.ts` (`detectCurrency()`) + `provenance.valueCurrency`; `scripts/backfill-monetary-normalization.ts` re-normalizes pre-fix pending rows.
+- Calibration attempt: `scripts/compute-normalization-params.ts --programs AUS,SGP` returned only 4 numeric fields with approved values (3 of them n=1) — too thin to swap in. Calibration deferred to Phase 3 once ≥5 programs are scored. AUS and SGP scored with engineer-chosen ranges and tagged `phase2Placeholder: true`.
+- /review reject flow patched (FormData id binding, try/catch with `console.error`, `.returning()` row-update reporting).
+- Tier-1 URL refresh: 2 AUS + 2 SGP soft-404 URLs replaced; ATO sources added for AUS tax fields.
+- Six LLM_MISS prompts retuned with recall hints (A.1.2, B.3.1, C.2.1, D.2.2, D.2.4, E.1.1).
+- ADR-008: Wayback Machine archival deferred from Phase 2 (Stage 1) to Phase 5, co-located with re-scrape diff detection.
+
+**Operational scripts shipped during Phase 2:**
+
+- `scripts/verify-provenance.ts` — read-only verifier with CI exit-code semantics.
+- `scripts/sync-prompts-from-seed.ts` — push `methodology-v1.ts` `extractionPromptMd` into live `field_definitions`.
+- `scripts/purge-orphan-pending.ts` — delete pending_review rows with incomplete provenance (dry-run by default).
+- `scripts/backfill-monetary-normalization.ts` — re-normalize pre-currency-fix rows.
+- `scripts/audit-phase2.ts`, `scripts/audit-scrape-cache.ts`, `scripts/purge-bad-scrapes.ts`.
+
+**Carry-overs into Phase 3 (per Phase 2 retrospective):**
+
+1. URL drift monitoring — schedule a monthly HEAD-check job in Trigger.dev (Phase 5 living-index work or sooner if Phase 3 fans out first).
+2. Calibration — Phase 3 must run `compute-normalization-params.ts` as the first scoring step once ≥5 programs are scored, then replace the engineer-chosen ranges in `run-paq-score.ts` before any non-placeholder scores are persisted.
+3. Auto-approve rate is a methodology lever — tightening prompts lifts confidence; loosening the dual-confidence threshold trades it for false positives. /review queue is the relief valve; Phase 4 dashboard scope assumes a working reviewer cadence.
 
 ### Phase 3 (5-country V1) — PENDING
 
@@ -434,7 +465,7 @@ gtmi/
 - All migrations reviewed by the other contributor before merge.
 - Any methodology change is an ADR and increments `methodology_versions`.
 - All LLM calls logged: prompt, response, model, token count, timestamp, cost.
-- Daily cost dashboard: LLM (Anthropic + Perplexity), Supabase, Vercel, Trigger.dev, Wayback.
+- Daily cost dashboard: LLM (Anthropic + Perplexity), Supabase, Cloud Run (web + scraper), Trigger.dev, Wayback (Phase 5+).
 - Weekly data-quality report: field coverage %, review queue backlog, policy changes detected, news signals triaged.
 
 ---
@@ -475,4 +506,4 @@ Migration steps:
 
 ---
 
-_Last updated: Session 8 complete — Stage 0 switched to Perplexity API; Firecrawl replaced by Python/Playwright scraper; E.3.2 World Bank API direct; cross-check bypassed in canary; extract retry + delay improvements (Szabi/Ayush)_
+_Last updated: Session 10 — Phase 2 closed (`phase-2-complete`). AUS + SGP scored with `phase2Placeholder: true`. Field-aware content windowing, Wave 2 enabled (48 fields), currency preservation, batch extraction + caches, /review on Cloud Run with Supabase auth, ADR-008 Wayback deferral (Szabi/Ayush)._
