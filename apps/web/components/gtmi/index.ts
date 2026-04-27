@@ -21,3 +21,4 @@ export { IndicatorRow } from './indicator-row';
 export { SubFactorAccordion } from './sub-factor-accordion';
 export { PillarBreakdownTable } from './pillar-breakdown-table';
 export { PillarComparison } from './pillar-comparison';
+export { CountryFlag } from './country-flag';

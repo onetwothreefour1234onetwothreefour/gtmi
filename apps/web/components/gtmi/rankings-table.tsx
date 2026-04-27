@@ -9,6 +9,7 @@ import { formatScore, formatRank } from '@/lib/format';
 import { PreCalibrationChip } from './pre-calibration-chip';
 import { CoverageChip } from './coverage-chip';
 import { PillarMiniBars } from './pillar-mini-bars';
+import { CountryFlag } from './country-flag';
 import { recomputePaq, type PillarWeights } from '@/lib/advisor-mode';
 import type { RankedProgramRow, SortField, SortDirection } from '@/lib/queries/types';
 
@@ -181,8 +182,9 @@ export function RankingsTable({
                 <td className="px-3 py-3">
                   <Link
                     href={`/countries/${row.countryIso}`}
-                    className="text-foreground hover:text-accent"
+                    className="inline-flex items-center gap-2 text-foreground hover:text-accent"
                   >
+                    <CountryFlag iso={row.countryIso} countryName={row.countryName} size="sm" />
                     {row.countryName}
                   </Link>
                   <span className="ml-2 font-mono text-data-sm text-muted-foreground">

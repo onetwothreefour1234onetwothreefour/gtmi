@@ -8,6 +8,7 @@ import {
   PillarMiniBars,
   EmptyState,
   DataTableNote,
+  CountryFlag,
 } from '@/components/gtmi';
 import { getCountryDetail } from '@/lib/queries/country-detail';
 import { formatRelativeDate } from '@/lib/format';
@@ -46,7 +47,8 @@ export default async function CountryDetailPage({ params }: PageProps) {
           {' / '}
           <span>{detail.header.region}</span>
         </p>
-        <div className="mt-2 flex flex-wrap items-baseline gap-4">
+        <div className="mt-2 flex flex-wrap items-center gap-4">
+          <CountryFlag iso={detail.header.iso} countryName={detail.header.name} size="lg" />
           <h1 className="font-serif text-display-lg text-ink">{detail.header.name}</h1>
           <span className="font-mono text-data-md tnum text-muted-foreground">
             {detail.header.iso}

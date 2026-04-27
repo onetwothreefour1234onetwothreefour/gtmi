@@ -10,6 +10,7 @@ import {
   PillarComparison,
   SubFactorAccordion,
   DataTableNote,
+  CountryFlag,
 } from '@/components/gtmi';
 import { getProgramDetail } from '@/lib/queries/program-detail';
 import { loadContent } from '@/lib/content';
@@ -101,7 +102,14 @@ export default async function ProgramDetailPage({ params }: PageProps) {
             {detail.header.countryName}
           </Link>
         </p>
-        <h1 className="mt-2 font-serif text-display-lg text-ink">{detail.header.programName}</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <CountryFlag
+            iso={detail.header.countryIso}
+            countryName={detail.header.countryName}
+            size="md"
+          />
+          <h1 className="font-serif text-display-lg text-ink">{detail.header.programName}</h1>
+        </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-data-sm text-muted-foreground">
           <span className="rounded-button bg-muted px-2 py-0.5 font-medium">
             {detail.header.programCategory}

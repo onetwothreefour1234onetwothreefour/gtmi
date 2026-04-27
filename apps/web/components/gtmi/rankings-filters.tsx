@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import type { RankedProgramsFilters } from '@/lib/queries/types';
+import { CountryFlag } from './country-flag';
 
 export interface RankingsFiltersProps {
   filters: RankedProgramsFilters;
@@ -290,16 +291,22 @@ function SelectedChipRow({
     <div className="flex flex-wrap items-center gap-2">
       <p className="text-data-sm text-muted-foreground">{label}:</p>
       {items.map((i) => (
-        <button
-          key={i}
-          type="button"
-          onClick={() => onClear(i)}
-          className="inline-flex items-center gap-1 rounded-button border border-accent bg-accent px-2 py-0.5 text-data-sm text-accent-foreground hover:opacity-80"
-        >
-          {i}
-          <span aria-hidden>×</span>
-        </button>
+        <SelectedCountryChip key={i} iso={i} onClear={() => onClear(i)} />
       ))}
     </div>
+  );
+}
+
+function SelectedCountryChip({ iso, onClear }: { iso: string; onClear: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClear}
+      className="inline-flex items-center gap-1.5 rounded-button border border-accent bg-accent px-2 py-0.5 text-data-sm text-accent-foreground hover:opacity-80"
+    >
+      <CountryFlag iso={iso} size="sm" />
+      {iso}
+      <span aria-hidden>×</span>
+    </button>
   );
 }

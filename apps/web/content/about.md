@@ -47,3 +47,13 @@ and methodology suggestions are welcome via the GitHub repository.
 The methodology, weights, and indicator definitions are published openly.
 Field-value data is licensed for non-commercial research use; commercial
 licensing is available from TTR Group.
+
+### Third-party assets
+
+- Country flag SVGs vendored from [flag-icons](https://github.com/lipis/flag-icons)
+  by Panayiotis Lipiridis, distributed under the MIT License (Copyright
+  &copy; 2013 Panayiotis Lipiridis). Stored locally under `public/flags/`.
+  The underlying flag designs are national symbols and are not subject to
+  copyright in most jurisdictions.
+- Typefaces &mdash; Fraunces, Inter, JetBrains Mono &mdash; self-hosted via
+  `next/font/google` under the SIL Open Font License (OFL).
