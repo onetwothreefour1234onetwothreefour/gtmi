@@ -1,0 +1,4 @@
+- GTMI does not measure lived experience.
+- GTMI does not capture informal practice.
+- GTMI does not rank countries for permanent immigration planning for HNW clients.
+- GTMI does not constitute legal advice.
