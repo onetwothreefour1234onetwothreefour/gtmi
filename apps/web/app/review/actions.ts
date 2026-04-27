@@ -1,9 +1,10 @@
 'use server';
 
-import { db, fieldValues, fieldDefinitions } from '@gtmi/db';
+import { db, fieldValues, fieldDefinitions, reviewQueue } from '@gtmi/db';
 import { normalizeRawValue, ScoringError } from '@gtmi/scoring';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 
 async function requireReviewer(): Promise<string> {
@@ -11,7 +12,10 @@ async function requireReviewer(): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Unauthorized');
+  if (!user) {
+    console.error('[review/actions] requireReviewer: no authenticated user');
+    throw new Error('Unauthorized');
+  }
   return user.id;
 }
 
@@ -52,17 +56,54 @@ export async function approveFieldValue(id: string, editedRaw?: string): Promise
     }
   }
 
-  await db.update(fieldValues).set(update).where(eq(fieldValues.id, id));
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(fieldValues).set(update).where(eq(fieldValues.id, id));
+      await tx
+        .update(reviewQueue)
+        .set({ status: 'approved', resolvedAt: new Date() })
+        .where(eq(reviewQueue.fieldValueId, id));
+    });
+  } catch (err) {
+    console.error(`[review/actions] approve transaction failed for ${id}:`, err);
+    throw err;
+  }
   revalidatePath('/review');
   revalidatePath(`/review/${id}`);
+  // redirect throws NEXT_REDIRECT; must be the final statement so the framework
+  // intercepts it. Do not wrap in try/catch — that swallows the redirect signal.
+  redirect('/review');
 }
 
 export async function rejectFieldValue(id: string): Promise<void> {
   const userId = await requireReviewer();
-  await db
-    .update(fieldValues)
-    .set({ status: 'rejected', reviewedAt: new Date(), reviewedBy: userId })
-    .where(eq(fieldValues.id, id));
+  console.log(`[review/actions] reject called for field_value ${id} by ${userId}`);
+  try {
+    await db.transaction(async (tx) => {
+      const updatedFv = await tx
+        .update(fieldValues)
+        .set({ status: 'rejected', reviewedAt: new Date(), reviewedBy: userId })
+        .where(eq(fieldValues.id, id))
+        .returning({ id: fieldValues.id });
+      if (updatedFv.length === 0) {
+        throw new Error(`field_values row ${id} not found — reject is a no-op`);
+      }
+      const updatedRq = await tx
+        .update(reviewQueue)
+        .set({ status: 'rejected', resolvedAt: new Date() })
+        .where(eq(reviewQueue.fieldValueId, id))
+        .returning({ id: reviewQueue.id });
+      console.log(
+        `[review/actions] reject ${id}: field_values=${updatedFv.length} row, review_queue=${updatedRq.length} row(s)`
+      );
+    });
+  } catch (err) {
+    console.error(`[review/actions] reject transaction failed for ${id}:`, err);
+    throw err;
+  }
   revalidatePath('/review');
   revalidatePath(`/review/${id}`);
+  // redirect throws NEXT_REDIRECT; must be the final statement so the framework
+  // intercepts it. Do not wrap in try/catch — that swallows the redirect signal.
+  redirect('/review');
 }

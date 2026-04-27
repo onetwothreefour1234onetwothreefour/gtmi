@@ -9,7 +9,7 @@ import type {
   ReviewDecision,
   ValidationResult,
 } from '../types/extraction';
-import type { HumanReviewStage } from '../types/pipeline';
+import type { HumanReviewStage, PendingProvenanceContext } from '../types/pipeline';
 
 interface HumanReviewOptions {
   confidenceThreshold?: number;
@@ -77,7 +77,8 @@ export class HumanReviewStageImpl implements HumanReviewStage {
   async enqueue(
     extraction: ExtractionOutput,
     validation: ValidationResult,
-    crossCheck: CrossCheckResult
+    crossCheck: CrossCheckResult,
+    context: PendingProvenanceContext
   ): Promise<string> {
     const reasons = this.reviewReasons(extraction, validation, crossCheck);
 
@@ -143,7 +144,16 @@ export class HumanReviewStageImpl implements HumanReviewStage {
       // Don't overwrite approved data — reviewer will compare new extraction against it.
       fieldValueId = existingRows[0]!.id;
     } else {
+      // Provenance shape MUST mirror what PublishStage writes for approved rows
+      // (see `packages/extraction/src/types/provenance.ts`). All ProvenanceRecord
+      // keys present except `reviewedBy` / `reviewedAt` / `reviewDecision`, which
+      // are only filled once a reviewer acts.
       const pendingProvenance: Record<string, unknown> = {
+        sourceUrl: context.sourceUrl,
+        geographicLevel: context.geographicLevel,
+        sourceTier: context.sourceTier,
+        scrapeTimestamp: context.scrapeTimestamp,
+        contentHash: context.contentHash,
         sourceSentence: extraction.sourceSentence,
         characterOffsets: extraction.characterOffsets,
         extractionModel: extraction.extractionModel,
@@ -151,7 +161,13 @@ export class HumanReviewStageImpl implements HumanReviewStage {
         validationModel: validation.validationModel,
         validationConfidence: validation.validationConfidence,
         validationNotes: validation.notes,
+        crossCheckResult: context.crossCheckResult,
+        crossCheckUrl: context.crossCheckUrl,
+        methodologyVersion: context.methodologyVersion,
       };
+      if (crossCheck.notes) {
+        pendingProvenance.crossCheckNotes = crossCheck.notes;
+      }
       if (normalizationError) {
         pendingProvenance.normalizationError = normalizationError;
       }

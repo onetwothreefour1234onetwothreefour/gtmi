@@ -43,6 +43,25 @@ export interface CrossCheckStage {
   execute(extraction: ExtractionOutput, tier2Scrape: ScrapeResult): Promise<CrossCheckResult>;
 }
 
+/**
+ * Provenance context required by `HumanReviewStage.enqueue` so that the
+ * `field_values.provenance` JSONB written for pending_review rows mirrors the
+ * shape written by `PublishStage` for approved rows. Without this, downstream
+ * consumers (review UI, verifier, scoring) see two different provenance shapes
+ * depending on whether the row was auto-approved or queued — which is the
+ * exact bug surfaced by the AUS Phase 2 close-out canary.
+ */
+export interface PendingProvenanceContext {
+  sourceUrl: string;
+  geographicLevel: import('./extraction').GeographicLevel;
+  sourceTier: import('./extraction').SourceTier;
+  scrapeTimestamp: string;
+  contentHash: string;
+  crossCheckResult: import('./provenance').CrossCheckOutcome;
+  crossCheckUrl: string | null;
+  methodologyVersion: string;
+}
+
 export interface HumanReviewStage {
   needsReview(
     extraction: ExtractionOutput,
@@ -52,7 +71,8 @@ export interface HumanReviewStage {
   enqueue(
     extraction: ExtractionOutput,
     validation: ValidationResult,
-    crossCheck: CrossCheckResult
+    crossCheck: CrossCheckResult,
+    context: PendingProvenanceContext
   ): Promise<string>;
   awaitDecision(queueItemId: string): Promise<ReviewDecision>;
 }

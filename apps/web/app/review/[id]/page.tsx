@@ -10,16 +10,36 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
   const row = await getReviewDetail(id);
   if (!row) notFound();
 
+  // Both wrappers read `id` from a hidden form input rather than relying on
+  // the closure binding. Inline server actions inside server components have
+  // historically been finicky about closures across Next.js minor versions —
+  // a hidden input is robust regardless.
   async function approve(fd: FormData): Promise<void> {
     'use server';
+    const fvId = (fd.get('id') as string | null) ?? '';
+    if (!fvId) throw new Error('approve: missing field_value id');
     const edited = fd.get('editedRaw') as string | null;
-    await approveFieldValue(id, edited ?? undefined);
+    await approveFieldValue(fvId, edited ?? undefined);
   }
 
-  async function reject(): Promise<void> {
+  async function reject(fd: FormData): Promise<void> {
     'use server';
-    await rejectFieldValue(id);
+    const fvId = (fd.get('id') as string | null) ?? '';
+    if (!fvId) throw new Error('reject: missing field_value id');
+    await rejectFieldValue(fvId);
   }
+
+  const isPending = row.status === 'pending_review';
+  const statusBanner =
+    row.status === 'approved' ? (
+      <div className="mb-6 rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        Approved
+      </div>
+    ) : row.status === 'rejected' ? (
+      <div className="mb-6 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        Rejected
+      </div>
+    ) : null;
 
   return (
     <main className="mx-auto max-w-4xl p-8">
@@ -38,6 +58,8 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
         </h1>
         <p className="mt-1 text-xs text-gray-500">{row.fieldLabel}</p>
       </header>
+
+      {statusBanner}
 
       <section className="mb-6 rounded border border-gray-200 p-4">
         <h2 className="mb-2 text-sm font-semibold text-gray-700">Raw value</h2>
@@ -113,39 +135,43 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
         </section>
       )}
 
-      <section className="mb-6">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Decision</h2>
-        <div className="flex flex-col gap-3">
-          <form action={approve}>
-            <label className="text-sm font-medium text-gray-700">
-              Edit raw value before approving <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              name="editedRaw"
-              defaultValue={row.valueRaw ?? ''}
-              className="mt-1 w-full rounded border border-gray-300 p-2 font-mono text-sm"
-            />
-            <p className="text-xs text-gray-500">Leave unchanged to approve as-is.</p>
-            <div className="flex gap-2">
+      {isPending && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-sm font-semibold text-gray-700">Decision</h2>
+          <div className="flex flex-col gap-3">
+            <form action={approve}>
+              <input type="hidden" name="id" value={id} />
+              <label className="text-sm font-medium text-gray-700">
+                Edit raw value before approving <span className="text-gray-400">(optional)</span>
+              </label>
+              <input
+                name="editedRaw"
+                defaultValue={row.valueRaw ?? ''}
+                className="mt-1 w-full rounded border border-gray-300 p-2 font-mono text-sm"
+              />
+              <p className="text-xs text-gray-500">Leave unchanged to approve as-is.</p>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="mt-2 rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
+                >
+                  Approve
+                </button>
+              </div>
+            </form>
+
+            <form action={reject}>
+              <input type="hidden" name="id" value={id} />
               <button
                 type="submit"
-                className="mt-2 rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
+                className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
               >
-                Approve
+                Reject
               </button>
-            </div>
-          </form>
-
-          <form action={reject}>
-            <button
-              type="submit"
-              className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
-            >
-              Reject
-            </button>
-          </form>
-        </div>
-      </section>
+            </form>
+          </div>
+        </section>
+      )}
 
       {row.extractionPromptMd && (
         <section className="mb-6">

@@ -52,6 +52,13 @@ export type GeographicLevel = 'global' | 'continental' | 'national' | 'regional'
 export interface FieldSpec {
   key: string;
   promptMd: string;
+  /**
+   * Human-readable field label (e.g. "Salary threshold for principal applicant").
+   * Used by content-window selection to derive keywords for chunk scoring.
+   * Optional for backwards compatibility — when omitted, windowing falls back
+   * to a head-slice (current pre-windowing behaviour, no regression).
+   */
+  label?: string;
 }
 
 export interface DiscoveredUrl {

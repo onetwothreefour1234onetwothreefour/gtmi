@@ -203,11 +203,17 @@ If the threshold is expressed only as a multiple of median wage, return value: n
         '\n\n' +
         `Extraction Task: A.1.2 — Salary threshold as % of local median wage
 Question: Is the salary threshold for this program defined or benchmarked as a percentage of the local median wage or equivalent statistical reference?
+Recall hints:
+
+If the source explicitly states the threshold is calibrated against, set at, derived from, or matched to a percentage of national/local median earnings — even alongside an absolute amount — report that percentage.
+Examples that should yield a value: "TSMIT is set at the median earnings for full-time workers", "salary equal to 80% of full-time median", "matched annually to ABS earnings data".
+
 Edge cases:
 
-If the threshold is a fixed amount (not a percentage), return null.
+If the threshold is purely a fixed amount with no percentage anchor stated anywhere, return empty (no value).
 If the source gives both (e.g., "the greater of X or Y% of median"), report the percentage.
-If expressed as a multiple (e.g., "1.5x median"), convert to a percentage (150).`,
+If expressed as a multiple (e.g., "1.5x median"), convert to a percentage (150).
+If only a benchmarking statement is given without a numeric percentage, do not infer; return empty.`,
       scoringRubricJsonb: null,
       normalizationFn: 'min_max',
       direction: 'lower_is_better',
@@ -667,10 +673,18 @@ Allowed values:
 "hybrid": online initiation but substantial in-person or paper steps remain.
 "offline_only": primarily paper-based or requires in-person submission.
 
+Recall hints:
+
+If the source describes applying through a named online portal (e.g., ImmiAccount, GOV.UK, USCIS online, MOM EP Online, IRCC portal, ICA myICA) and does not mention any paper-only or in-person submission step, treat that as evidence for "fully_online".
+If the source says "apply online" with no caveat, that is "fully_online".
+A required biometrics or in-person identity check is allowed under "fully_online" — do not downgrade for that alone.
+Document upload and online payment being supported counts as positive evidence even if not enumerated as separate steps.
+
 Edge cases:
 
 Biometrics appointments do not count against "fully_online" (inherently in-person).
-Paper-only requirements for specific document types (e.g., couriered sworn translations) reduce to "mostly_online".`,
+Paper-only requirements for specific document types (e.g., couriered sworn translations) reduce to "mostly_online".
+If the source is silent on application channel, return empty.`,
       scoringRubricJsonb: {
         categories: [
           {
@@ -933,16 +947,27 @@ If program explicitly exempted from LMT, report false.`,
 Question: Can a spouse accompany the principal applicant, and what are the spouse's work rights?
 Allowed values:
 
-"automatic_with_full_work_rights": included and has unrestricted work rights.
-"automatic_with_limited_work_rights": included but work rights limited (sector, hours, separate permit).
-"automatic_no_work_rights": included but cannot work.
-"by_permit_with_work_rights": applies separately; if approved, can work.
-"by_permit_no_work_rights": applies separately; if approved, cannot work.
+"automatic_with_full_work_rights": included on the same application/visa and has unrestricted work rights.
+"automatic_with_limited_work_rights": included on the same visa but work rights limited (sector, hours, separate permit).
+"automatic_no_work_rights": included on the same visa but cannot work.
+"by_permit_with_work_rights": must apply separately on a dependant pass; if approved, can work.
+"by_permit_no_work_rights": must apply separately; if approved, cannot work.
 "not_permitted": spouse cannot accompany.
+
+Recall hints:
+
+The category names use the literal word "automatic" but the source rarely does. Use these decision rules:
+
+  - "Family members can be included on this visa" + no separate dependant pass mentioned → automatic.
+  - Source describes a separate "Dependant Pass", "Spouse Visa", or "DP application" required → by_permit.
+  - "Family members can work" / "spouse has work rights" / "no condition on family member's employment" → with_full_work_rights.
+  - "Family members can work but require a separate work permit / Letter of Consent" → with_limited_work_rights.
+  - Source is silent on work rights but covers inclusion → return only the inclusion half if confident; if uncertain, return empty.
 
 Edge cases:
 
-This indicator reflects a married opposite-sex spouse. Same-sex partner recognition is C.2.4; unmarried partner variations go in notes.`,
+This indicator reflects a married opposite-sex spouse. Same-sex partner recognition is C.2.4; unmarried partner variations go in notes.
+If source explicitly references "secondary applicants" or "subsequent entrants" without specifying spouse, do not use that for this field.`,
       scoringRubricJsonb: {
         categories: [
           {
@@ -1236,11 +1261,23 @@ Requires-switching-tracks is true only if the switch is documented in official m
         '\n\n' +
         `Extraction Task: D.2.2 — Total minimum years from initial visa entry to citizenship eligibility
 Question: Total minimum years from date of initial entry on this program to the earliest date a holder can apply for citizenship?
+
+Recall hints:
+
+The total is usually given indirectly as a sum of two segments. Compose the answer when both segments are stated:
+
+  - "Years to PR on this visa" + "Years as PR before citizenship" = total minimum years.
+  - If the source gives only one segment (e.g. "must be a permanent resident for 4 years" or "4 years residence in Australia"), report that single number — it is the residence requirement at the citizenship stage and is the conventional way the threshold is published.
+  - Phrases that map to the total: "minimum residence requirement", "lawfully resident for X years", "X years' residence including X as a permanent resident", "X years in Australia of which X as PR".
+
+If the source explicitly publishes "X years from arrival to citizenship" or equivalent, use that directly.
+
 Edge cases:
 
 Include time spent under PR if that's part of the pathway.
-Report the standard route for a principal applicant (not spouse-of-citizen accelerations).
-If citizenship not available, return null.`,
+Report the standard route for a principal applicant (not spouse-of-citizen accelerations, military service, or extraordinary contribution).
+If citizenship is not available from this track at all, return empty.
+If the source describes an indefinite-leave / PR step but is silent on the citizenship-from-PR requirement, return only the years-to-PR figure and note in source sentence that this is the PR component only.`,
       scoringRubricJsonb: null,
       normalizationFn: 'min_max',
       direction: 'lower_is_better',
@@ -1286,10 +1323,21 @@ Allowed values:
 "moderate": multiple tests or one substantial test (language B2+ and civics).
 "heavy": multiple substantial tests including language above B2, civics, and integration/history.
 
+Recall hints:
+
+CEFR levels (A1, A2, B1, B2, C1, C2) are rarely stated by name on government pages. Use these mappings:
+
+  - "basic English" / "everyday English" / "functional English" → A2/B1 → light if it's the only test.
+  - "good knowledge of English" / "competent English" / IELTS 6 / TOEFL ~80 → B2 → moderate.
+  - "advanced English" / IELTS 7+ → C1+ → heavy.
+  - "Life in the UK test", "Australian citizenship test", "naturalisation test", "civics test" all count as a civics test.
+  - If both a language requirement AND a civics test are required, the answer is at least "moderate".
+
 Edge cases:
 
 Exemptions for age/disability do not change category.
-If citizenship not available, return null.`,
+If citizenship is not available from this track, return empty.
+If the source describes only "must understand basic English" with no civics test mentioned, return "light".`,
       scoringRubricJsonb: {
         categories: [
           { value: 'none', description: 'no test required.' },
@@ -1435,7 +1483,7 @@ If source distinguishes by domicile (UK pre-2025 style), report rule for typical
         SHARED_PREAMBLE +
         '\n\n' +
         `Extraction Task: E.1.1 — Material policy changes in last 5 years
-Question: Count the number of material policy changes in the last 5 years, weighted by severity.
+Question: Compute a severity-weighted count of material policy changes affecting this program in the last 5 years.
 Material change definition: change to eligibility criteria, quota/cap, fee schedule beyond inflation, rights granted, introduction/abolition of sub-stream, or processing time SLA.
 Severity weights:
 
@@ -1443,11 +1491,25 @@ Major (eligibility/pathway change, abolition/reintroduction): 3
 Moderate (quota change, fee restructure): 2
 Minor (inflation-only fee adjustment, form/portal update): 1
 
+Recall hints:
+
+The source need not be a formal changelog. Count any of these as evidence of a change:
+
+  - "introduced in YYYY", "replaced in YYYY", "renamed to ... in YYYY", "merged with ... in YYYY"
+  - "from YYYY", "since YYYY", "as of [date within last 5 years]"
+  - "previously [old value], now [new value]", "increased from X to Y in YYYY"
+  - "reformed", "overhauled", "tightened", "expanded", "this stream replaces the former [program]"
+  - News-format sources tracking the program's history (Migration Policy Institute, OECD migration outlook chapters, IMD reports) often provide explicit change counts — use them when present.
+
+The current date is 2026; "last 5 years" means changes dated 2021 or later.
+
+Sum the severity-weighted points across all changes you find. Report the integer total. The sourceSentence field should quote one representative change.
+
 Edge cases:
 
-Only count changes evidenced in THIS document (changelog, "what's new", dated announcements).
-Do not count announced-but-not-implemented here (those go to E.1.2).
-If no change history disclosed, return null with notes "change history not disclosed in source".`,
+Do not count announced-but-not-implemented changes here (those belong to E.1.2).
+Do not infer changes from tone or general policy commentary; only count explicitly dated changes.
+If the source provides no dated change information, return empty.`,
       scoringRubricJsonb: null,
       normalizationFn: 'z_score',
       direction: 'lower_is_better',

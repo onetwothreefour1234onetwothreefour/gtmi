@@ -1,6 +1,6 @@
 import 'server-only';
 import { db, fieldValues, fieldDefinitions, programs, countries, sources } from '@gtmi/db';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, inArray } from 'drizzle-orm';
 
 export type ReviewListRow = {
   id: string;
@@ -27,6 +27,32 @@ export type ReviewDetailRow = ReviewListRow & {
   extractionPromptMd: string;
   scoringRubricJsonb: unknown;
 };
+
+export async function listRecentlyReviewed(limit = 20): Promise<ReviewListRow[]> {
+  const rows = await db
+    .select({
+      id: fieldValues.id,
+      programId: fieldValues.programId,
+      programName: programs.name,
+      countryIso: programs.countryIso,
+      countryName: countries.name,
+      fieldKey: fieldDefinitions.key,
+      fieldLabel: fieldDefinitions.label,
+      pillar: fieldDefinitions.pillar,
+      status: fieldValues.status,
+      valueRaw: fieldValues.valueRaw,
+      extractedAt: fieldValues.extractedAt,
+    })
+    .from(fieldValues)
+    .innerJoin(programs, eq(programs.id, fieldValues.programId))
+    .innerJoin(countries, eq(countries.isoCode, programs.countryIso))
+    .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
+    .where(inArray(fieldValues.status, ['approved', 'rejected']))
+    .orderBy(desc(fieldValues.reviewedAt))
+    .limit(limit);
+
+  return rows;
+}
 
 export async function listPendingReview(): Promise<ReviewListRow[]> {
   const rows = await db

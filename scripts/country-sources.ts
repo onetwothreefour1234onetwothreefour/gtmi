@@ -9,13 +9,11 @@ export interface CountryLevelSource {
 }
 
 export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
-  {
-    url: 'https://www.oecd.org/en/topics/policy-issues/international-migration.html',
-    tier: 1,
-    geographicLevel: 'global',
-    reason: 'Policy stability, immigration trend data by country',
-    fieldKeys: ['E.1.1'],
-  },
+  // OECD migration pages were removed 2026-04-26 — every probed path under
+  // oecd.org/en/topics/.../migration returned a soft-404 ("the requested page
+  // cannot be found") during the OECD site migration. Migration Policy Institute
+  // (below) covers E.1.1 with similar geography. Re-add an OECD source once the
+  // site stabilises and a stable URL is confirmed.
   {
     url: 'https://www.imd.org/centers/wcc/world-competitiveness-center/rankings/world-talent-ranking/',
     tier: 1,
@@ -31,13 +29,31 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     fieldKeys: ['E.1.1'],
   },
   // AUS national-level sources — only scraped for Australian programs.
-  // All URLs HEAD-checked 2026-04-22. 404s were removed.
+  // URLs re-validated 2026-04-26: stale soft-404s replaced; ATO tax sources added.
   {
-    url: 'https://www.servicesaustralia.gov.au/who-can-enrol-in-medicare',
+    url: 'https://www.servicesaustralia.gov.au/medicare',
     tier: 1,
     geographicLevel: 'national',
-    reason: 'Medicare enrolment eligibility for visa holders — public healthcare access for C.3.1',
+    reason: 'Medicare overview — public healthcare access for C.3.1',
     fieldKeys: ['C.3.1'],
+    country: 'AUS',
+  },
+  {
+    url: 'https://www.ato.gov.au/individuals-and-families/coming-to-australia-or-going-overseas/your-tax-residency',
+    tier: 1,
+    geographicLevel: 'national',
+    reason:
+      'ATO tax residency tests — D.3.1 (residency trigger days), D.3.3 (territorial vs worldwide)',
+    fieldKeys: ['D.3.1', 'D.3.3'],
+    country: 'AUS',
+  },
+  {
+    url: 'https://www.ato.gov.au/individuals-and-families/coming-to-australia-or-going-overseas/your-tax-residency/foreign-and-temporary-residents',
+    tier: 1,
+    geographicLevel: 'national',
+    reason:
+      'ATO foreign and temporary resident tax — D.3.1, D.3.2 (special regime: temp resident foreign-source income exemption), D.3.3',
+    fieldKeys: ['D.3.1', 'D.3.2', 'D.3.3'],
     country: 'AUS',
   },
   {
@@ -156,7 +172,7 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
   },
 
   // SGP national-level sources — S Pass program.
-  // HEAD-checked 2026-04-22.
+  // Last HEAD-checked 2026-04-22; due for re-validation alongside SGP canary run.
   {
     url: 'https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility',
     tier: 1,
@@ -369,7 +385,7 @@ export const ISO3_TO_ISO2: Record<string, string> = {
 };
 
 export async function fetchWgiScore(
-  countryIso3: string,
+  countryIso3: string
 ): Promise<{ score: string; year: string; countryName: string } | null> {
   const iso2 = ISO3_TO_ISO2[countryIso3];
   if (!iso2) {
@@ -400,7 +416,7 @@ export async function fetchWgiScore(
 }
 
 export async function fetchAllWgiScores(
-  countryIsos: string[],
+  countryIsos: string[]
 ): Promise<Map<string, { score: string; year: string; countryName: string }>> {
   const results = new Map<string, { score: string; year: string; countryName: string }>();
   for (const iso3 of countryIsos) {

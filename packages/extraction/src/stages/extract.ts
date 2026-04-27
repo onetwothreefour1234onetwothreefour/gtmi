@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { createAnthropicClient, MODEL_EXTRACTION } from '../clients/anthropic';
 import type { ExtractionOutput, FieldSpec, ScrapeResult } from '../types/extraction';
 import type { ExtractStage } from '../types/pipeline';
+import { selectContentWindow } from '../utils/window';
 
 const SYSTEM_PROMPT =
   'You are a precise data extraction agent for immigration program research. Extract ' +
@@ -40,13 +41,18 @@ const MAX_CONTENT_CHARS = 30000;
 const EARLY_EXIT_CONFIDENCE = 0.9;
 const INTER_BATCH_DELAY_MS = 30000;
 
+// Bump when the windowing or system prompt logic changes in a way that would
+// invalidate previously-cached extractions for the same (content, field, prompt)
+// tuple. Cache rows under an old WINDOW_VERSION are silently bypassed.
+const WINDOW_VERSION = 1;
+
 function sha256(input: string): string {
   return createHash('sha256').update(input, 'utf8').digest('hex');
 }
 
 function makeCacheKey(contentHash: string, fieldKey: string, promptMd: string): string {
   const promptHash = sha256(SYSTEM_PROMPT + '::' + promptMd);
-  return sha256([contentHash, fieldKey, promptHash].join('::'));
+  return sha256([contentHash, fieldKey, promptHash, `wv${WINDOW_VERSION}`].join('::'));
 }
 
 async function readExtractionCache(cacheKey: string): Promise<ExtractionOutput | null> {
@@ -249,9 +255,19 @@ export class ExtractStageImpl implements ExtractStage {
     }
 
     const client = createAnthropicClient();
-    const content = scrape.contentMarkdown.slice(0, MAX_CONTENT_CHARS);
+    // Single-field path has no field label available (legacy interface). Fall
+    // back to head slice — `selectContentWindow` honours this when called with
+    // an empty-label spec. Production extraction goes through the batch path
+    // which passes real labels.
+    const content = selectContentWindow(
+      scrape.contentMarkdown,
+      [{ key: fieldKey, label: '' }],
+      MAX_CONTENT_CHARS
+    );
     if (scrape.contentMarkdown.length > MAX_CONTENT_CHARS)
-      console.log(`  ↳ [${fieldKey}] Content truncated to ${MAX_CONTENT_CHARS} chars`);
+      console.log(
+        `  ↳ [${fieldKey}] Content windowed: ${scrape.contentMarkdown.length} → ${content.length} chars`
+      );
 
     const MAX_RETRIES = 3;
     const BASE_DELAY_MS = 60000;
@@ -338,9 +354,15 @@ export class ExtractStageImpl implements ExtractStage {
 
     if (uncached.length === 0) return cached;
 
-    const content = scrape.contentMarkdown.slice(0, MAX_CONTENT_CHARS);
+    const content = selectContentWindow(
+      scrape.contentMarkdown,
+      uncached.map((f) => ({ key: f.key, label: f.label ?? '' })),
+      MAX_CONTENT_CHARS
+    );
     if (scrape.contentMarkdown.length > MAX_CONTENT_CHARS)
-      console.log(`  ↳ [Batch] Content truncated to ${MAX_CONTENT_CHARS} chars`);
+      console.log(
+        `  ↳ [Batch] Content windowed: ${scrape.contentMarkdown.length} → ${content.length} chars (across ${uncached.length} fields)`
+      );
 
     console.log(
       `  [Batch] Calling extraction model for ${uncached.length} uncached fields on ${scrape.url}`

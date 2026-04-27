@@ -112,7 +112,7 @@ Stage 5 — Human review → queue for values below confidence threshold or with
 Stage 6 — Publish     → approved values written to field_values with full provenance
 ```
 
-**Wave 1 field filter [NEW]:** `scripts/wave-config.ts` exports `WAVE_1_ENABLED` (default `true`) and `WAVE_1_FIELD_CODES` (27 sub-factor codes). When `WAVE_1_ENABLED` is `true`, the canary runner and Trigger.dev jobs restrict extraction to Wave 1 fields only. Rollback = set `WAVE_1_ENABLED = false`.
+**Wave field configuration:** `scripts/wave-config.ts` exports `WAVE_1_FIELD_CODES` (27 sub-factor codes), `WAVE_2_FIELD_CODES` (the remaining 21), and `ACTIVE_FIELD_CODES = WAVE_1 ∪ (WAVE_2_ENABLED ? WAVE_2 : [])`. With `WAVE_2_ENABLED = true` (the Phase 2 close-out default), the canary runner, Trigger.dev jobs, scoring script, and diagnostic all run against the full 48-field methodology. Rollback to Wave 1 only = set `WAVE_2_ENABLED = false`.
 
 ### 6.2 Stage 0 — URL Discovery [NEW v5: Perplexity replaces Claude]
 
@@ -328,7 +328,7 @@ gtmi/
 │   └── README.md              # Setup and run instructions
 ├── scripts/
 │   ├── canary-run.ts          # Full 7-stage pipeline runner; --country AUS|SGP CLI arg
-│   ├── wave-config.ts         # WAVE_1_ENABLED flag, WAVE_1_FIELD_CODES (27 sub-factor codes)
+│   ├── wave-config.ts         # WAVE_1_FIELD_CODES (27) + WAVE_2_FIELD_CODES (21); ACTIVE_FIELD_CODES (consumers import this)
 │   └── country-sources.ts     # Global/country-level source registry; fetchWgiScore; ISO3_TO_ISO2 [UPDATED]
 ├── docs/
 │   ├── BRIEF.md               # Build specification v4 (current)
@@ -387,7 +387,7 @@ gtmi/
 - Discovery cap increased from 5 to 10 URLs per program; discovery prompt extended with official-listing-page-first instruction and country-specific URL patterns
 - `canary-run.ts` fully implemented: per-field progress logging, `try/catch` error recovery per field, 3s per-field delay, discovered-URL listing after Stage 0
 - `canary-run.ts` accepts `--country AUS|SGP` CLI argument; runs independently per country
-- Wave 1 field filter: `scripts/wave-config.ts` created; `WAVE_1_ENABLED = true`; `WAVE_1_FIELD_CODES` lists 27 sub-factor codes; rollback = one flag change
+- Wave field config: `scripts/wave-config.ts` exports `WAVE_1_FIELD_CODES` (27), `WAVE_2_FIELD_CODES` (21), and `ACTIVE_FIELD_CODES`; `WAVE_2_ENABLED = true` activates 48-field coverage; rollback = one flag change
 - Country-level source registry: `scripts/country-sources.ts` created; 4 global sources (World Bank WGI, OECD Migration Outlook, IMD World Talent Ranking, Migration Policy Institute); `getCountryLevelSources(fieldKey)` helper
 - Two-phase discovery: country-level Phase 1 loads global sources once per country run; program-specific Phase 2 runs `DiscoverStageImpl` per program
 - Per-field Tier 2 cross-check source selection: Tier 2 URLs scored by keyword match against field label; global source fallback if no program Tier 2 matches

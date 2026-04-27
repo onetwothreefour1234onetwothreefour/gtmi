@@ -18,7 +18,7 @@
 
 import { db, fieldDefinitions, fieldValues, programs, sources, scrapeCache } from '@gtmi/db';
 import { and, eq, inArray } from 'drizzle-orm';
-import { WAVE_1_FIELD_CODES } from './wave-config';
+import { ACTIVE_FIELD_CODES } from './wave-config';
 
 const MAX_CONTENT_CHARS = 30000;
 
@@ -106,8 +106,8 @@ async function main() {
 
   // --- 2. Load Wave 1 field definitions ---
   const allDefs = await db.select().from(fieldDefinitions);
-  const wave1Defs = allDefs.filter((d) => WAVE_1_FIELD_CODES.includes(d.key));
-  console.log(`Wave 1 fields: ${wave1Defs.length}`);
+  const wave1Defs = allDefs.filter((d) => ACTIVE_FIELD_CODES.includes(d.key));
+  console.log(`Active fields: ${wave1Defs.length}`);
 
   // --- 3. Find which are empty (no row, or value_raw is null/empty) ---
   const existingFVs = await db

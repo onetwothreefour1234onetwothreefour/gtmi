@@ -168,10 +168,11 @@ export class ScrapeStageImpl implements ScrapeStage {
       };
     }
 
-    const content =
-      data.content_markdown.length > 30000
-        ? data.content_markdown.slice(0, 30000)
-        : data.content_markdown;
+    // Store the full scraped content. Field-aware windowing happens in
+    // `extract.ts` where the field labels (and therefore the relevance signal)
+    // are known. Capping here would silently throw away content the LLM might
+    // have used. `scrape_cache.content_markdown` is `text` (unbounded).
+    const content = data.content_markdown;
 
     const result: ScrapeResult = {
       url: discovered.url,

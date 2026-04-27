@@ -16,7 +16,7 @@ import type {
   ScrapeResult,
 } from '@gtmi/extraction';
 import { db, fieldDefinitions, programs } from '@gtmi/db';
-import { WAVE_1_ENABLED, WAVE_1_FIELD_CODES } from './wave-config';
+import { ACTIVE_FIELD_CODES } from './wave-config';
 import {
   COUNTRY_LEVEL_SOURCES,
   getCountryLevelSources,
@@ -43,12 +43,10 @@ async function main() {
   let allFieldDefs = await db.select().from(fieldDefinitions);
   const fieldPrompts = new Map<string, string>();
   for (const def of allFieldDefs) fieldPrompts.set(def.key, def.extractionPromptMd);
-  if (WAVE_1_ENABLED) {
-    allFieldDefs = allFieldDefs.filter((def) => WAVE_1_FIELD_CODES.includes(def.key));
-    console.log(`Wave 1 active — running ${allFieldDefs.length} of 48 fields`);
-  } else {
-    console.log(`Wave 1 disabled — running all 48 fields`);
-  }
+  allFieldDefs = allFieldDefs.filter((def) => ACTIVE_FIELD_CODES.includes(def.key));
+  console.log(
+    `Active wave config — running ${allFieldDefs.length} of 48 fields (codes from ACTIVE_FIELD_CODES)`
+  );
   console.log(`Pre-loop: ${allFieldDefs.length} field definitions loaded`);
 
   const scrape = new ScrapeStageImpl();
@@ -58,7 +56,7 @@ async function main() {
 
   // Include global sources + country-specific national sources for this run's country.
   const applicableGlobalSources = COUNTRY_LEVEL_SOURCES.filter(
-    (s) => !s.country || s.country === countryArg,
+    (s) => !s.country || s.country === countryArg
   );
   const globalDiscoveredUrls: DiscoveredUrl[] = applicableGlobalSources.map((s) => ({
     url: s.url,
@@ -92,7 +90,7 @@ async function main() {
       .map((s) => globalScrapeByUrl.get(s.url))
       .filter(
         (sr): sr is ScrapeResult =>
-          sr !== undefined && sr.httpStatus !== 0 && sr.contentMarkdown !== '',
+          sr !== undefined && sr.httpStatus !== 0 && sr.contentMarkdown !== ''
       );
     if (scrapes.length > 0) {
       globalSourcesByField.set(def.key, scrapes);
@@ -121,7 +119,7 @@ async function main() {
       const row = rows[0]!;
       if (row.countryIso !== countryArg) {
         throw new Error(
-          `Program ${programIdArg} has country_iso="${row.countryIso}" but --country="${countryArg}" — mismatch`,
+          `Program ${programIdArg} has country_iso="${row.countryIso}" but --country="${countryArg}" — mismatch`
         );
       }
       return row;
@@ -146,7 +144,7 @@ async function main() {
       : [];
     const selected = (matched.length > 0 ? matched : allForCountry)[0]!;
     console.warn(
-      `[Canary] No --programId provided; selected "${selected.name}" (${selected.id}) — pass --programId for deterministic runs.`,
+      `[Canary] No --programId provided; selected "${selected.name}" (${selected.id}) — pass --programId for deterministic runs.`
     );
     return selected;
   })();
@@ -168,7 +166,7 @@ async function main() {
     console.log('\nPhase 2: Discovering program-specific URLs');
     const discover = new DiscoverStageImpl();
     console.log(
-      `  [Phase 2] Searching for program-specific URLs for: ${programName} (${countryIso})...`,
+      `  [Phase 2] Searching for program-specific URLs for: ${programName} (${countryIso})...`
     );
     const discoveryResult = await discover.execute(programId, programName, countryIso);
     console.log(`Stage 0 complete: ${discoveryResult.discoveredUrls.length} URLs discovered`);
@@ -185,7 +183,7 @@ async function main() {
       if (result) {
         scrapeResults.push(result);
         console.log(
-          `  [Stage 1] Done: ${u.url} (HTTP ${result.httpStatus}, ${result.contentMarkdown.length} chars)`,
+          `  [Stage 1] Done: ${u.url} (HTTP ${result.httpStatus}, ${result.contentMarkdown.length} chars)`
         );
       }
     }
@@ -217,7 +215,7 @@ async function main() {
     for (const sr of globalScrapeResults) {
       if (!hasUsableContent(sr)) {
         console.log(
-          `  [Extract gate] Skipping empty/failed scrape: ${sr.url} (HTTP ${sr.httpStatus}, ${sr.contentMarkdown.length} chars)`,
+          `  [Extract gate] Skipping empty/failed scrape: ${sr.url} (HTTP ${sr.httpStatus}, ${sr.contentMarkdown.length} chars)`
         );
         continue;
       }
@@ -230,7 +228,7 @@ async function main() {
     // E.3.2 is handled via direct World Bank API — exclude from LLM batch
     const llmFields: FieldSpec[] = allFieldDefs
       .filter((d) => d.key !== 'E.3.2')
-      .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd }));
+      .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd, label: d.label }));
 
     let fieldsExtracted = 0;
     let fieldsAutoApproved = 0;
@@ -241,7 +239,7 @@ async function main() {
     if (e32def) {
       if (wgiResult) {
         console.log(
-          `  ↳ [E.3.2] Using pre-fetched WGI score: ${wgiResult.score} (${wgiResult.year})`,
+          `  ↳ [E.3.2] Using pre-fetched WGI score: ${wgiResult.score} (${wgiResult.year})`
         );
         const wgiExtraction: ExtractionOutput = {
           fieldDefinitionKey: 'E.3.2',
@@ -291,7 +289,7 @@ async function main() {
 
     // ── Batch extraction: all LLM fields across all scrapes ──────────────────
     console.log(
-      `\nBatch extraction: ${llmFields.length} fields across ${allUniqueScrapes.length} URLs`,
+      `\nBatch extraction: ${llmFields.length} fields across ${allUniqueScrapes.length} URLs`
     );
     let allExtractionResults: Map<string, { output: ExtractionOutput; sourceUrl: string }>;
     try {
@@ -300,7 +298,7 @@ async function main() {
         llmFields,
         programId,
         programName,
-        countryIso,
+        countryIso
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -316,7 +314,7 @@ async function main() {
     });
     if (missingLlmFields.length > 0 && tier2Scrapes.length > 0) {
       console.log(
-        `\n[Tier-2 fallback] ${missingLlmFields.length} fields missing — retrying with ${tier2Scrapes.length} tier-2 URLs`,
+        `\n[Tier-2 fallback] ${missingLlmFields.length} fields missing — retrying with ${tier2Scrapes.length} tier-2 URLs`
       );
       // Extend lookup maps so provenance resolution works for tier-2 sources.
       for (const sr of tier2Scrapes) scrapeByUrl.set(sr.url, sr);
@@ -326,7 +324,7 @@ async function main() {
           missingLlmFields,
           programId,
           programName,
-          countryIso,
+          countryIso
         );
         let tier2Fills = 0;
         for (const [key, result] of tier2Results) {
@@ -337,7 +335,7 @@ async function main() {
           }
         }
         console.log(
-          `[Tier-2 fallback] filled ${tier2Fills}/${missingLlmFields.length} missing fields`,
+          `[Tier-2 fallback] filled ${tier2Fills}/${missingLlmFields.length} missing fields`
         );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -348,7 +346,7 @@ async function main() {
     // ── Per-field validation + publish ───────────────────────────────────────
     for (const def of allFieldDefs.filter((d) => d.key !== 'E.3.2')) {
       console.log(
-        `[${allFieldDefs.indexOf(def) + 1}/${allFieldDefs.length}] Processing field: ${def.key} — ${def.label}`,
+        `[${allFieldDefs.indexOf(def) + 1}/${allFieldDefs.length}] Processing field: ${def.key} — ${def.label}`
       );
 
       const extractionResult = allExtractionResults.get(def.key);
@@ -365,7 +363,7 @@ async function main() {
       }
 
       console.log(
-        `  ↳ Extracted: "${extraction.valueRaw.substring(0, 60)}..." (confidence: ${extraction.extractionConfidence})`,
+        `  ↳ Extracted: "${extraction.valueRaw.substring(0, 60)}..." (confidence: ${extraction.extractionConfidence})`
       );
 
       fieldsExtracted++;
@@ -373,7 +371,7 @@ async function main() {
       const winningScrape = scrapeByUrl.get(sourceUrl) ?? globalScrapeByUrl.get(sourceUrl) ?? null;
       if (!winningScrape) {
         throw new Error(
-          `No scrape result found for source URL "${sourceUrl}" on field "${def.key}" — this is a bug`,
+          `No scrape result found for source URL "${sourceUrl}" on field "${def.key}" — this is a bug`
         );
       }
       const winningDiscovered =
@@ -382,14 +380,14 @@ async function main() {
         null;
       if (!winningDiscovered) {
         throw new Error(
-          `No discovered URL entry found for source URL "${sourceUrl}" on field "${def.key}" — this is a bug`,
+          `No discovered URL entry found for source URL "${sourceUrl}" on field "${def.key}" — this is a bug`
         );
       }
 
       console.log(`  ↳ [${def.key}] Calling validation model...`);
       const validation = await validate.execute(extraction, winningScrape);
       console.log(
-        `  ↳ Validation: ${validation.isValid ? 'valid' : 'invalid'} (confidence: ${validation.validationConfidence})`,
+        `  ↳ Validation: ${validation.isValid ? 'valid' : 'invalid'} (confidence: ${validation.validationConfidence})`
       );
 
       const crossCheck: CrossCheckResult = {
@@ -399,6 +397,17 @@ async function main() {
       };
       const crossCheckOutcome: CrossCheckOutcome = 'not_checked';
 
+      const pendingContext = {
+        sourceUrl,
+        geographicLevel: winningDiscovered.geographicLevel,
+        sourceTier: winningDiscovered.tier,
+        scrapeTimestamp: winningScrape.scrapedAt.toISOString(),
+        contentHash: winningScrape.contentHash,
+        crossCheckResult: crossCheckOutcome,
+        crossCheckUrl: null,
+        methodologyVersion: METHODOLOGY_VERSION,
+      };
+
       const isAutoApproved =
         extraction.extractionConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD &&
         validation.isValid &&
@@ -407,7 +416,7 @@ async function main() {
       console.log(`  ↳ Decision: ${isAutoApproved ? 'AUTO-APPROVED' : 'QUEUED FOR REVIEW'}`);
 
       if (!isAutoApproved) {
-        await humanReview.enqueue(extraction, validation, crossCheck);
+        await humanReview.enqueue(extraction, validation, crossCheck, pendingContext);
         fieldsQueued++;
         continue;
       }
@@ -439,7 +448,7 @@ async function main() {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(`  ↳ Publish failed for ${def.key}: ${msg} — queuing for review instead`);
-        await humanReview.enqueue(extraction, validation, crossCheck);
+        await humanReview.enqueue(extraction, validation, crossCheck, pendingContext);
         fieldsQueued++;
       }
     }

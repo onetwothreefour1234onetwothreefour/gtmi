@@ -1,10 +1,27 @@
 import Link from 'next/link';
-import { listPendingReview } from '@/lib/review-queries';
+import { listPendingReview, listRecentlyReviewed } from '@/lib/review-queries';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ReviewPage() {
-  const rows = await listPendingReview();
+const STATUS_COLORS: Record<string, string> = {
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
+};
+
+export default async function ReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
+  const activeTab = tab === 'reviewed' ? 'reviewed' : 'pending';
+
+  const [pendingRows, recentRows] = await Promise.all([
+    listPendingReview(),
+    listRecentlyReviewed(20),
+  ]);
+
+  const rows = activeTab === 'pending' ? pendingRows : recentRows;
 
   const groups = new Map<string, { label: string; rows: typeof rows }>();
   for (const row of rows) {
@@ -19,13 +36,38 @@ export default async function ReviewPage() {
     <main className="mx-auto max-w-5xl p-8">
       <header className="mb-6">
         <h1 className="text-2xl font-bold">Review Queue</h1>
-        <p className="text-sm text-gray-600">
-          {rows.length} field value{rows.length === 1 ? '' : 's'} pending review.
-        </p>
       </header>
 
+      <nav className="mb-6 flex gap-1 border-b border-gray-200">
+        <Link
+          href="/review"
+          className={`px-4 py-2 text-sm font-medium ${
+            activeTab === 'pending'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Pending{' '}
+          <span className="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+            {pendingRows.length}
+          </span>
+        </Link>
+        <Link
+          href="/review?tab=reviewed"
+          className={`px-4 py-2 text-sm font-medium ${
+            activeTab === 'reviewed'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Recently Reviewed
+        </Link>
+      </nav>
+
       {rows.length === 0 ? (
-        <p className="text-gray-500">Nothing to review.</p>
+        <p className="text-gray-500">
+          {activeTab === 'pending' ? 'Nothing to review.' : 'No recently reviewed items.'}
+        </p>
       ) : (
         Array.from(groups.entries()).map(([key, group]) => (
           <section key={key} className="mb-8">
@@ -46,9 +88,18 @@ export default async function ReviewPage() {
                         {row.valueRaw ?? <em>(no raw value)</em>}
                       </div>
                     </div>
-                    <span className="shrink-0 text-xs text-gray-400">
-                      {row.extractedAt?.toISOString().slice(0, 10) ?? '—'}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {activeTab === 'reviewed' && (
+                        <span
+                          className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[row.status] ?? 'bg-gray-100 text-gray-600'}`}
+                        >
+                          {row.status}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-400">
+                        {row.extractedAt?.toISOString().slice(0, 10) ?? '—'}
+                      </span>
+                    </div>
                   </Link>
                 </li>
               ))}

@@ -1,4 +1,21 @@
+/**
+ * Wave configuration for the canary / Trigger.dev extraction pipeline.
+ *
+ * Wave 1 was the original 27 sub-factors used to validate the end-to-end
+ * pipeline on the AUS canary. Wave 2 covers the remaining 21 sub-factors
+ * needed for full methodology coverage (48 fields total).
+ *
+ * Consumers MUST import `ACTIVE_FIELD_CODES` rather than `WAVE_1_FIELD_CODES`
+ * directly so a single flag flip changes scope across canary, Trigger.dev,
+ * scoring, and the diagnostic.
+ *
+ * Backwards compatibility: WAVE_1_ENABLED + WAVE_1_FIELD_CODES are still
+ * exported. Older callers that haven't migrated keep working with Wave-1-only
+ * scope until they switch to ACTIVE_FIELD_CODES.
+ */
+
 export const WAVE_1_ENABLED = true;
+export const WAVE_2_ENABLED = true;
 
 export const WAVE_1_FIELD_CODES: string[] = [
   'A.1.1',
@@ -29,3 +46,32 @@ export const WAVE_1_FIELD_CODES: string[] = [
   'E.2.2',
   'E.3.2',
 ];
+
+// Remaining 21 sub-factors required for full 48-field methodology coverage.
+export const WAVE_2_FIELD_CODES: string[] = [
+  'A.1.2',
+  'A.1.3',
+  'A.3.3',
+  'B.2.3',
+  'B.2.4',
+  'B.3.1',
+  'B.3.2',
+  'B.3.3',
+  'C.1.3',
+  'C.2.4',
+  'D.1.3',
+  'D.1.4',
+  'D.2.3',
+  'D.2.4',
+  'D.3.1',
+  'D.3.2',
+  'D.3.3',
+  'E.1.2',
+  'E.2.1',
+  'E.2.3',
+  'E.3.1',
+];
+
+export const ACTIVE_FIELD_CODES: string[] = WAVE_2_ENABLED
+  ? [...WAVE_1_FIELD_CODES, ...WAVE_2_FIELD_CODES]
+  : WAVE_1_FIELD_CODES;

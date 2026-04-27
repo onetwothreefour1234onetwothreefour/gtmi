@@ -13,8 +13,8 @@
  * consumers can refuse to publish until Phase 3 replaces these with real
  * distribution stats from ≥5 scored programs.
  *
- * Scope: Wave 1 fields only (via WAVE_1_FIELD_CODES). Out-of-scope fields do
- * not contribute to denominators or weight re-normalization.
+ * Scope: ACTIVE_FIELD_CODES (Wave 1 ∪ Wave 2 when WAVE_2_ENABLED). Out-of-scope
+ * fields do not contribute to denominators or weight re-normalization.
  *
  * Usage:
  *   npx tsx scripts/run-paq-score.ts --country AUS [--programId <uuid>]
@@ -24,7 +24,7 @@ import { db, fieldDefinitions, fieldValues, methodologyVersions, scores } from '
 import { runScoringEngine } from '@gtmi/scoring';
 import type { NormalizationParams, ScoringInput } from '@gtmi/scoring';
 import { eq, and } from 'drizzle-orm';
-import { WAVE_1_FIELD_CODES } from './wave-config';
+import { ACTIVE_FIELD_CODES } from './wave-config';
 
 // ---------------------------------------------------------------------------
 // Phase 2 placeholder normalization params (global benchmark ranges)
@@ -71,7 +71,7 @@ async function main() {
   const countryArg = countryArgIdx !== -1 ? process.argv[countryArgIdx + 1] : undefined;
   if (!countryArg) {
     console.error(
-      'Usage: npx tsx scripts/run-paq-score.ts --country <AUS|SGP> [--programId <uuid>]',
+      'Usage: npx tsx scripts/run-paq-score.ts --country <AUS|SGP> [--programId <uuid>]'
     );
     process.exit(1);
   }
@@ -192,7 +192,7 @@ async function main() {
       direction: d.direction as import('@gtmi/scoring').Direction,
     })),
     normalizationParams: NORMALIZATION_PARAMS,
-    activeFieldKeys: WAVE_1_FIELD_CODES,
+    activeFieldKeys: ACTIVE_FIELD_CODES,
   };
 
   // Print which fields will be scored
@@ -202,7 +202,7 @@ async function main() {
   for (const d of scoredDefs) {
     const fv = approvedFVs.find((fv) => fv.fieldDefinitionId === d.id);
     console.log(
-      `  ${d.key.padEnd(8)} ${d.normalizationFn.padEnd(12)} → normalized: ${JSON.stringify(fv?.valueNormalized)}`,
+      `  ${d.key.padEnd(8)} ${d.normalizationFn.padEnd(12)} → normalized: ${JSON.stringify(fv?.valueNormalized)}`
     );
   }
 
@@ -224,7 +224,7 @@ async function main() {
   console.log(`CME Score:        ${output.cmeScore.toFixed(2)}`);
   console.log(`Composite Score:  ${output.compositeScore.toFixed(2)}`);
   console.log(
-    `Coverage:         ${output.populatedFieldCount}/${output.activeFieldCount} Wave-1 fields (${((output.populatedFieldCount / Math.max(1, output.activeFieldCount)) * 100).toFixed(1)}%)`,
+    `Coverage:         ${output.populatedFieldCount}/${output.activeFieldCount} Wave-1 fields (${((output.populatedFieldCount / Math.max(1, output.activeFieldCount)) * 100).toFixed(1)}%)`
   );
   console.log(`Flagged (insufficient disclosure): ${output.flaggedInsufficientDisclosure}`);
   console.log('\nData coverage by pillar:');
@@ -244,7 +244,7 @@ async function main() {
     phase2Placeholder: true,
     placeholderReason:
       'NORMALIZATION_PARAMS are engineer-chosen ranges, not calibrated from real distribution data. Do not publish publicly.',
-    wave: 1,
+    activeFieldCodes: ACTIVE_FIELD_CODES,
     activeFieldCount: output.activeFieldCount,
     populatedFieldCount: output.populatedFieldCount,
   };
@@ -283,10 +283,10 @@ async function main() {
   console.log(`\nWritten to scores table — id: ${inserted[0]?.id}`);
   if (output.flaggedInsufficientDisclosure) {
     console.log(
-      '\n⚠  FLAGGED: insufficient disclosure (data coverage < 70% in one or more pillars)',
+      '\n⚠  FLAGGED: insufficient disclosure (data coverage < 70% in one or more pillars)'
     );
     console.log(
-      '   This is expected for Phase 2 with a single program and partial field coverage.',
+      '   This is expected for Phase 2 with a single program and partial field coverage.'
     );
     console.log('   Scores are deterministic and repeatable — engine is working correctly.');
   }

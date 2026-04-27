@@ -1,6 +1,6 @@
 # GTMI Implementation Plan
 
-> **Last updated:** Session 8 — 21 Apr 2026. Stage 0 switched to Perplexity API; Firecrawl replaced by Python/Playwright scraper; E.3.2 World Bank API direct; cross-check bypassed in canary; extract rate-limit retry; inter-scrape delay 2s→5s; canary per-field delay 3s→25s.
+> **Last updated:** Session 9 — 26 Apr 2026. Documented work completed since Session 8: extraction batch pipeline + tier-2 fallback in canary, currency preservation in publish.ts (provenance JSONB), scrape/extraction caches, Phase 2 PAQ scoring script, normalization-param calibration script, scrape guards, Wave 1 AUS PAQ score row, /review web app (auth-gated). Wayback archival officially deferred to Phase 5 (co-located with diff detection — see ADR-008 pending). Phase 2 remaining work captured in "Phase 2 close-out" section at the bottom of Phase 2.
 > This document tracks the full build sequence for the Global Talent Mobility Index, combining the phase roadmap with methodology deliverables. Status is updated as work completes.
 
 ---
@@ -119,7 +119,9 @@
 - ✅ **Switched to custom Python/Playwright scraper service**: `scrape.ts` rewritten to call FastAPI service at `SCRAPER_URL` (default `http://localhost:8765`); `scraper/` directory created with `main.py`, `requirements.txt`, `README.md`; start with `uvicorn main:app --host 0.0.0.0 --port 8765`
 - ✅ Store `ScrapeResult` per URL (content, SHA-256 hash, HTTP status, timestamp)
 - ✅ Handle scrape failures loudly — Tier 1 throws, Tier 2/3 logs and returns empty result
-- ⬜ Archive source pages to Wayback Machine Save Page Now API
+- ✅ Scrape cache (`scrape_cache` table, 24h TTL, dedup by URL hash) — implemented in `packages/extraction/src/stages/scrape.ts`
+- ✅ Scrape guards (`scrape-guards.ts`) — reject empty/HTML-error/anti-bot responses before they enter extraction
+- 🚚 **Wayback Machine archival → moved to Phase 5** (co-located with re-scrape diff detection; archival of every canary scrape would pollute history)
 
 ### Stage 2 — Extract
 
@@ -131,6 +133,12 @@
 - ✅ Extraction system prompt strict output format rules: numeric → base value only (min of range); categorical → 1–5 word label; text → 20-word max summary; count → integer only
 - ✅ Rate-limit retry: 3 attempts on HTTP 429 with exponential back-off (60s × attempt); throws after 3 failures
 - ✅ `stripJsonFences` improvement: fallback extracts first `{...}` JSON object if no code fences (handles model preamble text)
+- ✅ Batch extraction: `executeBatch` extracts all fields for a single scrape in one LLM call (8K max-tokens, JSON array response); `executeAllFields` iterates batches across URLs and merges by highest confidence per field
+- ✅ Extraction cache (`extraction_cache` table, keyed by sha256(contentHash + fieldKey + promptHash)); cache hits skip the LLM call entirely
+- ✅ Early exit: `executeAllFields` stops scraping more URLs once every field is at confidence ≥ 0.9
+- ✅ Inter-batch delay: 30s between URL batches (replaces old 25s per-field delay; sized for 8K-token batched calls)
+- ✅ Coverage-gap sentinels: LLM-returned `not_found` / `not_addressed` for categorical fields are skipped at publish so absence is honest in scoring coverage math (`publish.ts:62-71`)
+- ⬜ Field-aware content-window selection — current code still slices to first 30K chars in `extract.ts:252,341`; diagnostic `scripts/diag-empty-fields.ts` already classifies fields as TRUNCATION/LLM_MISS/ABSENT but the fix isn't implemented
 
 ### Stage 3 — Validate
 
@@ -151,7 +159,8 @@
 
 - ✅ Implement review queue logic
 - ✅ Flag values where: extraction confidence < 0.85, validation confidence < 0.85, cross-check disagrees, PAQ delta vs previous > 5 points
-- ⬜ Human review dashboard functional (basic UI)
+- ✅ Human review dashboard functional (basic UI) — `apps/web/app/review` with Supabase magic-link auth, pending/recently-reviewed tabs, status banners, approve flow with re-normalization on edit
+- ⬜ Reject flow on `/review/[id]` writes to DB but doesn't redirect/refresh consistently — reproduce + fix
 
 ### Stage 6 — Publish
 
@@ -161,6 +170,8 @@
 - ✅ W-6: `MODEL_VALIDATION` and `MODEL_CROSSCHECK` constants added to `packages/extraction/src/clients/anthropic.ts`; validation and cross-check stages updated to reference their own constants
 - ✅ W-2: `normalizeRawValue` normalization layer implemented in `packages/scoring/src/normalize-raw.ts`; publish stage calls it before writing `valueNormalized` to DB
 - ✅ I-5: Unique constraint added on `field_values (program_id, field_definition_id)`; publish stage uses `onConflictDoUpdate` for idempotent re-runs
+- ✅ Currency preservation: `detectCurrency()` (19 ISO 4217 codes + symbols) strips currency prefix before normalization; preserved in `provenance.valueCurrency` JSONB key — no schema change required (`packages/extraction/src/utils/currency.ts`, `publish.ts:74-85`)
+- ✅ Backfill helper: `scripts/backfill-monetary-normalization.ts` re-normalizes pending_review rows whose valueNormalized was null because the currency prefix wasn't stripped pre-fix
 
 ### Bug fixes
 
@@ -177,7 +188,8 @@
 - ✅ Missing data penalty: `(present / total)^0.5` multiplier at sub-factor level
 - ✅ Programs below 70% data coverage on any pillar flagged "insufficient disclosure"
 - ✅ Unit test: byte-identical re-runs given same inputs — 99 tests passing (6 methodology + 67 scoring engine + 26 normalize-raw)
-- ⬜ PAQ score produced for Australia Skills in Demand 482 Core Skills Stream
+- ✅ PAQ score produced for Australia Skills in Demand 482 Core Skills Stream — `scripts/run-paq-score.ts --country AUS` writes to `scores` table, idempotent via `onConflictDoUpdate(programId, methodologyVersionId)`. Score row tagged `metadata.phase2Placeholder = true` because normalization params are engineer-chosen, not calibrated
+- ✅ Calibration helper: `scripts/compute-normalization-params.ts` derives p10/p90 per min_max field from live `field_values` distribution; outputs paste-ready TS snippet. Designed to run once ≥5 programs are scored (Phase 3 blocker)
 
 ### Canary script (`scripts/canary-run.ts`)
 
@@ -192,17 +204,31 @@
 - ✅ Phase 1 WGI pre-fetch: `fetchWgiScore(countryArg)` called once per run before field loop
 - ✅ E.3.2 special handling: bypasses LLM extraction; uses pre-fetched World Bank API score; `extractionModel: 'world-bank-api-direct'`; auto-approved at confidence 1.0
 - ✅ Cross-check bypassed: Stage 4 hardcoded to `not_checked` / `agrees: true` in canary (all sources merged into extraction inputs; Trigger.dev job retains proper cross-check)
+- ✅ Tier-2 fallback: after batch extraction across tier-1 + global sources, missing fields are retried against tier-2 sources in a second batch; partial fills logged per field (`canary-run.ts:312-346`)
+- ✅ Two-phase scrape: global/country-level sources scraped once and reused; program-specific URLs scraped per program (`canary-run.ts:56-103`)
 
 ### Canary verification
 
 - ✅ AUS canary run complete: 27/48 fields attempted (Wave 1), 14 fields extracted values, 13 fields returned no value (content truncation at 30K chars), 0 auto-approved (all queued for human review). Issues identified: Tier 2 cross-check source mismatch (fixed), content truncation for salary/education/stability fields, currency not yet preserved in fee fields.
-- 🔄 Wave 1 (27 fields) attempted; Wave 2 (remaining 21 fields) pending
-- 🔄 Singapore S Pass canary run (ready to execute — `pnpm --filter @gtmi/db exec tsx ../../scripts/canary-run.ts --country SGP`)
-- ⬜ Currency preservation in `publish.ts` (store ISO currency code + numeric value separately)
-- ⬜ Content window strategy for fields truncated at 30K chars
-- ⬜ Provenance records verified for AUS canary extracted fields
-- ⬜ PAQ score produced and verified deterministic for AUS canary program
-- ⬜ Human review dashboard functional (basic UI)
+- ✅ Currency preservation in `publish.ts` (stored in `provenance.valueCurrency` JSONB)
+- ✅ AUS PAQ score produced + idempotent + flagged `phase2Placeholder` (calibration deferred to Phase 3)
+- ✅ Human review dashboard functional (basic UI) — see Stage 5 section above
+- 🔄 Wave 1 (27 fields) attempted; Wave 2 (remaining 21 fields) **see Phase 2 close-out below**
+- 🔄 Singapore S Pass canary run — **see Phase 2 close-out below**
+- ⬜ Content window strategy for fields truncated at 30K chars — **see Phase 2 close-out below**
+- ⬜ Provenance records verified end-to-end for AUS canary extracted fields — **see Phase 2 close-out below**
+
+### Phase 2 close-out (Session 9 — work plan)
+
+Open items below this line are the only blockers to declaring Phase 2 complete. Work order matches dependency graph in conversation thread.
+
+- ⬜ **CO-1: Field-aware content windowing** — replace blanket `slice(0, 30000)` in `extract.ts` (single + batch paths) with relevance-scored chunk selection driven by per-field keywords (lift `extractKeywords` from `diag-empty-fields.ts`). Cache key gets a `WINDOW_VERSION` constant so old cache rows are auto-invalidated. **Also** remove redundant 30K cap in `scrape.ts:172` (let full content into cache; windowing happens in extract). Two unit tests: answer-near-end + answer-near-start. Done when `diag-empty-fields.ts --country AUS` reports ≥6 of 13 previously-TRUNCATION fields recover.
+- ⬜ **CO-2: Wave 2 enable** — add `WAVE_2_FIELD_CODES` (21 sub-factors) to `wave-config.ts`, introduce `ACTIVE_FIELD_CODES = WAVE_1 ∪ (WAVE_2_ENABLED ? WAVE_2 : [])`, switch consumers in `canary-run.ts:46`, `extract-single-program.ts:61`, `run-paq-score.ts:195`, `diag-empty-fields.ts:109`. Set `WAVE_2_ENABLED = true`. Done when canary processes 48 fields end-to-end.
+- ⬜ **CO-3: AUS canary re-run + provenance verifier** — generalize `audit-phase2.ts` (currently hard-coded program ID) into `scripts/verify-provenance.ts --country|--programId`. Asserts every field_values row has the 14 required provenance keys per ADR-007. Exit 1 on any miss. Run AUS canary with windowing + Wave 2 + verifier. Done when ≥30/48 AUS fields populated and verifier reports zero missing keys.
+- ⬜ **CO-4: SGP canary** (parallel to CO-3) — `canary-run.ts --country SGP` + verifier. Done when SGP S Pass has ≥20 populated field_values, provenance verified.
+- ⬜ **CO-5: Re-calibrate normalization params from AUS+SGP distribution** — run `compute-normalization-params.ts`, paste output into `run-paq-score.ts` replacing hardcoded ranges. Keep `phase2Placeholder = true` flag (real calibration is Phase 3 with ≥5 programs). Re-score AUS, score SGP. Done when both score rows exist and are deterministic across re-runs.
+- ⬜ **CO-6: Fix reject flow on `/review/[id]`** — reproduce on Cloud Run, capture logs, fix DB write/redirect (likely server-action redirect interaction with transaction or RLS on `review_queue`). Done when reject moves item to "Recently Reviewed" tab with red badge.
+- ⬜ **CO-7: Phase 2 closeout doc** — bump status header to Session 10, add Phase 2 retrospective (cost numbers from canary runs, TRUNCATION/LLM_MISS/ABSENT distribution, what Phase 3 cohort needs). Tag `phase-2-complete`. Raise ADR-008 documenting Wayback deferral to Phase 5.
 
 ---
 
@@ -356,3 +382,5 @@ Session 6 changes (Wave 1 filter, two-phase discovery, per-field Tier 2 selectio
 Session 7 changes (Stage 0 five-category source mix expansion, publish.ts normalizeRawValue type fix) are operational and bug-fix decisions. No ADRs raised.
 
 Session 8 changes (Perplexity API for Stage 0, Python/Playwright scraper replacing Firecrawl, E.3.2 World Bank API direct, canary cross-check bypass, extract/validate resilience improvements) are tooling, operational, and bug-fix decisions. No ADRs raised.
+
+Session 9 changes (currency preservation in provenance JSONB, batch extraction + tier-2 fallback, scrape/extraction caches, Phase 2 PAQ scoring, /review web app with Supabase auth, Cloud Run deployment with NEXT_PUBLIC_APP_URL canonical-origin fix) are operational. ADR-008 to be raised on Phase 2 closeout for Wayback deferral to Phase 5.
