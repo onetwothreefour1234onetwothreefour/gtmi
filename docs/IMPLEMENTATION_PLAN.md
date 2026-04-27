@@ -327,12 +327,25 @@ Both flagged `insufficient_disclosure` because pillars C and D have no auto-appr
 - ✅ Vitest tests: `lib/queries/search.test.ts` (17 — sanitisation, parameterisation, SQL-injection guard, dialect render shape), `lib/advisor-mode.test.ts` (13 — proportional rebalance math + recomputePaq).
 - ✅ `apps/web/next.config.ts` loads the monorepo-root `.env` so RSC database queries see `DATABASE_URL` in dev (Cloud Run injects directly via Secret Manager).
 
-### Phase 4.3 — Program detail — ⬜
+### Phase 4.3 — Program detail — ✅ COMPLETE (Session 12)
 
-- ⬜ Migration 00005: `programs.long_summary_md` + `long_summary_updated_at` + `long_summary_reviewer` (per ADR-010, to be raised in 4.3).
-- ⬜ `lib/queries/program-detail.ts` (joins programs, scores, field_values, sources, field_definitions, methodology_versions, policy_changes).
-- ⬜ Program detail page covering all three states (scored, unscored, placeholder). Pillar radar with cohort median + compare-to. Sub-factor accordion + indicator drilldown with `ProvenanceTrigger` on every value. PolicyTimeline empty-state.
-- ⬜ Vitest tests for provenance popover edge cases (defensive read paths, malformed offsets, mixed status).
+- ✅ Migration **00007** (numbered after 00006 FTS rather than 00005 — supabase/migrations/ already had a gap-free 00001…00006 sequence): `programs.long_summary_md` + `long_summary_updated_at` + `long_summary_reviewer`. Applied via `scripts/apply-migration.ts` per ADR-012; verified via the new `scripts/check-programs-columns.ts` diagnostic.
+- ✅ **ADR-010**: columns on `programs` over a separate `program_narratives` table, with explicit promotion conditions (multilingual, narrative versioning, polymorphic narratives) for the next ADR.
+- ✅ `lib/queries/program-detail.ts` — single-payload server-only query that joins programs ↔ countries ↔ latest scores ↔ field_definitions LEFT JOIN field_values ↔ sources ↔ policy_changes (RLS gated on `summary_human_approved=true`) ↔ cohort. `unstable_cache`-wrapped, tagged `program:[id]` and `programs:all`. Cohort median extracted to `program-detail-helpers.ts` so tests can import without `'server-only'`.
+- ✅ Program detail page at `app/(public)/programs/[id]/page.tsx` covers all three states:
+  - Scored: `<CompositeScoreDisplay>` + `<PillarComparison>` (radar + breakdown table + compare-to dropdown) + `<SubFactorAccordion>` with all 15 sub-factors.
+  - Pre-calibration: same layout + chip on composite + per-indicator + page-level explanatory banner.
+  - Unscored: header + program metadata + `<EmptyState>` "Awaiting Phase 3 scoring" + government source list + "Summary forthcoming" placeholder.
+- ✅ `<ProvenanceTrigger>` accessible from every numeric data point in the indicator drilldown, with the ADR-007 schema (13 always-required + 3 approved-only + `valueCurrency` + `stabilityEdgeCase`) and the disabled Wayback-link affordance per ADR-008.
+- ✅ `<PolicyTimeline>` reads from `detail.policyChanges` (returns `[]` in Phase 4 because the table is empty + RLS gated). Empty-state copy renders today; Phase 5 lights up automatically with zero code change.
+- ✅ Editorial summary panel: prefers `programs.long_summary_md`, falls back to `apps/web/content/programs/<countryIso-lower>-<slug>.md` stubs. Comment-only stubs resolve to "" via `loadContent`'s HTML-comment strip so the "Summary forthcoming" placeholder renders gracefully.
+- ✅ Vitest tests this phase (+21 new):
+  - `lib/queries/program-detail.test.ts` (11) — `computeMedianPillarScores` + `pillarContribution` math.
+  - `components/gtmi/indicator-row.test.tsx` (10) — currency, missing-value branch, pre-calibration chip gating, direction arrow, ProvenanceTrigger accessibility.
+- ✅ Live verification against the staging DB:
+  - `/programs/e1687f65-…` (AUS, placeholder) → 200, full layout with all 15 sub-factor rows.
+  - `/programs/b72e8153-…` (SGP, placeholder) → 200, same composition; cohort dropdown surfaces AUS + CAN.
+  - `/programs/011dd295-…` (UAE Golden Visa, unscored) → 200, EmptyState + sources list + Summary forthcoming placeholder.
 
 ### Phase 4.4 — Methodology + country + changes + about — ⬜
 
