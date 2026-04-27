@@ -120,6 +120,20 @@ export function ProvenanceTrigger({
 
           <ProvenanceHighlight sentence={p.sourceSentence} charOffsets={p.charOffsets} />
 
+          {p.sourceTier === 2 && (
+            <div
+              className="mt-3 inline-flex items-start gap-2 rounded-button border border-slate-300/60 bg-slate-100/60 px-2.5 py-1.5 text-data-sm text-slate-700 dark:border-slate-600/60 dark:bg-slate-800/60 dark:text-slate-200"
+              data-testid="tier2-source-badge"
+              role="note"
+            >
+              <span className="font-medium">Tier 2 source</span>
+              <span className="text-muted-foreground">
+                This value was sourced from a law firm or advisory publication, not a government
+                source directly.
+              </span>
+            </div>
+          )}
+
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-data-sm">
             <dt className="text-muted-foreground">Source</dt>
             <dd className="truncate">

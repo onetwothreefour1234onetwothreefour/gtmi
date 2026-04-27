@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ProvenanceTrigger } from './provenance-trigger';
 import { readProvenance, type Provenance } from '@/lib/provenance';
 
@@ -151,5 +152,38 @@ describe('ProvenanceTrigger', () => {
     const result = readProvenance(withCurrency, 'pending_review');
     expect(result.ok).toBe(true);
     expect((result.provenance as Provenance).valueCurrency).toBe('AUD');
+  });
+
+  // Phase 3.4 / ADR-013 — Tier 2 source badge inside the popover.
+  it('renders the "Tier 2 source" badge inside the popover when sourceTier === 2', async () => {
+    const tier2 = { ...COMPLETE_PROVENANCE, sourceTier: 2 } as Provenance;
+    render(
+      <ProvenanceTrigger provenance={tier2} status="pending_review" valueRaw="not required" />
+    );
+    // Badge sits inside the popover content; it shouldn't be in the DOM until the
+    // user opens the popover.
+    expect(screen.queryByTestId('tier2-source-badge')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    const badge = await screen.findByTestId('tier2-source-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute('role', 'note');
+    expect(badge).toHaveTextContent('Tier 2 source');
+    expect(badge).toHaveTextContent(
+      'This value was sourced from a law firm or advisory publication, not a government source directly.'
+    );
+  });
+
+  it('does NOT render the Tier 2 badge when sourceTier === 1 (government)', async () => {
+    render(
+      <ProvenanceTrigger
+        provenance={COMPLETE_PROVENANCE}
+        status="pending_review"
+        valueRaw="AUD 73,150"
+      />
+    );
+    expect(screen.queryByTestId('tier2-source-badge')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    // Popover is open now; the badge still must not appear.
+    expect(screen.queryByTestId('tier2-source-badge')).not.toBeInTheDocument();
   });
 });

@@ -133,6 +133,9 @@ export const fieldDefinitions = pgTable(
     direction: varchar('direction', { length: 50 }).notNull(),
     sourceTierRequired: integer('source_tier_required').notNull(),
     versionIntroduced: varchar('version_introduced', { length: 50 }).notNull(),
+    // Phase 3.4 / ADR-013: gate Tier 2 backfill at the indicator level.
+    // Default false; flipped true for the ADR-013 allowlist (B.3.3, C.2.4, D.2.3).
+    tier2Allowed: boolean('tier2_allowed').notNull().default(false),
   },
   () => [
     pgPolicy('Team members can write field_definitions', {

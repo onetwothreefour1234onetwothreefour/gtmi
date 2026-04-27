@@ -8,3 +8,4 @@ export {
   PHASE_3_3_PROMPT_UNCERTAIN,
   PHASE_3_3_REWRITTEN_KEYS,
 } from './seed/methodology-v2';
+export { TIER2_BACKFILL_ALLOWLIST } from './seed/tier2-allowlist';
