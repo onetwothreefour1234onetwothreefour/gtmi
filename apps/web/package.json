@@ -31,6 +31,8 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "recharts": "^3.8.1",
+    "remark": "^15",
+    "remark-html": "^16",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
