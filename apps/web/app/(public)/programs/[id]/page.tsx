@@ -11,7 +11,9 @@ import {
   SubFactorAccordion,
   DataTableNote,
   CountryFlag,
+  JsonLd,
 } from '@/components/gtmi';
+import { absoluteUrl, SITE_URL } from '@/lib/site-url';
 import { getProgramDetail } from '@/lib/queries/program-detail';
 import { loadContent } from '@/lib/content';
 import type { PillarKey } from '@/lib/theme';
@@ -28,9 +30,26 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const detail = await getProgramDetail(id);
   if (!detail) return { title: 'Program not found' };
+  const canonical = absoluteUrl(`/programs/${id}`);
+  const title = `${detail.header.programName} — ${detail.header.countryName}`;
+  const description =
+    detail.header.programDescriptionMd?.slice(0, 160) ??
+    `${detail.header.programName} in ${detail.header.countryName} — GTMI program profile with composite score, pillar breakdown, and source provenance.`;
   return {
-    title: `${detail.header.programName} — ${detail.header.countryName}`,
-    description: detail.header.programDescriptionMd ?? undefined,
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: 'article',
+      url: canonical,
+      title,
+      description,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
   };
 }
 
@@ -90,8 +109,37 @@ export default async function ProgramDetailPage({ params }: PageProps) {
   );
   const summaryHtml = summaryFromDb ? await renderMarkdown(summaryFromDb) : summaryFromFile;
 
+  const datasetJsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    name: `${detail.header.programName} — ${detail.header.countryName} (GTMI)`,
+    description: `GTMI program profile for ${detail.header.programName}, including the composite GTMI score, the per-pillar score breakdown across Access, Process, Rights, Pathway, and Stability, and source provenance for every published indicator value.`,
+    url: absoluteUrl(`/programs/${detail.header.programId}`),
+    license: `${SITE_URL}/about`,
+    creator: { '@type': 'Organization', name: 'TTR Group', url: SITE_URL },
+    keywords: [
+      'GTMI',
+      detail.header.countryName,
+      detail.header.programCategory,
+      'talent visa',
+      'mobility programme',
+    ],
+    isAccessibleForFree: true,
+    sourceOrganization: { '@type': 'Organization', name: 'TTR Group' },
+    ...(detail.score?.composite !== null && detail.score?.composite !== undefined
+      ? {
+          variableMeasured: [
+            { '@type': 'PropertyValue', name: 'Composite score', value: detail.score.composite },
+            { '@type': 'PropertyValue', name: 'CME score', value: detail.score.cme ?? null },
+            { '@type': 'PropertyValue', name: 'PAQ score', value: detail.score.paq ?? null },
+          ],
+        }
+      : {}),
+  };
+
   return (
     <>
+      <JsonLd data={datasetJsonLd} />
       <header className="mx-auto max-w-page px-6 pt-12">
         <p className="text-data-sm uppercase tracking-widest text-muted-foreground">
           <Link href="/programs" className="hover:text-foreground">

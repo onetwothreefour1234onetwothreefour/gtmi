@@ -9,7 +9,9 @@ import {
   EmptyState,
   DataTableNote,
   CountryFlag,
+  JsonLd,
 } from '@/components/gtmi';
+import { absoluteUrl, SITE_URL } from '@/lib/site-url';
 import { getCountryDetail } from '@/lib/queries/country-detail';
 import { formatRelativeDate } from '@/lib/format';
 import type { CountryProgramRow, CountryTaxTreatment } from '@/lib/queries/country-detail-types';
@@ -24,9 +26,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { iso } = await params;
   const detail = await getCountryDetail(iso);
   if (!detail) return { title: 'Country not found' };
+  const canonical = absoluteUrl(`/countries/${detail.header.iso}`);
+  const title = detail.header.name;
+  const description = `${detail.programs.length} talent-mobility programmes scored for ${detail.header.name} on GTMI — the Global Talent Mobility Index.`;
   return {
-    title: detail.header.name,
-    description: `Talent-mobility programmes scored for ${detail.header.name}.`,
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: { type: 'article', url: canonical, title, description },
+    twitter: { card: 'summary_large_image', title, description },
   };
 }
 
@@ -36,9 +44,23 @@ export default async function CountryDetailPage({ params }: PageProps) {
   if (!detail) notFound();
 
   const scoredCount = detail.programs.filter((p) => p.composite !== null).length;
+  const datasetJsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    name: `${detail.header.name} talent mobility programmes (GTMI)`,
+    description: `${detail.programs.length} talent-mobility programmes evaluated for ${detail.header.name} under the Global Talent Mobility Index methodology.`,
+    url: absoluteUrl(`/countries/${detail.header.iso}`),
+    license: `${SITE_URL}/about`,
+    creator: { '@type': 'Organization', name: 'TTR Group', url: SITE_URL },
+    keywords: ['GTMI', detail.header.name, detail.header.region, 'talent mobility'],
+    isAccessibleForFree: true,
+    sourceOrganization: { '@type': 'Organization', name: 'TTR Group' },
+    spatialCoverage: detail.header.name,
+  };
 
   return (
     <>
+      <JsonLd data={datasetJsonLd} />
       <header className="mx-auto max-w-page px-6 pt-12">
         <p className="text-data-sm uppercase tracking-widest text-muted-foreground">
           <Link href="/programs" className="hover:text-foreground">
