@@ -19,8 +19,13 @@ export async function loadContent(relativePath: string): Promise<string> {
   const fullPath = path.join(process.cwd(), 'content', safe);
   try {
     const raw = await fs.readFile(fullPath, 'utf8');
-    if (!raw.trim()) return '';
-    const file = await remark().use(remarkHtml).process(raw);
+    // Strip HTML comments before checking for emptiness — TODO-only stub files
+    // (used for the AUS/SGP narratives in Phase 4.3) should resolve to "" so
+    // consumers render the "Summary forthcoming" placeholder rather than an
+    // invisible HTML-comment-only block.
+    const stripped = raw.replace(/<!--[\s\S]*?-->/g, '').trim();
+    if (!stripped) return '';
+    const file = await remark().use(remarkHtml).process(stripped);
     return String(file);
   } catch (error) {
     if (

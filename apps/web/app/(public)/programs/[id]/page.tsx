@@ -67,8 +67,13 @@ export default async function ProgramDetailPage({ params }: PageProps) {
   const detail = await getProgramDetail(id);
   if (!detail) notFound();
 
+  // Count any field value that has a non-empty raw extraction. Phase 2
+  // retrospective coverage was reported as 30/48 (AUS) and 34/48 (SGP) on
+  // the all-extracted basis, not the approved-only basis. Approved-only
+  // coverage is a separate metric — surfaced via the Pre-calibration chip
+  // and the per-indicator status pill.
   const populated = detail.fieldValues.filter(
-    (fv) => fv.valueRaw !== null && fv.valueRaw !== '' && fv.status === 'approved'
+    (fv) => fv.valueRaw !== null && fv.valueRaw !== ''
   ).length;
 
   const indicatorCounts = indicatorCountsByPillar(detail.fieldValues);
