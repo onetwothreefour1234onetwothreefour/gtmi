@@ -173,13 +173,22 @@ Missing indicator data is not imputed. An absent indicator is excluded from its 
   | SGP S Pass | 34/48 (70.8%) | 6 | 28 | 18.11 | 24.14 | 19.92 |
 - **Empty-field root-cause classifier**: `scripts/diag-empty-fields.ts` partitions empty fields into TRUNCATION / LLM_MISS / ABSENT. Post-Phase-2 distribution: TRUNCATION = 0 (windowing fix), LLM_MISS ≈ 6 (six prompts retuned with recall hints), ABSENT ≈ 15 (data not on discovered Tier-1 sources — largest sub-clusters are tax fields, family detail behind JS-gated pages, and policy-stability fields awaiting Tier-3 news/V-Dem integration in Phase 5).
 - **Provenance verifier**: `scripts/verify-provenance.ts` checks every `field_values` row carries the 13 always-required + 3 approved-only ProvenanceRecord keys per ADR-007; CI-friendly exit codes.
-- **Web review UI** (`apps/web/app/review`): pending and recently-reviewed tabs grouped by country/program; detail page shows source sentence, extraction confidence, and validation confidence; approve flow re-normalises on edit; reject flow patched to read row id from FormData. Auth via Supabase magic link; route protection in `middleware.ts`. Deployed to Cloud Run via `Dockerfile` + `cloudbuild.yaml` + `deploy.cmd` with `NEXT_PUBLIC_APP_URL` carrying the canonical origin so callbacks resolve correctly.
+- **Web review UI** (`apps/web/app/(internal)/review`): pending and recently-reviewed tabs grouped by country/program; detail page shows source sentence, extraction confidence, and validation confidence; approve flow re-normalises on edit; reject flow patched to read row id from FormData. Auth via Supabase magic link; route protection in `middleware.ts` (matcher pinned to `/review`). Deployed to Cloud Run via `Dockerfile` + `cloudbuild.yaml` + `deploy.cmd` with `NEXT_PUBLIC_APP_URL` carrying the canonical origin so callbacks resolve correctly.
+- **Public dashboard** (`apps/web/app/(public)`): Phase 4.1–4.4 surfaces co-deployed in the same Cloud Run image as the review UI. Routes:
+  - `/` — landing with the Ranked Index Table, advisor mode, FTS search, preview-release banner.
+  - `/programs` — paginated programmes index reusing the same explorer (50 per page).
+  - `/programs/[id]` — program detail with `<CompositeScoreDisplay>`, `<PillarComparison>` (radar + breakdown table + compare-to dropdown), `<SubFactorAccordion>` drilling into all 15 sub-factors with `<ProvenanceTrigger>` on every indicator, `<PolicyTimeline>` empty state, and a "What this means" panel reading from `programs.long_summary_md` (ADR-010) or `apps/web/content/programs/<countryIso>-<slug>.md` stubs.
+  - `/methodology` — auto-rendered from `methodology_versions` + `field_definitions`; 48 indicators / 5 pillars / 15 sub-factors / version live; per-pillar rationale from `apps/web/content/pillars/{A..E}.md`.
+  - `/countries/[iso]` — country header (region, IMD rank, IMD Appeal score), per-country mini rankings table, Phase 5 stability empty-state, tax-treatment summary aggregating D.3.2 + D.3.3 across the country's programmes.
+  - `/changes` — disabled-filter UI + Phase 5 empty-state. `getPolicyChanges` runs a real RLS-gated SELECT (returns `[]` today; lights up automatically when Phase 5 populates `policy_changes`).
+  - `/about` — TTR Group attribution, data sources, citation guidance.
+  - `/preview-gallery` — internal robots-disallowed primitives gallery.
 
 ### Stubbed or not yet implemented
 
 - **Calibration of normalization params**: `compute-normalization-params.ts` returned only 4 numeric fields with approved observations across the AUS+SGP cohort and 3 had n=1 — too thin to swap in. Calibration runs as the first scoring step in Phase 3 once ≥5 programs are scored, after which `phase2Placeholder` clears.
 - **URL drift monitoring**: 4 of the discovered Tier-1 URLs (2 AUS, 2 SGP) returned 0-char soft-404s during the Phase 2 close-out runs. A monthly HEAD-check job is scheduled into Phase 5 living-index work or sooner if Phase 3 fans out first.
 - **Wayback Machine archival**: deferred to Phase 5 per [ADR-008](decisions/008-defer-wayback-archival-to-phase-5.md). The Phase 2 line-item is marked moved (🚚) in `IMPLEMENTATION_PLAN.md`.
-- **Public dashboard**: Phase 4. The `/review` queue is the only authenticated surface live today; no public-facing rankings UI yet.
+- **Public dashboard polish**: Phase 4.5 (OG image generation via `@vercel/og` on Cloud Run, JSON-LD `Dataset` structured data, accessibility audit, Lighthouse 95+ pass, cross-browser smoke). Phase 4.1–4.4 surfaces are live; the polish pass is the only outstanding Phase 4 work.
 - **Sensitivity analyses**: Phase 3 deliverable; runner not yet implemented.
 - **News signal ingestion (Tier 3) and policy-change diff detection**: Phase 5.

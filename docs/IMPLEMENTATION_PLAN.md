@@ -232,14 +232,17 @@ All open items required to declare Phase 2 complete have shipped. Below is the h
 
 #### Phase 2 retrospective
 
-**Final canary outcomes (deterministic, both `phase2Placeholder: true`):**
+**Final canary outcomes (deterministic, all `phase2Placeholder: true`):**
 
-| Program                         | Coverage (extraction) | Auto-approved | Queued | PAQ   | CME   | Composite |
-| ------------------------------- | --------------------- | ------------- | ------ | ----- | ----- | --------- |
-| AUS Skills in Demand 482 — Core | 30/48 (62.5%)         | 6             | 24     | 13.72 | 22.53 | 16.36     |
-| SGP S Pass                      | 34/48 (70.8%)         | 6             | 28     | 18.11 | 24.14 | 19.92     |
+| Program                                       | Coverage (extraction) | Auto-approved | Queued | PAQ   | CME   | Composite |
+| --------------------------------------------- | --------------------- | ------------- | ------ | ----- | ----- | --------- |
+| AUS Skills in Demand 482 – Core Skills Stream | 30/48 (62.5%)         | 6             | 24     | 13.72 | 22.53 | 16.36     |
+| SGP S Pass                                    | 34/48 (70.8%)         | 6             | 28     | 18.11 | 24.14 | 19.92     |
+| CAN Express Entry – Federal Skilled Worker¹   | 23/48 (47.9%)         | 3             | 20     | 11.36 | 34.49 | 18.30     |
 
-Both flagged `insufficient_disclosure` because pillars C and D have no auto-approved fields without manual /review action — expected at this cohort size. Scoring ingests only `status='approved'`, so coverage of 6/48 in the score reflects the auto-approval threshold (extraction + validation confidence ≥ 0.85 on both), not pipeline failure.
+¹ **CAN added after Phase 2 close-out.** The original Phase 2 close-out (Sessions 9–10) shipped with AUS + SGP only. CAN Express Entry was scored during Session 11 against the same Phase 2 pipeline and the same engineer-chosen normalisation params — added to the cohort here because the program-detail page (Phase 4.3) and the country-detail page (Phase 4.4) both render it. Its lower coverage (47.9%) reflects a smaller canary run, not pipeline regression. Calibration in Phase 3 will replace the placeholder normalisation across all three.
+
+All three flagged `insufficient_disclosure` because pillars C and D have no auto-approved fields without manual /review action — expected at this cohort size. Scoring ingests only `status='approved'`, so coverage of 6/48 (or 3/48 for CAN) in the score reflects the auto-approval threshold (extraction + validation confidence ≥ 0.85 on both), not pipeline failure.
 
 **Empty-field distribution on the post-polish AUS run** (per `diag-empty-fields.ts`):
 
@@ -347,12 +350,18 @@ Both flagged `insufficient_disclosure` because pillars C and D have no auto-appr
   - `/programs/b72e8153-…` (SGP, placeholder) → 200, same composition; cohort dropdown surfaces AUS + CAN.
   - `/programs/011dd295-…` (UAE Golden Visa, unscored) → 200, EmptyState + sources list + Summary forthcoming placeholder.
 
-### Phase 4.4 — Methodology + country + changes + about — ⬜
+### Phase 4.4 — Methodology + country + changes + about — ✅ COMPLETE (Session 13)
 
-- ⬜ `/methodology` auto-rendered from `methodology_versions` + `field_definitions`.
-- ⬜ `/countries/[iso]` country detail.
-- ⬜ `/changes` empty-state surface (Phase 5 lights up).
-- ⬜ `/about`.
+- ✅ `/methodology` auto-rendered from `methodology_versions` + `field_definitions`. Eight numbered sections in the dispatch order: What GTMI measures, Composite structure (with the live `<MethodologyBar>`), The 5 pillars (per-pillar rationale + per-sub-factor weight + per-indicator row), Normalization, Data integrity, Sensitivity analyses, What GTMI does not measure, Versions. Live verification: 48 indicators / 5 pillars / 15 sub-factors / version v1.0.0 all render against the staging DB.
+- ✅ `/countries/[iso]` country detail with header (region, IMD rank, IMD Appeal score with Phase 3 chip when null), per-country mini rankings table reusing the score-bar / coverage-chip / pillar-mini-bars / pre-calibration-chip primitives, Phase 5 stability empty-state, tax-treatment summary aggregating D.3.2 + D.3.3 across the country's programmes (with "Data not yet collected" placeholder), MAX(extracted_at) "Last verified" footer. Live verification: AUS / SGP / CAN render fully; OMN (unscored) renders the unscored state.
+- ✅ `/changes` page with disabled filter UI (severity / country / pillar / date range) and `<EmptyState>` Phase 5 copy. `getPolicyChanges` runs a real RLS-gated SELECT against `policy_changes` (returns `[]` today; Phase 5 lights up automatically).
+- ✅ `/about` page rendering `apps/web/content/about.md` via remark.
+- ✅ Vitest tests this phase (+27 new):
+  - `lib/queries/methodology-current.test.ts` (9) — pillar grouping, sub-factor sort, weight attachment, 48-indicator round-trip.
+  - `lib/queries/country-detail.test.ts` (9) — tax-treatment aggregation, approved-only filter, whitespace trimming, total preservation.
+  - `lib/queries/policy-changes.test.ts` (9) — WHERE clause shape, parameterisation, SQL-injection guard, empty-array filter drop.
+- ✅ Markdown stubs shipped (analyst will edit before public launch): `methodology/{intro,normalization,data-integrity,sensitivity,whatGTMIMeasuresNot}.md`, `pillars/{A,B,C,D,E}.md`, `changes-empty.md`, `about.md`.
+- ✅ No new dependencies. Phase 4.4 ships purely on the existing remark + Drizzle + postgres-js stack.
 
 ### Phase 4.5 — Polish — ⬜
 
