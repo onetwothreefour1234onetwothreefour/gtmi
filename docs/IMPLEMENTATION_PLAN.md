@@ -1,6 +1,6 @@
 # GTMI Implementation Plan
 
-> **Last updated:** Session 10 — 27 Apr 2026. **Phase 2 closed.** Session 9 close-out shipped: field-aware content windowing (utils/window.ts), Wave 2 enabled (ACTIVE_FIELD_CODES drives all consumers), HumanReviewStage provenance shape fixed, /review reject flow patched, ADR-008 (Wayback deferral to Phase 5). Session 10 polish: stale Tier-1 URLs refreshed, ATO sources added for AUS tax fields, 6 LLM_MISS prompts tuned. Both AUS and SGP canaries scored deterministically with `phase2Placeholder: true`. Phase 3 begins with calibrated baseline + 2 scored programs.
+> **Last updated:** Session 10 — 27 Apr 2026 (plan restructured 27 Apr 2026). **Phase 2 closed.** Session 9 close-out shipped: field-aware content windowing (utils/window.ts), Wave 2 enabled (ACTIVE_FIELD_CODES drives all consumers), HumanReviewStage provenance shape fixed, /review reject flow patched, ADR-008 (Wayback deferral to Phase 6). Session 10 polish: stale Tier-1 URLs refreshed, ATO sources added for AUS tax fields, 6 LLM_MISS prompts tuned. Both AUS and SGP canaries scored deterministically with `phase2Placeholder: true`. **Plan restructured:** Coverage maximization pulled forward as Phase 3 (before the 5-country pilot); 5-country pilot moves to Phase 5; Living Index becomes Phase 6; Scale and Enrichment becomes Phase 7.
 > This document tracks the full build sequence for the Global Talent Mobility Index, combining the phase roadmap with methodology deliverables. Status is updated as work completes.
 
 ---
@@ -121,7 +121,7 @@
 - ✅ Handle scrape failures loudly — Tier 1 throws, Tier 2/3 logs and returns empty result
 - ✅ Scrape cache (`scrape_cache` table, 24h TTL, dedup by URL hash) — implemented in `packages/extraction/src/stages/scrape.ts`
 - ✅ Scrape guards (`scrape-guards.ts`) — reject empty/HTML-error/anti-bot responses before they enter extraction
-- 🚚 **Wayback Machine archival → moved to Phase 5** (co-located with re-scrape diff detection; archival of every canary scrape would pollute history)
+- 🚚 **Wayback Machine archival → moved to Phase 6** (co-located with re-scrape diff detection; archival of every canary scrape would pollute history)
 
 ### Stage 2 — Extract
 
@@ -228,7 +228,7 @@ All open items required to declare Phase 2 complete have shipped. Below is the h
 - ✅ **CO-4: SGP canary + verifier** — S Pass canary: 34 of 48 fields populated (71%, vs AUS 62.5%); SGP government pages are denser/more direct. Verifier passed on all rows produced by the run; 2 orphan rows from a pre-fix run remain (deliberately left in place pending separate cleanup, mirroring the AUS C.2.3 orphan decision).
 - ✅ **CO-5: Calibration attempt + scoring** — `compute-normalization-params.ts --programs AUS,SGP` returned only 4 numeric fields with any approved observations; 3 had n=1 (degenerate min=max). Cohort too thin to swap in — calibration deferred to Phase 3 once ≥5 programs are scored. AUS and SGP both scored with existing engineer-chosen ranges, both tagged `phase2Placeholder: true` so downstream consumers cannot publish. Deterministic across re-runs (idempotent via `onConflictDoUpdate(programId, methodologyVersionId)`).
 - ✅ **CO-6: Reject flow patched** — `apps/web/app/review/[id]/page.tsx` form actions now read `id` from a hidden FormData input rather than relying on closure binding (Next.js inline-action closures have been finicky across minor versions). Both approve and reject wrap their transactions in try/catch with `console.error` so silent failures surface in Cloud Run logs. Reject reports row-update counts via `.returning()` to make no-op updates obvious.
-- ✅ **CO-7: Phase 2 closeout doc + ADR-008** — this header bump; ADR-008 Wayback deferral committed at `docs/decisions/008-defer-wayback-archival-to-phase-5.md`. Tag `phase-2-complete` to be applied with this commit.
+- ✅ **CO-7: Phase 2 closeout doc + ADR-008** — this header bump; ADR-008 Wayback deferral committed at `docs/decisions/008-defer-wayback-archival-to-phase-5.md` (deferred to Phase 6 in restructured plan). Tag `phase-2-complete` to be applied with this commit.
 
 #### Phase 2 retrospective
 
@@ -266,39 +266,72 @@ All three flagged `insufficient_disclosure` because pillars C and D have no auto
 
 ---
 
-## Phase 3 — 5-Country Pilot
+## Phase 3 — Coverage Maximization
 
-**Goal:** Full extraction across all 5 pilot countries (~25 programs). First composite scores. All sensitivity analyses run.
+**Goal:** Push extraction coverage from the current 30–34/48 baseline (AUS, SGP, CAN canaries) toward the 42–44/48 realistic ceiling before running the full 5-country pilot. Every improvement shipped here is reused across all subsequent country runs.
 
-### Extraction
+### Coverage strategy
 
-- ⬜ Full extraction across Australia, Hong Kong, UK, Canada, Singapore
-- ⬜ All ~25 programs extracted end-to-end through all 7 pipeline stages
-- ⬜ Target: ≥90% field coverage across the pilot
-- ⬜ Fields under 70% coverage flagged for extraction prompt review
+The realistic per-programme ceiling is **42–44/48**, not 48/48. The remaining 4–6 indicators are either methodology gaps (the indicator we defined doesn't correspond to data anyone publishes) or country-specific transparency gaps (e.g. Bahrain, Saudi Arabia, UAE don't publish admission statistics in any structured form; E.2.1 is permanently null for those countries). The credibility play is "publish only what we can defensibly source, surface what's missing per programme" — not 100% coverage with fudged values. The `insufficient_disclosure` flag (programs <70% coverage on any pillar are excluded from public ranking) is the safety net.
 
-### Scoring
+Phase 3 ranks the five work-streams below by leverage. Sub-phases are intended to ship in order; each is independently useful even if a later one slips.
 
-- ⬜ CME scores loaded from IMD for all 30 countries
-- ⬜ CME re-normalized to 0–100 within our 30-country cohort (min-max within cohort)
-- ⬜ First full composite scoring run (30% CME + 70% PAQ)
-- ⬜ Composite scores published internally
+### Phase 3.1 — V-Dem direct-API (~1 day engineering)
 
-### Sensitivity analyses (all 6)
+**Unlocks**: E.3.1 (Rule of law) cohort-wide, deterministic confidence 1.0. Mirrors the World Bank API direct-fetch already shipped for E.3.2 in Phase 2.
 
-- ⬜ **Weight sensitivity (Monte Carlo):** 1,000 Dirichlet-sampled weight vectors, ±20% perturbation. Median rank, 5th–95th percentile band, Spearman ρ per program.
-- ⬜ **Normalization sensitivity:** pure min-max, pure z-score, distance-to-frontier alternatives. Spearman ρ vs baseline.
-- ⬜ **Aggregation sensitivity:** geometric mean at pillar level vs baseline.
-- ⬜ **CME/PAQ split sensitivity:** 20/80, 25/75, 35/65, 40/60, 50/50. Top-10 shift documented.
-- ⬜ **Indicator dropout test:** drop one indicator at a time. Flag if any program moves >5 ranks.
-- ⬜ **Correlation and redundancy:** Pearson matrix across all indicators. ρ > 0.8 within sub-factor triggers review.
-- ⬜ All results stored in `sensitivity_runs` table
+- ⬜ V-Dem fetcher in `scripts/country-sources.ts`: `fetchVdemRuleOfLawScore(iso3)` calling V-Dem's API
+- ⬜ Wired into canary Phase 1 alongside `fetchWgiScore`
+- ⬜ E.3.1 published with `extractionModel: 'v-dem-api-direct'`, auto-approved at confidence 1.0
+- ⬜ ISO3 mapping table extended for any V-Dem-vs-ISO3166 discrepancies (e.g. Hong Kong, Taiwan)
 
-### Methodology page
+### Phase 3.2 — Cross-departmental discovery audit
 
-- ⬜ Draft public methodology page auto-rendered from database
-- ⬜ Pillar weights, sub-factor weights, indicator weights all displayed
-- ⬜ Normalization choices documented per indicator
+**Unlocks**: D.3.x tax fields (cohort-wide), E.2.x transparency fields (cohort-wide). Today Stage 0 (Perplexity) gets pulled toward the immigration authority page; the methodology actually requires sources from multiple government departments per programme.
+
+- ⬜ Per-country "expected source departments" registry: immigration authority, tax authority, statistics bureau, gazette/parliamentary record, regional/state where federal devolves authority
+- ⬜ Discovery prompt rewritten to enumerate the cross-departmental set explicitly, not just rank URLs
+- ⬜ Validation step in `discover.ts`: if no URL from an expected department appears, re-prompt with the missing-department hint
+- ⬜ Country-source registry expansion (`scripts/country-sources.ts`) — analogous to the AUS-ATO addition in Phase 2 close-out, but systematic across the cohort: tax authority + statistics bureau per country
+- ⬜ Re-canary AUS, SGP, CAN with the expanded registry; expect coverage to land at 35–38/48 per programme
+
+### Phase 3.3 — Cohort-wide prompt sweep
+
+**Unlocks**: ~2–4 LLM_MISS fields per programme (keywords present in scraped content, model returned empty). Six prompts got recall hints in Session 10 polish; the remaining 42 haven't had a serious revision pass since Phase 1.
+
+- ⬜ Run `scripts/diag-empty-fields.ts` after each Phase 3.2 re-canary; bin empty fields into TRUNCATION / LLM_MISS / ABSENT
+- ⬜ For each LLM_MISS field, examine scraped content + current prompt + model response → identify the recall failure pattern
+- ⬜ Update prompt in `packages/db/src/seed/methodology-v1.ts`, sync to DB via `scripts/sync-prompts-from-seed.ts`, re-canary the affected programmes
+- ⬜ Iterate until LLM_MISS converges to 0 across the cohort
+- ⬜ Document recurring failure patterns as a prompt-engineering reference for future indicator additions
+
+### Phase 3.4 — Tier 2 backfill methodology revision (ADR-013)
+
+**Unlocks**: ~2–3 fields per programme where Tier 1 truly has nothing but Tier 2 sources (Fragomen, KPMG, etc.) cover the gap. Today the methodology forbids Tier 2 from populating fields directly; this is the editorial-design conversation about whether to relax that rule.
+
+- ⬜ Draft ADR-013: scope of Tier 2 backfill — which indicators (probably outside the scoring core; C.2.x family rights nuances, B.3.3 appeal-process clarity, et al.), how it surfaces in provenance (`sourceTier: 2` flag visible to readers)
+- ⬜ Methodology working session — Szabi + Ayush — review which indicators are genuinely Tier-1-only versus which can defensibly accept Tier 2
+- ⬜ Methodology v3 release with the per-indicator Tier 2 allowlist
+- ⬜ Extraction stage: enable Tier 2 fallback for the allowlisted indicators (the multi-URL extraction code already supports it; just an indicator-level config change)
+
+### Phase 3.5 — Methodology v2 indicator review (ADR-014)
+
+**Unlocks**: 2–4 indicators that don't correspond to publishable data anywhere. Three response options per indicator: drop and re-normalize sub-factor weights; restructure as boolean ("does this country publish at all?"); or country-level cohort substitution (similar to E.1.1's Stability Edge Case).
+
+- ⬜ Audit every indicator that returns `not_addressed` or `not_found` on >50% of the cohort post-3.2 + 3.3
+- ⬜ For each, decide: keep, drop, restructure, or country-substitute
+- ⬜ ADR-014 captures the per-indicator decision with rationale
+- ⬜ Methodology v2.0.0 published; weights re-normalized; `methodology_versions` row added; existing scores keep their v1 stamp (no retroactive recomputation per dispatch §14)
+- ⬜ Re-canary the cohort under v2 to produce v2-tagged scores for direct comparison
+
+### Phase 3 close-out target
+
+After 3.1–3.5, expected per-programme coverage **42–44/48** (43 average). Gate for Phase 5 (5-country pilot): every canary programme (AUS, SGP, CAN) must reach ≥42/48 before Phase 5 begins. Phase 5 then extends this improved pipeline to GBR and HKG. Programmes still flagged `insufficient_disclosure` are by-design exclusions, not pipeline failures.
+
+### Operational artefacts shipped during Phase 3 (running list)
+
+- `scripts/check-source-departments.ts` — diagnostic that lists expected vs discovered source departments per country.
+- `scripts/audit-empty-fields-rollup.ts` — extends `diag-empty-fields.ts` to roll up TRUNCATION/LLM_MISS/ABSENT counts across the cohort.
 
 ---
 
@@ -378,19 +411,48 @@ All three flagged `insufficient_disclosure` because pillars C and D have no auto
 
 ---
 
-## Phase 5 — Living Index + Coverage Push
+## Phase 5 — 5-Country Pilot
 
-**Goal:** Push every scored programme as close to 48/48 indicator coverage as the underlying data allows, while making the per-indicator gap auditable when full coverage isn't achievable. Expanded from the original "policy monitoring only" scope to address the Phase 2 retrospective finding that AUS+SGP+CAN converge at 30–34/48 today (driven by source-discovery gaps, not pipeline failure).
+**Goal:** Full extraction across all 5 pilot countries (~25 programs) using the improved pipeline from Phase 3. First composite scores with calibrated normalization params. All sensitivity analyses run.
 
-### Coverage strategy (the framing for every Phase 5 sub-phase)
+**Pre-condition:** Phase 3 close-out — every canary programme (AUS, SGP, CAN) at ≥42/48 indicator coverage before Phase 5 begins.
 
-The realistic per-programme ceiling is **42–44/48**, not 48/48. The remaining 4–6 indicators are either methodology gaps (the indicator we defined doesn't correspond to data anyone publishes) or country-specific transparency gaps (e.g. Bahrain, Saudi Arabia, UAE don't publish admission statistics in any structured form; E.2.1 is permanently null for those countries). The credibility play is "publish only what we can defensibly source, surface what's missing per programme" — not 100% coverage with fudged values. The `insufficient_disclosure` flag (programs <70% coverage on any pillar are excluded from public ranking) is the safety net.
+### Extraction
 
-Phase 5 ranks the six work-streams below by leverage. Sub-phases are intended to ship in order; each is independently useful even if a later one slips.
+- ⬜ Full extraction across Australia, Hong Kong, UK, Canada, Singapore
+- ⬜ All ~25 programs extracted end-to-end through all 7 pipeline stages
+- ⬜ Target: ≥42/48 field coverage per program (Phase 3 pipeline carries this)
+- ⬜ Fields below 70% coverage on any pillar flagged for review
 
-### Phase 5.1 — Living-index policy monitoring (highest leverage)
+### Scoring
 
-**Unlocks**: E.1.1 (material policy changes in last 5 years), E.1.2 (forward-announced pipeline changes), E.1.3 (programme age — already extractable, but stays fresh via re-scrape). ~3 fields × every programme in the cohort.
+- ⬜ CME scores loaded from IMD for all 30 countries
+- ⬜ CME re-normalized to 0–100 within our 30-country cohort (min-max within cohort)
+- ⬜ Calibration: run `compute-normalization-params.ts` — viable now with ≥5 programs scored; replace engineer-chosen ranges in `run-paq-score.ts`; `phase2Placeholder` flag cleared
+- ⬜ First full composite scoring run (30% CME + 70% PAQ)
+- ⬜ Composite scores published internally
+
+### Sensitivity analyses (all 6)
+
+- ⬜ **Weight sensitivity (Monte Carlo):** 1,000 Dirichlet-sampled weight vectors, ±20% perturbation. Median rank, 5th–95th percentile band, Spearman ρ per program.
+- ⬜ **Normalization sensitivity:** pure min-max, pure z-score, distance-to-frontier alternatives. Spearman ρ vs baseline.
+- ⬜ **Aggregation sensitivity:** geometric mean at pillar level vs baseline.
+- ⬜ **CME/PAQ split sensitivity:** 20/80, 25/75, 35/65, 40/60, 50/50. Top-10 shift documented.
+- ⬜ **Indicator dropout test:** drop one indicator at a time. Flag if any program moves >5 ranks.
+- ⬜ **Correlation and redundancy:** Pearson matrix across all indicators. ρ > 0.8 within sub-factor triggers review.
+- ⬜ All results stored in `sensitivity_runs` table
+
+### Methodology page
+
+- ⬜ Draft public methodology page auto-rendered from database
+- ⬜ Pillar weights, sub-factor weights, indicator weights all displayed
+- ⬜ Normalization choices documented per indicator
+
+---
+
+## Phase 6 — Living Index
+
+**Goal:** Policy monitoring infrastructure — weekly re-scrapes, change detection, and news signal ingestion. Activates the `/changes` timeline and policy alerts already wired in Phase 4.
 
 - ⬜ Weekly re-scrape of all Tier 1 sources via Trigger.dev scheduled jobs
 - ⬜ Content hash comparison against `scrape_history`
@@ -404,68 +466,13 @@ Phase 5 ranks the six work-streams below by leverage. Sub-phases are intended to
 - ⬜ Dashboard policy change timeline activates with zero code change (already wired in Phase 4.3)
 - ⬜ Tier 3 news-signal ingestion via Exa semantic search (IMI Daily, Henley newsroom, Expatica, Nomad Gate); `news_signals` table populated; signals flow into review queue
 - ⬜ Email alerts via Resend on material/breaking changes; summary text generated by Claude with human review before sending
+- ⬜ URL drift monitoring: monthly HEAD-check job surfacing Tier 1 URL soft-404s before they cost a canary run
 
-### Phase 5.2 — V-Dem direct-API integration (deterministic, ~1 day eng)
-
-**Unlocks**: E.3.1 (Rule of law) cohort-wide, deterministic confidence 1.0. Mirrors the World Bank API direct-fetch already shipped for E.3.2 in Phase 2.
-
-- ⬜ V-Dem fetcher in `scripts/country-sources.ts`: `fetchVdemRuleOfLawScore(iso3)` calling V-Dem's API
-- ⬜ Wired into canary Phase 1 alongside `fetchWgiScore`
-- ⬜ E.3.1 published with `extractionModel: 'v-dem-api-direct'`, auto-approved at confidence 1.0
-- ⬜ ISO3 mapping table extended for any V-Dem-vs-ISO3166 discrepancies (e.g. Hong Kong, Taiwan)
-
-### Phase 5.3 — Cross-departmental discovery audit
-
-**Unlocks**: D.3.x tax fields (cohort-wide), E.2.x transparency fields (cohort-wide). Today Stage 0 (Perplexity) gets pulled toward the immigration authority page; the methodology actually requires sources from multiple government departments per programme.
-
-- ⬜ Per-country "expected source departments" registry: immigration authority, tax authority, statistics bureau, gazette/parliamentary record, regional/state where federal devolves authority
-- ⬜ Discovery prompt rewritten to enumerate the cross-departmental set explicitly, not just rank URLs
-- ⬜ Validation step in `discover.ts`: if no URL from an expected department appears, re-prompt with the missing-department hint
-- ⬜ Country-source registry expansion (`scripts/country-sources.ts`) — analogous to the AUS-ATO addition in Phase 2 close-out, but systematic across the cohort: tax authority + statistics bureau per country
-- ⬜ Re-canary all five pilot countries (AUS, SGP, CAN, GBR, HKG) with the expanded registry; expect coverage to land at 35–38/48 per programme
-
-### Phase 5.4 — Cohort-wide prompt sweep
-
-**Unlocks**: ~2–4 LLM_MISS fields per programme (keywords present in scraped content, model returned empty). Six prompts got recall hints in Session 10 polish; the remaining 42 haven't had a serious revision pass since Phase 1.
-
-- ⬜ Run `scripts/diag-empty-fields.ts` after each Phase 5.3 re-canary; bin empty fields into TRUNCATION / LLM_MISS / ABSENT
-- ⬜ For each LLM_MISS field, examine scraped content + current prompt + model response → identify the recall failure pattern
-- ⬜ Update prompt in `packages/db/src/seed/methodology-v1.ts`, sync to DB via `scripts/sync-prompts-from-seed.ts`, re-canary the affected programmes
-- ⬜ Iterate until LLM_MISS converges to 0 across the cohort
-- ⬜ Document recurring failure patterns as a prompt-engineering reference for future indicator additions
-
-### Phase 5.5 — Tier 2 backfill methodology revision (ADR-013)
-
-**Unlocks**: ~2–3 fields per programme where Tier 1 truly has nothing but Tier 2 sources (Fragomen, KPMG, etc.) cover the gap. Today the methodology forbids Tier 2 from populating fields directly; this is the editorial-design conversation about whether to relax that rule.
-
-- ⬜ Draft ADR-013: scope of Tier 2 backfill — which indicators (probably outside the scoring core; C.2.x family rights nuances, B.3.3 appeal-process clarity, et al.), how it surfaces in provenance (`sourceTier: 2` flag visible to readers)
-- ⬜ Methodology working session — Szabi + Ayush — review which indicators are genuinely Tier-1-only versus which can defensibly accept Tier 2
-- ⬜ Methodology v3 release with the per-indicator Tier 2 allowlist
-- ⬜ Extraction stage: enable Tier 2 fallback for the allowlisted indicators (the multi-URL extraction code already supports it; just an indicator-level config change)
-
-### Phase 5.6 — Methodology v2 indicator review (ADR-014)
-
-**Unlocks**: 2–4 indicators that don't correspond to publishable data anywhere. Three response options per indicator: drop and re-normalize sub-factor weights; restructure as boolean ("does this country publish at all?"); or country-level cohort substitution (similar to E.1.1's Stability Edge Case).
-
-- ⬜ Audit every indicator that returns `not_addressed` or `not_found` on >50% of the cohort post-5.3 + 5.4
-- ⬜ For each, decide: keep, drop, restructure, or country-substitute
-- ⬜ ADR-014 captures the per-indicator decision with rationale
-- ⬜ Methodology v2.0.0 published; weights re-normalized; `methodology_versions` row added; existing scores keep their v1 stamp (no retroactive recomputation per dispatch §14)
-- ⬜ Re-canary the cohort under v2 to produce v2-tagged scores for direct comparison
-
-### Phase 5 close-out target
-
-After 5.1–5.6, expected per-programme coverage **42–44/48** (43 average). Programmes still flagged `insufficient_disclosure` are by-design exclusions, not pipeline failures. The public dashboard's per-indicator "Not on government source" placeholder + the Pre-calibration / Phase-3 chips already make the gap visible to readers — the editorial credibility play.
-
-### Operational artefacts shipped during Phase 5 (running list)
-
-- `scripts/check-source-departments.ts` — diagnostic that lists expected vs discovered source departments per country.
-- `scripts/audit-empty-fields-rollup.ts` — extends `diag-empty-fields.ts` to roll up TRUNCATION/LLM_MISS/ABSENT counts across the cohort.
-- Trigger.dev jobs: `weekly-rescrape`, `diff-and-classify`, `news-signal-ingest`.
+Trigger.dev jobs: `weekly-rescrape`, `diff-and-classify`, `news-signal-ingest`.
 
 ---
 
-## Phase 6 — Scale and Enrichment
+## Phase 7 — Scale and Enrichment
 
 **Goal:** Full 85-program universe. External indices integrated. Methodology whitepaper published.
 
@@ -477,9 +484,9 @@ After 5.1–5.6, expected per-programme coverage **42–44/48** (43 average). Pr
 ### External index integration
 
 - ✅ World Bank Worldwide Governance Indicators (WGI) — Pillar E.3.2 — **shipped in Phase 2** via `fetchWgiScore` in canary Phase 1
-- 🚚 V-Dem Institute — Pillar E.3.1 — **moved to Phase 5.2** (deterministic, ~1 day eng; ships before the broader Phase 6 enrichment so E.3 closes earlier)
+- 🚚 V-Dem Institute — Pillar E.3.1 — **moved to Phase 3.1** (deterministic, ~1 day eng; ships before the broader Phase 7 enrichment so E.3 closes earlier)
 - ⬜ Annual IMD Appeal refresh job (CME update) — runs once per year following IMD's release
-- ⬜ OECD tax treaty database (Pillar D.3 supplementary; supplements the per-country tax-authority discovery shipped in Phase 5.3)
+- ⬜ OECD tax treaty database (Pillar D.3 supplementary; supplements the per-country tax-authority discovery shipped in Phase 3.2)
 - ⬜ QS World University Rankings (program narrative only, not scoring)
 
 ### Publications
@@ -513,4 +520,4 @@ Session 7 changes (Stage 0 five-category source mix expansion, publish.ts normal
 
 Session 8 changes (Perplexity API for Stage 0, Python/Playwright scraper replacing Firecrawl, E.3.2 World Bank API direct, canary cross-check bypass, extract/validate resilience improvements) are tooling, operational, and bug-fix decisions. No ADRs raised.
 
-Session 9 changes (currency preservation in provenance JSONB, batch extraction + tier-2 fallback, scrape/extraction caches, Phase 2 PAQ scoring, /review web app with Supabase auth, Cloud Run deployment with NEXT_PUBLIC_APP_URL canonical-origin fix) are operational. ADR-008 to be raised on Phase 2 closeout for Wayback deferral to Phase 5.
+Session 9 changes (currency preservation in provenance JSONB, batch extraction + tier-2 fallback, scrape/extraction caches, Phase 2 PAQ scoring, /review web app with Supabase auth, Cloud Run deployment with NEXT_PUBLIC_APP_URL canonical-origin fix) are operational. ADR-008 to be raised on Phase 2 closeout for Wayback deferral to Phase 6.

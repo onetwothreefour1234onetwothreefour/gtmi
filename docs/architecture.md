@@ -2,7 +2,7 @@
 
 > This document reflects what is implemented on `main` as of Session 10 — **Phase 2 closed (tag `phase-2-complete`, 2026-04-27)**. AUS and SGP canaries scored deterministically, both flagged `phase2Placeholder: true`. Review UI deployed to Cloud Run behind Supabase magic-link auth. For the full product specification see [docs/BRIEF.md](BRIEF.md). For the scoring methodology see [docs/METHODOLOGY.md](METHODOLOGY.md).
 
-> **Last updated:** Session 10 — 27 Apr 2026. Phase 2 close-out shipped: field-aware content windowing, Wave 2 enabled (48-field coverage), currency preservation in provenance, batch extraction with extraction cache, scrape cache + guards, ADR-008 deferring Wayback to Phase 5, /review reject flow patched, AUS+SGP scored, Tier-1 URLs refreshed (ATO added for AUS tax fields), 6 LLM_MISS prompts tuned.
+> **Last updated:** 27 Apr 2026 (plan restructured). Phase 2 close-out shipped: field-aware content windowing, Wave 2 enabled (48-field coverage), currency preservation in provenance, batch extraction with extraction cache, scrape cache + guards, ADR-008 deferring Wayback to Phase 6, /review reject flow patched, AUS+SGP scored, Tier-1 URLs refreshed (ATO added for AUS tax fields), 6 LLM_MISS prompts tuned. **Phase ordering:** Phase 3 = Coverage Maximization (V-Dem API, cross-departmental discovery, prompt sweep, Tier 2 backfill ADR, methodology v2 review). Phase 4 = Public Dashboard (complete). Phase 5 = 5-Country Pilot. Phase 6 = Living Index. Phase 7 = Scale and Enrichment.
 
 ## 1. Overview
 
@@ -194,19 +194,30 @@ Missing indicator data is not imputed. An absent indicator is excluded from its 
 ### Stubbed or not yet implemented
 
 - **Calibration of normalization params**: `compute-normalization-params.ts` returned only 4 numeric fields with approved observations across the AUS+SGP cohort and 3 had n=1 — too thin to swap in. Calibration runs as the first scoring step in Phase 3 once ≥5 programs are scored, after which `phase2Placeholder` clears.
-- **URL drift monitoring**: 4 of the discovered Tier-1 URLs (2 AUS, 2 SGP) returned 0-char soft-404s during the Phase 2 close-out runs. A monthly HEAD-check job is scheduled into Phase 5.1 living-index work.
+- **URL drift monitoring**: 4 of the discovered Tier-1 URLs (2 AUS, 2 SGP) returned 0-char soft-404s during the Phase 2 close-out runs. A monthly HEAD-check job is scheduled into Phase 6 living-index work.
 - **Lighthouse 95+ verification**: structurally complete (SSG + ISR, OG images, sitemap, JSON-LD, a11y assertions). Actual Lighthouse score capture requires a live deploy; the close-out report enumerates each route's expected posture.
 - **Sensitivity analyses**: Phase 3 deliverable; runner not yet implemented.
 
-### Phase 5 — six work-streams, ranked by leverage
+### Phase 3 — Coverage Maximization (next up)
 
-Expanded from the original "Living Index" framing to address the Phase 2 retrospective finding that AUS+SGP+CAN converge at 30–34/48 today — driven by source-discovery gaps, not pipeline failure. Realistic per-programme coverage target: **42–44/48 (43 average)**. Full per-sub-phase line items in `IMPLEMENTATION_PLAN.md` Phase 5.
+Push extraction coverage from the 30–34/48 baseline toward the 42–44/48 ceiling on the AUS, SGP, CAN canary programmes before running the full 5-country pilot. Gate for Phase 5: every canary programme at ≥42/48. Full per-sub-phase line items in `IMPLEMENTATION_PLAN.md` Phase 3.
 
-- **5.1 Living-index policy monitoring** — weekly re-scrape, hash-diff, severity classification, Wayback archival (per [ADR-008](decisions/008-defer-wayback-archival-to-phase-5.md)), Tier 3 news-signal ingestion via Exa, Resend alerts. Unlocks Pillar E.1.x cohort-wide. The `policy_changes` table populates; the `<PolicyTimeline>` component on `/programs/[id]` and the disabled-filter UI on `/changes` already wired in Phase 4 — both light up with zero code change.
-- **5.2 V-Dem direct-API** — `fetchVdemRuleOfLawScore(iso3)` mirroring the World Bank API path shipped in Phase 2 for E.3.2. Closes Pillar E.3 cohort-wide. ~1 day engineering.
-- **5.3 Cross-departmental discovery audit** — per-country source-department registry expansion (immigration, tax, statistics bureau, gazette, regional). Discovery prompt rewritten to enumerate the cross-departmental set explicitly and re-prompt on missing departments. Unlocks D.3.x tax fields and E.2.x transparency fields cohort-wide. Re-canary the 5-country pilot.
-- **5.4 Cohort-wide prompt sweep** — systematic LLM_MISS triage and prompt revision. `scripts/diag-empty-fields.ts` already classifies empty fields; the work is iterating each prompt in `methodology-v1.ts` until LLM_MISS converges to 0.
-- **5.5 Tier 2 backfill methodology revision** — ADR-013. Relaxes the Tier-1-only rule for selected indicators outside the scoring core, with `sourceTier: 2` flag visible in provenance. The extraction code already supports per-tier selection; enabling it is an indicator-level config change.
-- **5.6 Methodology v2 indicator review** — ADR-014. Audit indicators returning `not_addressed` on >50% of the cohort post-5.3 + 5.4. Decide per-indicator: keep, drop and re-normalize sub-factor weights, restructure as boolean, or country-substitute. Methodology v2.0.0 published; existing scores keep their v1 stamp.
+- **3.1 V-Dem direct-API** — `fetchVdemRuleOfLawScore(iso3)` mirroring the World Bank API path shipped in Phase 2 for E.3.2. Closes Pillar E.3.1 cohort-wide. ~1 day engineering.
+- **3.2 Cross-departmental discovery audit** — per-country source-department registry expansion (immigration, tax, statistics bureau, gazette, regional). Discovery prompt rewritten to enumerate the cross-departmental set explicitly and re-prompt on missing departments. Unlocks D.3.x tax fields and E.2.x transparency fields cohort-wide.
+- **3.3 Cohort-wide prompt sweep** — systematic LLM_MISS triage and prompt revision. `scripts/diag-empty-fields.ts` already classifies empty fields; the work is iterating each prompt in `methodology-v1.ts` until LLM_MISS converges to 0.
+- **3.4 Tier 2 backfill methodology revision** — ADR-013. Relaxes the Tier-1-only rule for selected indicators outside the scoring core, with `sourceTier: 2` flag visible in provenance. The extraction code already supports per-tier selection; enabling it is an indicator-level config change.
+- **3.5 Methodology v2 indicator review** — ADR-014. Audit indicators returning `not_addressed` on >50% of the cohort post-3.2 + 3.3. Decide per-indicator: keep, drop and re-normalize sub-factor weights, restructure as boolean, or country-substitute. Methodology v2.0.0 published; existing scores keep their v1 stamp.
 
-The credibility design is "publish only what we can defensibly source, surface what's missing per programme, let the reader apply their own credibility weighting via the `insufficient_disclosure` flag" — not 100% coverage with fudged values. Per-indicator "Not on government source" placeholder + Pre-calibration / Phase-3 chips already make the gap visible to readers. Methodology framing in `METHODOLOGY.md` §7.5.1.
+The credibility design is "publish only what we can defensibly source, surface what's missing per programme, let the reader apply their own credibility weighting via the `insufficient_disclosure` flag" — not 100% coverage with fudged values. Per-indicator "Not on government source" placeholder + Pre-calibration chips already make the gap visible to readers. Methodology framing in `METHODOLOGY.md` §7.5.1.
+
+### Phase 5 — 5-Country Pilot (after Phase 3 gate)
+
+Full extraction across AUS, HKG, GBR, CAN, SGP (~25 programmes) using the Phase 3 improved pipeline. Calibration: `compute-normalization-params.ts` runs at Phase 5 start (≥5 programmes scored); `phase2Placeholder` flag clears. First full composite scoring. All 6 sensitivity analyses. Methodology page auto-rendered from DB.
+
+### Phase 6 — Living Index
+
+Policy monitoring infrastructure: weekly re-scrape, hash-diff, severity classification, Wayback archival (per [ADR-008](decisions/008-defer-wayback-archival-to-phase-5.md)), Tier 3 news-signal ingestion via Exa, Resend alerts. The `policy_changes` table populates; the `<PolicyTimeline>` component on `/programs/[id]` and the disabled-filter UI on `/changes` already wired in Phase 4 — both light up with zero code change.
+
+### Phase 7 — Scale and Enrichment
+
+Full 85-programme cohort. OECD tax treaty database supplements D.3. Annual IMD Appeal refresh job. Methodology whitepaper. Internal beta to TTR Group strategy clients.

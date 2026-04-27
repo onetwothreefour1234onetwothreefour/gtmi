@@ -1,8 +1,8 @@
 # PROJECT: Global Talent Mobility Index (GTMI) — Build Specification v6
 
-> **Document status:** Canonical build specification v6. Supersedes v5 — incorporating Phase 2 close-out (Sessions 9–10). Changes from v5 are marked with `[NEW v6]`. ADRs 002–008 approved and documented (008 = Wayback deferral, 2026-04-26).
+> **Document status:** Canonical build specification v7. Supersedes v6 — plan restructured 27 Apr 2026. Coverage maximization pulled forward as Phase 3 before the 5-country pilot (now Phase 5). Phase 6 = Living Index. Phase 7 = Scale and Enrichment. Changes from v6 are marked with `[NEW v7]`. ADRs 002–008 approved and documented (008 = Wayback deferral, 2026-04-26).
 
-> **Last updated:** Session 10 — 27 Apr 2026. **Phase 2 closed (tag `phase-2-complete`).** AUS Skills in Demand 482 — Core (PAQ 13.72 / CME 22.53 / Composite 16.36) and SGP S Pass (PAQ 18.11 / CME 24.14 / Composite 19.92) scored deterministically, both `phase2Placeholder: true`. Field-aware content windowing replaces head-slice. Wave 2 enabled — full 48-field coverage. Currency code preserved in provenance. Batch extraction + extraction cache + scrape cache shipped. Tier-1 URLs refreshed (ATO added for AUS tax fields), six LLM_MISS prompts retuned. /review UI deployed to Cloud Run with Supabase magic-link auth. Wayback archival deferred to Phase 5 (ADR-008).
+> **Last updated:** 27 Apr 2026 (plan restructured). **Phase 2 closed (tag `phase-2-complete`).** AUS Skills in Demand 482 — Core (PAQ 13.72 / CME 22.53 / Composite 16.36) and SGP S Pass (PAQ 18.11 / CME 24.14 / Composite 19.92) scored deterministically, both `phase2Placeholder: true`. Field-aware content windowing replaces head-slice. Wave 2 enabled — full 48-field coverage. Currency code preserved in provenance. Batch extraction + extraction cache + scrape cache shipped. Tier-1 URLs refreshed (ATO added for AUS tax fields), six LLM_MISS prompts retuned. /review UI deployed to Cloud Run with Supabase magic-link auth. Wayback archival deferred to Phase 6 (ADR-008). **Next:** Phase 3 — Coverage Maximization (V-Dem API, cross-departmental discovery, prompt sweep, Tier 2 backfill ADR, methodology v2 review). Gate: ≥42/48 per canary programme before Phase 5 pilot begins.
 
 ---
 
@@ -89,7 +89,7 @@ Daily 15-minute sync or async in Slack. Architectural decisions captured as ADRs
 - **Orchestration**: Trigger.dev v3 for scheduled jobs (scraping, diff detection, alerts, news signal ingestion).
 - **Enrichment**: Exa for semantic search of law firm and news commentary. Direct API for World Bank, V-Dem. Scrape (respectfully, with rate limits) for Numbeo, QS, Henley Passport Index. OECD tax treaty database accessed via published PDFs parsed and cached.
 - **Email**: Resend for policy change alerts.
-- **Archival**: Wayback Machine Save Page Now API for legal defensibility of source snapshots.
+- **Archival**: Wayback Machine Save Page Now API for legal defensibility of source snapshots (Phase 6, per ADR-008).
 - **Deployment**: Cloud Run for Next.js (`apps/web`) and Python scraper (`scraper/`) — `Dockerfile` + `cloudbuild.yaml` + `deploy.cmd`; Supabase cloud; Trigger.dev cloud. Vercel is not used. [NEW v6]
 - **Auth**: Supabase Auth (magic link). `apps/web/middleware.ts` enforces auth on `/review`. `NEXT_PUBLIC_APP_URL` carries the canonical origin so callbacks resolve correctly behind Cloud Run. [NEW v6]
 - **Monorepo**: pnpm workspaces + Turborepo.
@@ -373,7 +373,7 @@ gtmi/
 | AUS Skills in Demand 482 — Core | 30/48 (62.5%)         | 6             | 24     | 13.72 | 22.53 | 16.36     |
 | SGP S Pass                      | 34/48 (70.8%)         | 6             | 28     | 18.11 | 24.14 | 19.92     |
 
-Both flagged `insufficient_disclosure` (auto-approved coverage below pillar threshold, expected until /review backfill). Calibration of normalization params deferred to Phase 3 (cohort too thin: 4 numeric fields with approved values, 3 with n=1).
+Both flagged `insufficient_disclosure` (auto-approved coverage below pillar threshold, expected until /review backfill). Calibration of normalization params deferred to Phase 5 (cohort too thin: 4 numeric fields with approved values, 3 with n=1).
 
 **Completed in Phase 2:**
 
@@ -429,7 +429,7 @@ Both flagged `insufficient_disclosure` (auto-approved coverage below pillar thre
 - Wave 2 enabled — `WAVE_2_ENABLED = true`, `ACTIVE_FIELD_CODES` covers all 48 methodology fields, all four consumers switched.
 - AUS + SGP canaries: 30/48 and 34/48 fields populated respectively; provenance verifier passed on every row from these runs.
 - Currency preservation: `utils/currency.ts` (`detectCurrency()`) + `provenance.valueCurrency`; `scripts/backfill-monetary-normalization.ts` re-normalizes pre-fix pending rows.
-- Calibration attempt: `scripts/compute-normalization-params.ts --programs AUS,SGP` returned only 4 numeric fields with approved values (3 of them n=1) — too thin to swap in. Calibration deferred to Phase 3 once ≥5 programs are scored. AUS and SGP scored with engineer-chosen ranges and tagged `phase2Placeholder: true`.
+- Calibration attempt: `scripts/compute-normalization-params.ts --programs AUS,SGP` returned only 4 numeric fields with approved values (3 of them n=1) — too thin to swap in. Calibration deferred to Phase 5 once ≥5 programs are scored. AUS and SGP scored with engineer-chosen ranges and tagged `phase2Placeholder: true`.
 - /review reject flow patched (FormData id binding, try/catch with `console.error`, `.returning()` row-update reporting).
 - Tier-1 URL refresh: 2 AUS + 2 SGP soft-404 URLs replaced; ATO sources added for AUS tax fields.
 - Six LLM_MISS prompts retuned with recall hints (A.1.2, B.3.1, C.2.1, D.2.2, D.2.4, E.1.1).
@@ -446,29 +446,26 @@ Both flagged `insufficient_disclosure` (auto-approved coverage below pillar thre
 **Carry-overs into Phase 3 (per Phase 2 retrospective):**
 
 1. URL drift monitoring — schedule a monthly HEAD-check job in Trigger.dev (Phase 5 living-index work or sooner if Phase 3 fans out first).
-2. Calibration — Phase 3 must run `compute-normalization-params.ts` as the first scoring step once ≥5 programs are scored, then replace the engineer-chosen ranges in `run-paq-score.ts` before any non-placeholder scores are persisted.
+2. Calibration — Phase 5 must run `compute-normalization-params.ts` as the first scoring step once ≥5 programs are scored, then replace the engineer-chosen ranges in `run-paq-score.ts` before any non-placeholder scores are persisted.
 3. Auto-approve rate is a methodology lever — tightening prompts lifts confidence; loosening the dual-confidence threshold trades it for false positives. /review queue is the relief valve; Phase 4 dashboard scope assumes a working reviewer cadence.
 
-### Phase 3 (5-country V1) — PENDING
+### Phase 3 (coverage maximization) — PENDING [NEW v7]
 
-### Phase 4 (public dashboard) — PENDING
+Push extraction coverage from 30–34/48 baseline toward the 42–44/48 ceiling on the AUS, SGP, CAN canary programmes before running the full pilot. Five work-streams in order: V-Dem direct-API (E.3.1, ~1 day), cross-departmental discovery audit (D.3.x tax + E.2.x transparency), cohort-wide prompt sweep (LLM_MISS → 0), Tier 2 backfill methodology revision (ADR-013), methodology v2 indicator review (ADR-014). Gate: every canary programme at ≥42/48 before Phase 5 begins.
 
-### Phase 5 (living index + coverage push) — PENDING [NEW v6]
+### Phase 4 (public dashboard) — ✅ COMPLETE (tag `phase-4-complete`, Session 14)
 
-Expanded scope from the original "weekly re-scrape only" framing. Phase 5 also addresses the Phase 2 retrospective finding that AUS+SGP+CAN converge at 30–34/48 today — driven by source-discovery gaps, not pipeline failure. Six sub-phases ranked by leverage:
+### Phase 5 (5-country pilot) — PENDING [NEW v7]
 
-- **5.1 Living-index policy monitoring** — weekly re-scrape, hash-diff, severity classification, Wayback archival (per ADR-008), Tier 3 news-signal ingestion via Exa, Resend alerts on material/breaking changes. Unlocks Pillar E.1.x cohort-wide.
-- **5.2 V-Dem direct-API** — `fetchVdemRuleOfLawScore(iso3)` mirroring the World Bank API path already in production. Closes Pillar E.3 cohort-wide. ~1 day engineering.
-- **5.3 Cross-departmental discovery audit** — per-country source-department registry expansion (immigration, tax, statistics bureau, gazette, regional). Discovery prompt rewritten to enumerate the cross-departmental set explicitly and re-prompt on missing departments. Unlocks Pillar D.3.x tax fields and E.2.x transparency fields cohort-wide. Re-canary the 5-country pilot.
-- **5.4 Cohort-wide prompt sweep** — systematic LLM_MISS triage and prompt revision until LLM_MISS converges to 0 across the cohort. Six prompts hinted in Session 10; the remaining 42 haven't had a serious revision pass since Phase 1.
-- **5.5 Tier 2 backfill methodology revision (ADR-013)** — relaxed the Tier-1-only rule for selected indicators outside the scoring core, with `sourceTier: 2` flag visible in provenance. Unlocks ~2–3 fields per programme where Tier 1 truly has nothing.
-- **5.6 Methodology v2 indicator review (ADR-014)** — audit indicators that return `not_addressed` on >50% of the cohort post-5.3 + 5.4. Decide per-indicator: keep, drop and re-normalize sub-factor weights, restructure as boolean, or country-substitute. Methodology v2.0.0 published; existing scores keep their v1 stamp.
+Full extraction across Australia, Hong Kong, UK, Canada, Singapore (~25 programmes) using the improved pipeline from Phase 3. Pre-condition: Phase 3 close-out (≥42/48 on canary programmes). Calibration: run `compute-normalization-params.ts` — viable with ≥5 programmes scored; replace engineer-chosen ranges; `phase2Placeholder` flag cleared. First full composite scoring run. All 6 sensitivity analyses. Methodology page auto-rendered from database.
 
-**Realistic per-programme coverage target after 5.1–5.6: 42–44/48 (43 average).** The remaining 4–6 indicators are either methodology gaps (the indicator we defined doesn't correspond to data anyone publishes) or country-specific transparency gaps (e.g. Bahrain, Saudi Arabia, UAE don't publish admission statistics in any structured form; E.2.1 is permanently null for those countries). The credibility play is "publish only what we can defensibly source, surface what's missing per programme" — not 100% coverage with fudged values. The `insufficient_disclosure` flag is the safety net for programmes below 70% coverage on any pillar.
+### Phase 6 (living index) — PENDING [NEW v7]
 
-### Phase 6 (scale and enrichment) — PENDING
+Policy monitoring infrastructure: weekly re-scrape of all Tier 1 sources, content hash diff, re-extraction on change, `policy_changes` rows with severity classification (Breaking/Material/Minor), Wayback Machine archival (per ADR-008), Tier 3 news-signal ingestion via Exa, Resend alerts on material/breaking changes. The `/changes` timeline and `<PolicyTimeline>` on programme detail already wired in Phase 4 — both activate with zero code change. URL drift monitoring via monthly HEAD-check job.
 
-Onboard the remaining 60 programmes to reach the full 85-programme cohort across IMD Top 30. OECD tax treaty database supplements Pillar D.3. Annual IMD Appeal refresh job. Methodology whitepaper published. Open internal beta to TTR Group strategy clients.
+### Phase 7 (scale and enrichment) — PENDING [NEW v7]
+
+Onboard the remaining 60 programmes to reach the full 85-programme cohort across IMD Top 30. OECD tax treaty database supplements Pillar D.3 (complements Phase 3.2 cross-departmental discovery). Annual IMD Appeal refresh job. Methodology whitepaper published. Open internal beta to TTR Group strategy clients.
 
 ---
 

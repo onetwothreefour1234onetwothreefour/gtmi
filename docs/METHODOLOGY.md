@@ -1,8 +1,8 @@
 # Global Talent Mobility Index (GTMI) — Methodology v4
 
-> **Document status:** Canonical methodology specification v4. Supersedes v3 — incorporating Phase 2 close-out (Sessions 9–10). Changes from v3 are marked with `[NEW v4]`. ADRs 002–008 approved and documented (008 = Wayback deferral, 2026-04-26).
+> **Document status:** Canonical methodology specification v5. Supersedes v4 — plan restructured 27 Apr 2026. Coverage maximization moved to Phase 3 (before the 5-country pilot). Calibration now deferred to Phase 5. Wayback archival deferred to Phase 6. Changes from v4 are marked `[NEW v5]`.
 
-> **Last updated:** Session 10 — 27 Apr 2026. **Phase 2 closed (tag `phase-2-complete`).** AUS Skills in Demand 482 — Core (PAQ 13.72) and SGP S Pass (PAQ 18.11) scored deterministically and tagged `phase2Placeholder: true`; calibration deferred to Phase 3. Field-aware content windowing replaces head-slice in extraction. Wave 2 enabled — full 48-field methodology coverage. Currency code preserved in `provenance.valueCurrency`. Batch extraction + extraction cache + scrape cache shipped. Wayback archival deferred to Phase 5 (ADR-008).
+> **Last updated:** 27 Apr 2026 (plan restructured). **Phase 2 closed (tag `phase-2-complete`).** AUS Skills in Demand 482 — Core (PAQ 13.72) and SGP S Pass (PAQ 18.11) scored deterministically and tagged `phase2Placeholder: true`; calibration deferred to Phase 5. Field-aware content windowing replaces head-slice in extraction. Wave 2 enabled — full 48-field methodology coverage. Currency code preserved in `provenance.valueCurrency`. Batch extraction + extraction cache + scrape cache shipped. Wayback archival deferred to Phase 6 (ADR-008).
 
 ---
 
@@ -382,19 +382,19 @@ Every published value carries: source URL, **geographic level**, **source tier**
 
 ### 7.4 Living index and policy change detection
 
-All Tier 1 sources re-scraped weekly (Phase 5). Content hash comparison triggers re-extraction. Severity classification:
+All Tier 1 sources re-scraped weekly (Phase 6). Content hash comparison triggers re-extraction. Severity classification:
 
 - **Breaking**: PAQ change >5 points.
 - **Material**: PAQ change 1–5 points.
 - **Minor**: PAQ change <1 point, or non-scoring text changes.
 
-Wayback Machine archival co-located with the re-scrape diff path (Phase 5) — see ADR-008 for the deferral rationale.
+Wayback Machine archival co-located with the re-scrape diff path (Phase 6) — see ADR-008 for the deferral rationale.
 
 ### 7.5 Missing data and edge case handling
 
 - **Missing Data Penalty**: indicator excluded from sub-factor; weights re-normalized; sub-factor score multiplied by `(present / total)^0.5`. Scoring ingests only `status='approved'` rows, so coverage in scores reflects the dual-confidence (extraction + validation ≥ 0.85) auto-approval threshold combined with /review queue completion — not pipeline failure.
 - **Insufficient Disclosure**: programs below 70% data coverage on any pillar flagged and excluded from public top list. Both Phase 2 canaries (AUS, SGP) flagged at close-out — expected at this cohort size; expected to clear once /review queue is worked through.
-- **Phase 2 placeholder flag**: scores computed with engineer-chosen normalization ranges (rather than calibrated p10/p90 percentiles from a real distribution) carry `metadata.phase2Placeholder = true` on the `scores` row and must not be published publicly. Calibration is the first scoring step in Phase 3 once ≥5 programs are scored, after which the flag clears [NEW v4].
+- **Phase 2 placeholder flag**: scores computed with engineer-chosen normalization ranges (rather than calibrated p10/p90 percentiles from a real distribution) carry `metadata.phase2Placeholder = true` on the `scores` row and must not be published publicly. Calibration is the first scoring step in Phase 5 once ≥5 programs are scored, after which the flag clears [NEW v4].
 - **Stability Edge Case (E.1.1)**: programs younger than 3 years use within-country cohort mean substitution for E.1.1, falling back to global cohort mean if fewer than two mature programs exist in country. Flagged in provenance record.
 
 ### 7.5.1 Coverage philosophy and realistic ceiling [NEW v5]
@@ -409,7 +409,7 @@ The realistic per-programme ceiling, post the Phase 5 coverage push, is **42–4
 2. **Indicators that do not correspond to publishable data anywhere** — methodology v2 review (Phase 5.6, ADR-014) decides per indicator whether to drop, restructure as boolean, or country-substitute. Methodology weights re-normalize at v2; existing v1 scores keep their v1 stamp (no retroactive recomputation).
 3. **Indicators outside the Pillar A-D scoring core where Tier 1 is silent but Tier 2 covers the gap** — methodology v3 review (Phase 5.5, ADR-013) authorises Tier 2 backfill for the allowlisted indicators, with `sourceTier: 2` flag visible in the provenance display so the reader sees the credibility tradeoff.
 
-Phase 5 (`docs/IMPLEMENTATION_PLAN.md` §Phase 5) sequences the six work-streams that drive coverage from today's 30–34/48 baseline (AUS, SGP, CAN canaries) toward the 42–44/48 ceiling: living-index policy monitoring, V-Dem direct API, cross-departmental discovery audit, cohort-wide prompt sweep, Tier 2 backfill ADR, methodology v2 review.
+Phase 3 (`docs/IMPLEMENTATION_PLAN.md` §Phase 3) sequences the five coverage work-streams that drive coverage from today's 30–34/48 baseline (AUS, SGP, CAN canaries) toward the 42–44/48 ceiling before the 5-country pilot: V-Dem direct API, cross-departmental discovery audit, cohort-wide prompt sweep, Tier 2 backfill ADR, and methodology v2 review. Living-index policy monitoring is a separate Phase 6 deliverable.
 
 ### 7.6 LLM use boundaries
 
