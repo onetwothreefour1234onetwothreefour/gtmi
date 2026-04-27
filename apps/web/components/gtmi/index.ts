@@ -15,3 +15,5 @@ export { SectionHeader } from './section-header';
 export { DataTableNote } from './data-table-note';
 export { RankingsTable } from './rankings-table';
 export { RankingsFilters } from './rankings-filters';
+export { AdvisorModeToggle } from './advisor-mode-toggle';
+export { RankingsExplorer } from './rankings-explorer';
