@@ -19,8 +19,30 @@ import { loadContent } from '@/lib/content';
 import type { PillarKey } from '@/lib/theme';
 import { remark } from 'remark';
 import remarkHtml from 'remark-html';
+import { db } from '@gtmi/db';
+import { sql } from 'drizzle-orm';
 
 export const revalidate = 3600;
+export const dynamicParams = true;
+
+/**
+ * Pre-render the most-popular program detail pages at build time. Less-
+ * popular programs render on-demand and cache via ISR (revalidate=3600).
+ *
+ * Phase 4.5 reality: the most-popular set is "every scored program" plus
+ * the seeded ones in the IMD Top 30. Returning every program from the
+ * live DB is fine at 85-row scale.
+ */
+export async function generateStaticParams(): Promise<Array<{ id: string }>> {
+  try {
+    const rows = (await db.execute(sql`SELECT id FROM programs LIMIT 200`)) as unknown as Array<{
+      id: string;
+    }>;
+    return rows.map((r) => ({ id: r.id }));
+  } catch {
+    return [];
+  }
+}
 
 interface PageProps {
   params: Promise<{ id: string }>;
