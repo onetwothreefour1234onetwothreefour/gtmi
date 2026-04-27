@@ -15,7 +15,9 @@ export const metadata: Metadata = {
     'Every weight, every indicator, every normalisation choice — read live from the GTMI methodology version table.',
 };
 
-export const revalidate = 3600;
+// Runtime render — DATABASE_URL is runtime-only in Cloud Run.
+// unstable_cache inside getMethodologyCurrent handles cross-request caching.
+export const dynamic = 'force-dynamic';
 
 const PILLAR_LABEL: Record<PillarKey, string> = {
   A: 'Access',

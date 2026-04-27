@@ -10,7 +10,9 @@ export const metadata: Metadata = {
     'Tier 1 government source changes detected and classified by severity. Phase 5 lights up the live timeline.',
 };
 
-export const revalidate = 600;
+// Runtime render — getPolicyChanges hits DATABASE_URL.
+// unstable_cache inside the query handles cross-request caching (10min TTL).
+export const dynamic = 'force-dynamic';
 
 export default async function ChangesPage() {
   const [events, emptyHtml] = await Promise.all([

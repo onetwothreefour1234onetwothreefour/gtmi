@@ -4,6 +4,8 @@ import { getCountryDetail } from '@/lib/queries/country-detail';
 export const alt = 'GTMI country detail';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
+// Runtime generation — reads DATABASE_URL via getCountryDetail.
+export const dynamic = 'force-dynamic';
 
 export default async function CountryOG({
   params,

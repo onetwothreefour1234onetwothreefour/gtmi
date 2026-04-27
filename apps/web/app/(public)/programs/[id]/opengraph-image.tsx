@@ -5,6 +5,8 @@ import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
 export const alt = 'GTMI program detail';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
+// Runtime generation — reads DATABASE_URL via getProgramDetail.
+export const dynamic = 'force-dynamic';
 
 const PILLAR_ORDER: PillarKey[] = ['A', 'B', 'C', 'D', 'E'];
 const PILLAR_LABEL: Record<PillarKey, string> = {

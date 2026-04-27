@@ -15,31 +15,16 @@ import { absoluteUrl, SITE_URL } from '@/lib/site-url';
 import { getCountryDetail } from '@/lib/queries/country-detail';
 import { formatRelativeDate } from '@/lib/format';
 import type { CountryProgramRow, CountryTaxTreatment } from '@/lib/queries/country-detail-types';
-import { db } from '@gtmi/db';
-import { sql } from 'drizzle-orm';
 
 interface PageProps {
   params: Promise<{ iso: string }>;
 }
 
-export const revalidate = 3600;
-export const dynamicParams = true;
-
-/**
- * Pre-render every cohort country page at build time. The countries table
- * is small (~30 rows, capped at 50 for safety) and rarely changes — SSG
- * pays off here in TTFB on the most-trafficked routes.
- */
-export async function generateStaticParams(): Promise<Array<{ iso: string }>> {
-  try {
-    const rows = (await db.execute(
-      sql`SELECT iso_code AS iso FROM countries ORDER BY iso_code LIMIT 50`
-    )) as unknown as Array<{ iso: string }>;
-    return rows.map((r) => ({ iso: r.iso }));
-  } catch {
-    return [];
-  }
-}
+// Render on request, not at build. DATABASE_URL is a runtime-only secret
+// in the Cloud Run service; the build container never has it. Cross-
+// request caching is preserved by the `unstable_cache` wrapper inside
+// `getCountryDetail` (1h TTL, tags `country:ISO` + `programs:all`).
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { iso } = await params;

@@ -6,7 +6,13 @@ import { parseRankingsParams } from '@/lib/queries/filters-from-url';
 import { loadContent } from '@/lib/content';
 import { DEFAULT_PILLAR_WEIGHTS } from '@/lib/advisor-mode';
 
-export const revalidate = 3600;
+// Render on request, not at build. The query layer (lib/queries/*) wraps
+// every DB call in `unstable_cache` with a 1h TTL + revalidation tags, so
+// across-request caching still works — we just skip Next's build-time
+// prerender step that would otherwise need DATABASE_URL in the build env.
+// See cloudbuild.yaml: NEXT_PUBLIC_* are build-args, DATABASE_URL is a
+// runtime --set-secrets only.
+export const dynamic = 'force-dynamic';
 
 export default async function LandingPage({
   searchParams,

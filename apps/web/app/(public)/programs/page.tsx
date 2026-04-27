@@ -11,7 +11,8 @@ export const metadata: Metadata = {
     'Browse all 85 talent-based mobility programmes across the IMD World Talent Ranking Top 30 economies.',
 };
 
-export const revalidate = 3600;
+// See / page header comment — runtime render, not build prerender.
+export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 50;
 

@@ -5,6 +5,12 @@ import { sql } from 'drizzle-orm';
 import { SITE_URL } from '@/lib/site-url';
 import { logger } from '@/lib/logger';
 
+// Render at request time — DATABASE_URL is a runtime-only secret in
+// Cloud Run; the build container does not have it. The function below
+// short-circuits to static entries when env is missing, so even at
+// build time it returns a valid sitemap shape.
+export const dynamic = 'force-dynamic';
+
 interface ProgramRow {
   id: string;
   updatedAt: Date | null;
@@ -39,6 +45,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   let dynamicEntries: MetadataRoute.Sitemap = [];
+
+  // Skip the DB-driven branch entirely when DATABASE_URL is absent —
+  // typically at `next build` inside Cloud Build, where DATABASE_URL is a
+  // runtime --set-secrets only and not a build-arg. The static entries
+  // above are still emitted; per-program / per-country sitemap rows will
+  // populate on the next ISR window after the deploy is live.
+  if (!process.env['DATABASE_URL']) {
+    return staticEntries;
+  }
+
   try {
     const [programsRaw, countriesRaw] = await Promise.all([
       db.execute(sql`
