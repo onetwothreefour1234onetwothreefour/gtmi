@@ -71,9 +71,9 @@
 
 ---
 
-## Phase 2 — Extraction Canary
+## Phase 2 — Extraction Canary — ✅ COMPLETE (tag `phase-2-complete`)
 
-**Goal:** One program end-to-end. Australia Skills in Demand 482 Core Skills Stream through all pipeline stages, producing provenance records and a deterministic PAQ score.
+**Goal:** One program end-to-end. Australia Skills in Demand 482 Core Skills Stream through all pipeline stages, producing provenance records and a deterministic PAQ score. **Closed out across both AUS and SGP**, both scored deterministically with `phase2Placeholder: true`.
 
 ### Extraction prompts
 
@@ -138,7 +138,7 @@
 - ✅ Early exit: `executeAllFields` stops scraping more URLs once every field is at confidence ≥ 0.9
 - ✅ Inter-batch delay: 30s between URL batches (replaces old 25s per-field delay; sized for 8K-token batched calls)
 - ✅ Coverage-gap sentinels: LLM-returned `not_found` / `not_addressed` for categorical fields are skipped at publish so absence is honest in scoring coverage math (`publish.ts:62-71`)
-- ⬜ Field-aware content-window selection — current code still slices to first 30K chars in `extract.ts:252,341`; diagnostic `scripts/diag-empty-fields.ts` already classifies fields as TRUNCATION/LLM_MISS/ABSENT but the fix isn't implemented
+- ✅ Field-aware content-window selection — `packages/extraction/src/utils/window.ts` selects relevance-scored 2K chunks (200-char overlap, 1500/800-char baseline prefix/suffix) keyed on per-field labels within a 30K budget. Cache key carries `WINDOW_VERSION` for clean invalidation. Replaces `slice(0, 30000)` in both single + batch paths; redundant 30K cap in `scrape.ts` removed. 10 unit tests; post-fix TRUNCATION = 0 in `diag-empty-fields.ts`.
 
 ### Stage 3 — Validate
 
@@ -159,8 +159,8 @@
 
 - ✅ Implement review queue logic
 - ✅ Flag values where: extraction confidence < 0.85, validation confidence < 0.85, cross-check disagrees, PAQ delta vs previous > 5 points
-- ✅ Human review dashboard functional (basic UI) — `apps/web/app/review` with Supabase magic-link auth, pending/recently-reviewed tabs, status banners, approve flow with re-normalization on edit
-- ⬜ Reject flow on `/review/[id]` writes to DB but doesn't redirect/refresh consistently — reproduce + fix
+- ✅ Human review dashboard functional (basic UI) — `apps/web/app/review` with Supabase magic-link auth, pending/recently-reviewed tabs grouped by country/program, source-sentence + confidence display on detail page, approve flow with re-normalization on edit. Deployed to Cloud Run via `Dockerfile` + `cloudbuild.yaml`.
+- ✅ Reject flow on `/review/[id]` patched — form actions read row id from a hidden FormData input rather than closure binding (Next.js inline-action closures were unreliable across minor versions); approve/reject wrap their transactions in try/catch with `console.error` so silent failures surface in Cloud Run logs; reject reports row-update counts via `.returning()`.
 
 ### Stage 6 — Publish
 
@@ -213,10 +213,10 @@
 - ✅ Currency preservation in `publish.ts` (stored in `provenance.valueCurrency` JSONB)
 - ✅ AUS PAQ score produced + idempotent + flagged `phase2Placeholder` (calibration deferred to Phase 3)
 - ✅ Human review dashboard functional (basic UI) — see Stage 5 section above
-- 🔄 Wave 1 (27 fields) attempted; Wave 2 (remaining 21 fields) **see Phase 2 close-out below**
-- 🔄 Singapore S Pass canary run — **see Phase 2 close-out below**
-- ⬜ Content window strategy for fields truncated at 30K chars — **see Phase 2 close-out below**
-- ⬜ Provenance records verified end-to-end for AUS canary extracted fields — **see Phase 2 close-out below**
+- ✅ Wave 1 (27 fields) + Wave 2 (21 fields) — full 48-field coverage active via `WAVE_2_ENABLED = true`
+- ✅ Singapore S Pass canary run — 34/48 fields populated (70.8%); verifier passed
+- ✅ Content window strategy for fields truncated at 30K chars — field-aware windowing shipped (CO-1)
+- ✅ Provenance records verified end-to-end — `scripts/verify-provenance.ts` asserts 13 required + 3 approved-only keys per ADR-007
 
 ### Phase 2 close-out (Sessions 9–10 — completed)
 
@@ -303,31 +303,52 @@ Both flagged `insufficient_disclosure` because pillars C and D have no auto-appr
 
 **Goal:** Interactive public-facing web dashboard. Every data point shows provenance on hover.
 
-### Program explorer
+### Phase 4.1 — Foundation — ✅ COMPLETE (Session 11, pushed)
 
-- ⬜ Country and program explorer with filters (region, category, pillar strength)
-- ⬜ Composite score display per program
-- ⬜ Pillar breakdown radar chart per program
-- ⬜ Sub-factor drill-down per pillar
-- ⬜ Indicator table with values and provenance hover
+- ✅ Theme tokens (editorial palette, pre-calibration amber, sequential score scale, 5-pillar palette with C-pillar shifted to `#5C8A9B`), self-hosted fonts via `next/font/google` (Fraunces / Inter / JetBrains Mono), border-radius rules, editorial type scale, container max-widths.
+- ✅ Dark mode via `next-themes` (system / light / dark cycle), reduced-motion respected globally.
+- ✅ `(public)` and `(internal)` route groups; `/review` moved into `(internal)/review/*` via `git mv`; URLs unchanged.
+- ✅ Public layout shell (sticky 60px top nav with skip-to-content, 3-column footer).
+- ✅ GTMI primitives in `apps/web/components/gtmi/`: `ScoreBar`, `PreCalibrationChip`, `CoverageChip`, `CompositeScoreDisplay`, `PillarMiniBars`, `PillarRadar`, `WeightSlider`, `MethodologyBar`, `ProvenanceTrigger` (defensive ADR-007 read with "Provenance incomplete" fail-loud chip), `ProvenanceHighlight`, `PolicyTimeline` (mocked + empty), `EmptyState`, `DirectionArrow`, `SectionHeader`, `DataTableNote`, `ThemeToggle`.
+- ✅ ADR-007 schema TypeScript types and `readProvenance()` defensive reader (`apps/web/lib/provenance.ts`).
+- ✅ Vitest tests: `score-bar.test.tsx` (15) + `provenance-trigger.test.tsx` (15). Wired into CI through the existing `pnpm test` / `turbo run test` matrix.
+- ✅ `/preview-gallery` internal harness (robots-disallowed, not linked) renders every primitive in every state.
 
-### Provenance display
+### Phase 4.2 — Rankings + Programs Index — ✅ COMPLETE (Session 11)
 
-- ⬜ Hover any data point → exact source sentence, URL, scrape date
-- ⬜ Click-through to Wayback-archived version if current URL differs from scraped URL
-- ⬜ Every published value traceable to the sentence that produced it
+- ✅ **Migration 00006**: `programs.search_tsv` generated tsvector column (name weight A + description_md weight B) with GIN index. Hand-authored SQL because Drizzle does not support `GENERATED ALWAYS … STORED` or `tsvector`.
+- ✅ **ADR-011**: Postgres FTS over Algolia/Typesense for the Phase 4 corpus.
+- ✅ Query layer at `apps/web/lib/queries/`: `types.ts` (denormalised UI shapes), `search.ts` (`sanitiseSearchInput`, `buildTsQuery`, `buildSearchPredicate`, `buildSearchRank`), `ranked-programs.ts` (single round-trip with two LATERAL subqueries; cached via `unstable_cache` with tag `programs:all`), `filters-from-url.ts`.
+- ✅ `RankingsTable` with 8-column dispatch §9.1 layout, three row states (scored / unscored / pre-calibration), sortable column headers, FLIP-based row reorder via `framer-motion`, advisor-mode client recompute via `recomputePaq()` (composite stays 0.3*CME + 0.7*PAQ).
+- ✅ `RankingsFilters` — country multi-select, region/category chip groups, score-range numeric inputs (0–100, step 0.5), scored-only checkbox, debounced (300ms) FTS search input, reset link, selected-country chip row.
+- ✅ `AdvisorModeToggle` + `RankingsExplorer` orchestrator. Filters/sort sync to the URL; advisor weights stay client-only.
+- ✅ `/` (landing) and `/programs` (paginated, PAGE_SIZE=50) routes consume the explorer with server-rendered initial state derived from URL params.
+- ✅ Editorial copy in `apps/web/content/`: `landing.md`, `preview-banner.md`, stub `programs/{aus-skills-in-demand-482-core,sgp-s-pass}.md` for the 4.3 narrative panel. `lib/content.ts` renders Markdown → HTML via `remark`.
+- ✅ Vitest tests: `lib/queries/search.test.ts` (17 — sanitisation, parameterisation, SQL-injection guard, dialect render shape), `lib/advisor-mode.test.ts` (13 — proportional rebalance math + recomputePaq).
+- ✅ `apps/web/next.config.ts` loads the monorepo-root `.env` so RSC database queries see `DATABASE_URL` in dev (Cloud Run injects directly via Secret Manager).
 
-### Methodology page
+### Phase 4.3 — Program detail — ⬜
 
-- ⬜ Auto-generated from `methodology_versions` and `field_definitions` tables
-- ⬜ No separate copy — database is single source of truth
-- ⬜ Sensitivity analysis visualizations: Monte Carlo rank bands, CME/PAQ split chart, indicator dropout heatmap
+- ⬜ Migration 00005: `programs.long_summary_md` + `long_summary_updated_at` + `long_summary_reviewer` (per ADR-010, to be raised in 4.3).
+- ⬜ `lib/queries/program-detail.ts` (joins programs, scores, field_values, sources, field_definitions, methodology_versions, policy_changes).
+- ⬜ Program detail page covering all three states (scored, unscored, placeholder). Pillar radar with cohort median + compare-to. Sub-factor accordion + indicator drilldown with `ProvenanceTrigger` on every value. PolicyTimeline empty-state.
+- ⬜ Vitest tests for provenance popover edge cases (defensive read paths, malformed offsets, mixed status).
 
-### Infrastructure
+### Phase 4.4 — Methodology + country + changes + about — ⬜
 
-- ⬜ Next.js 15 App Router with React Server Components
-- ⬜ Tailwind CSS, shadcn/ui, Recharts visualizations, Framer Motion interactions
-- ⬜ RLS: public reads limited to approved `field_values`, current `scores`, current `methodology_versions`, approved `policy_changes`, public `programs` metadata
+- ⬜ `/methodology` auto-rendered from `methodology_versions` + `field_definitions`.
+- ⬜ `/countries/[iso]` country detail.
+- ⬜ `/changes` empty-state surface (Phase 5 lights up).
+- ⬜ `/about`.
+
+### Phase 4.5 — Polish — ⬜
+
+- ⬜ OG image generation via `@vercel/og` library running on Cloud Run.
+- ⬜ SEO + JSON-LD `Dataset` structured data on program pages.
+- ⬜ Accessibility audit; Lighthouse 95+ on Performance / Accessibility / Best Practices / SEO.
+- ⬜ Cross-browser smoke test (Chrome / Safari / Firefox / Edge).
+- ⬜ Cloud Run deployment validation that `/review` and the public dashboard co-deploy correctly.
+- ⬜ Doc updates per dispatch §15: flip Phase 4 line items to ✅, add Session N close-out note, update `architecture.md` §4 stack table + §7 Implemented on main, add ADRs 009 + 010 alongside ADR-011.
 
 ---
 
@@ -398,9 +419,9 @@ Both flagged `insufficient_disclosure` because pillars C and D have no auto-appr
 - Any methodology change = ADR + `methodology_versions` increment
 - Scores not recomputed retroactively on methodology change — each score carries its `methodology_version_id`
 - All LLM calls logged: prompt, response, model, token count, timestamp, cost
-- Daily cost dashboard: LLM, Firecrawl, Supabase, Vercel, Trigger.dev, Wayback
+- Daily cost dashboard: Anthropic, Perplexity, Supabase, Cloud Run (web + scraper), Trigger.dev, Wayback (Phase 5+)
 - Weekly data-quality report: field coverage %, review queue backlog, policy changes detected, news signals triaged
-- Incident runbook maintained for: extraction pipeline failure, Supabase outage, LLM provider outage, Firecrawl rate limiting, invalid source URL, program closure
+- Incident runbook maintained for: extraction pipeline failure, Supabase outage, LLM provider outage, Perplexity / scraper service outage, invalid source URL, program closure
 
 ---
 
