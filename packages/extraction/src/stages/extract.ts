@@ -55,6 +55,19 @@ function makeCacheKey(contentHash: string, fieldKey: string, promptMd: string): 
   return sha256([contentHash, fieldKey, promptHash, `wv${WINDOW_VERSION}`].join('::'));
 }
 
+/**
+ * Phase 3.3 helper: recompute the cache key the way `extract.ts` does, so a
+ * one-off invalidation script can DELETE specific rows. Exported for tooling
+ * only — runtime extraction does not call this.
+ */
+export function computeExtractionCacheKey(
+  contentHash: string,
+  fieldKey: string,
+  promptMd: string
+): string {
+  return makeCacheKey(contentHash, fieldKey, promptMd);
+}
+
 async function readExtractionCache(cacheKey: string): Promise<ExtractionOutput | null> {
   try {
     const rows = await db

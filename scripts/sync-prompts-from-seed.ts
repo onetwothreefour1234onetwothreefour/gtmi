@@ -1,42 +1,52 @@
 /**
- * One-shot sync: push the `extractionPromptMd` value from `methodology-v1.ts`
- * into the live `field_definitions` table for a given subset of field keys.
+ * One-shot sync: push the `extractionPromptMd` value from a methodology
+ * seed file (v1 or v2) into the live `field_definitions` table.
  *
  * The seed file is the source of truth for prompts; existing DB rows were
  * inserted at first run and aren't auto-updated when the seed changes. This
  * script reconciles them on demand.
  *
+ * --source defaults to v1 for backward compatibility (Phase 2 behaviour).
+ * Pass --source v2 to push the Phase 3.3 prompt overrides.
+ *
  * Dry-run by default; pass --execute to apply.
  *
  * Usage:
- *   # Sync the 6 LLM_MISS prompts tuned in Phase 2 close-out:
- *   npx tsx scripts/sync-prompts-from-seed.ts \
- *     --keys A.1.2,B.3.1,C.2.1,D.2.2,D.2.4,E.1.1
+ *   # Phase 3.3 — push v2 prompt rewrites (LLM_MISS sweep):
+ *   npx tsx scripts/sync-prompts-from-seed.ts --source v2 --all --execute
  *
- *   # Sync everything:
- *   npx tsx scripts/sync-prompts-from-seed.ts --all --execute
+ *   # Sync a specific key set from v1 (rollback):
+ *   npx tsx scripts/sync-prompts-from-seed.ts --source v1 --all --execute
+ *
+ *   # Dry-run a v2 push for a subset:
+ *   npx tsx scripts/sync-prompts-from-seed.ts --source v2 --keys A.1.2,B.3.1
  */
 
-import { db, fieldDefinitions, methodologyV1 } from '@gtmi/db';
+import { client, db, fieldDefinitions, methodologyV1, methodologyV2 } from '@gtmi/db';
 import { eq, inArray } from 'drizzle-orm';
 
-// methodologyV1.indicators carries the canonical {key, label, extractionPromptMd, ...}
-// rows. We narrow to the shape this script needs.
+// methodology objects expose .indicators with the canonical rows.
 interface SeedIndicator {
   key: string;
   extractionPromptMd: string;
 }
-const fieldDefinitionsSeed: SeedIndicator[] = (methodologyV1 as { indicators: SeedIndicator[] })
-  .indicators;
+
+type SourceTag = 'v1' | 'v2';
+
+function getSeed(source: SourceTag): SeedIndicator[] {
+  const m = source === 'v2' ? methodologyV2 : methodologyV1;
+  return (m as { indicators: SeedIndicator[] }).indicators;
+}
 
 interface CliArgs {
   keys: string[];
   all: boolean;
   execute: boolean;
+  source: SourceTag;
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const out: CliArgs = { keys: [], all: false, execute: false };
+  const out: CliArgs = { keys: [], all: false, execute: false, source: 'v1' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = argv[i + 1];
@@ -50,6 +60,13 @@ function parseArgs(argv: string[]): CliArgs {
       out.all = true;
     } else if (a === '--execute') {
       out.execute = true;
+    } else if (a === '--source' && next) {
+      if (next !== 'v1' && next !== 'v2') {
+        console.error(`--source must be 'v1' or 'v2' (got "${next}")`);
+        process.exit(2);
+      }
+      out.source = next;
+      i++;
     }
   }
   return out;
@@ -59,11 +76,13 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   if (!args.all && args.keys.length === 0) {
     console.error(
-      'Usage: sync-prompts-from-seed.ts --keys A.1.2,B.3.1,... [--execute]  |  --all [--execute]'
+      'Usage: sync-prompts-from-seed.ts --source v1|v2 [--keys A.1.2,B.3.1,...] [--all] [--execute]'
     );
     process.exit(2);
   }
 
+  console.log(`Source seed: methodology-${args.source}`);
+  const fieldDefinitionsSeed = getSeed(args.source);
   const seedRows = fieldDefinitionsSeed.filter((s) => args.all || args.keys.includes(s.key));
   if (seedRows.length === 0) {
     console.error(`No seed rows match keys ${args.keys.join(',')}`);
@@ -142,7 +161,16 @@ async function main(): Promise<void> {
   console.log(`Done — ${changes.length} row(s) updated.`);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main()
+  .then(async () => {
+    await client.end({ timeout: 5 });
+  })
+  .catch(async (err) => {
+    console.error(err);
+    try {
+      await client.end({ timeout: 5 });
+    } catch {
+      // ignore
+    }
+    process.exit(1);
+  });
