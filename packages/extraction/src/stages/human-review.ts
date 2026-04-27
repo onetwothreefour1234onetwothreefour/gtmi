@@ -102,7 +102,9 @@ export class HumanReviewStageImpl implements HumanReviewStage {
     // null — the reviewer can correct the raw before approval.
     const rawAsString =
       typeof extraction.valueRaw === 'string' ? extraction.valueRaw : String(extraction.valueRaw);
-    let valueNormalized: number | string | boolean | null = null;
+    // Phase 3.5: NormalizedValue widened to include Record<string, unknown>
+    // so boolean_with_annotation can round-trip through review.
+    let valueNormalized: number | string | boolean | Record<string, unknown> | null = null;
     let normalizationError: string | null = null;
     try {
       // Strip currency prefix for numeric fields before normalization, mirroring publish.ts.

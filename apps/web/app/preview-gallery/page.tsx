@@ -52,6 +52,27 @@ const PROVENANCE_APPROVED: Provenance = {
   reviewerNotes: 'Verified against ATO supplementary fee table.',
 };
 
+// Phase 3.5 / ADR-014 — country-substitute provenance fixture.
+// extractionModel='country-substitute-regional' triggers the purple
+// "Country-substitute" badge inside the ProvenanceTrigger popover.
+const PROVENANCE_COUNTRY_SUBSTITUTE: Provenance = {
+  ...PROVENANCE_OK,
+  sourceUrl: 'https://www.education.gov.au/visa-holder-children-public-schools-overview',
+  geographicLevel: 'global',
+  sourceTier: 1,
+  sourceSentence:
+    'OECD high-income default: visa-holder dependants automatically eligible for public schooling.',
+  charOffsets: [0, 86],
+  extractionModel: 'country-substitute-regional',
+  extractionConfidence: 1.0,
+  validationModel: 'country-substitute-regional',
+  validationConfidence: 1.0,
+  crossCheckResult: 'not_checked',
+  reviewer: 'auto',
+  reviewedAt: '2026-04-27T00:00:00.000Z',
+  reviewerNotes: 'Regional default applied; Phase 3.5 ADR-014.',
+};
+
 const PROVENANCE_INCOMPLETE = {
   // Deliberately missing contentHash, charOffsets, validationModel.
   sourceUrl: PROVENANCE_OK.sourceUrl,
@@ -263,6 +284,14 @@ export default function PrimitivesPreviewPage() {
             </Row>
             <Row label="Null provenance">
               <ProvenanceTrigger provenance={null} status="approved" />
+            </Row>
+            <Row label="Country-substitute (Phase 3.5 / ADR-014; C.3.2 OECD default)">
+              <span className="font-mono text-data-md">automatic</span>
+              <ProvenanceTrigger
+                provenance={PROVENANCE_COUNTRY_SUBSTITUTE}
+                status="approved"
+                valueRaw="automatic"
+              />
             </Row>
           </div>
         </Block>

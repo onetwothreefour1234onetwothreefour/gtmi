@@ -7,6 +7,7 @@ import {
 } from './types';
 import {
   normalizeBoolean,
+  normalizeBooleanWithAnnotation,
   normalizeCategorical,
   normalizeMinMax,
   normalizeZScore,
@@ -29,6 +30,8 @@ const KNOWN_NORMALIZATION_FNS = new Set<NormalizationFn>([
   'z_score',
   'categorical',
   'boolean',
+  'boolean_with_annotation',
+  'country_substitute_regional',
 ]);
 
 interface IndicatorResult {
@@ -42,7 +45,7 @@ interface IndicatorResult {
 function scoreIndicator(
   def: FieldDefinitionRecord,
   valueNormalized: unknown,
-  input: ScoringInput,
+  input: ScoringInput
 ): number {
   const parsed = parseIndicatorValue(valueNormalized, def.normalizationFn);
   const params = input.normalizationParams[def.key] ?? {};
@@ -52,16 +55,28 @@ function scoreIndicator(
       return normalizeMinMax(parsed as number, params, def.direction);
     case 'z_score':
       return normalizeZScore(parsed as number, params, def.direction);
-    case 'categorical': {
+    case 'categorical':
+    case 'country_substitute_regional': {
+      // country_substitute_regional reuses the categorical scoring path —
+      // the substituted string in valueNormalized maps to a rubric score
+      // exactly like a normal categorical extraction. The "country
+      // substitute" provenance lives on the field_values row's
+      // provenance.extractionModel, not in scoring.
       if (!def.scoringRubricJsonb) {
         throw new ScoringError(
-          `Field "${def.key}" uses categorical normalization but has no scoringRubricJsonb`,
+          `Field "${def.key}" uses ${def.normalizationFn} normalization but has no scoringRubricJsonb`
         );
       }
       return normalizeCategorical(parsed as string, def.scoringRubricJsonb);
     }
     case 'boolean':
       return normalizeBoolean(parsed as boolean, def.direction);
+    case 'boolean_with_annotation':
+      return normalizeBooleanWithAnnotation(
+        parsed as Record<string, unknown>,
+        def.key,
+        def.direction
+      );
   }
 }
 
@@ -70,14 +85,14 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
   for (const fv of input.fieldValues) {
     if (fv.status !== 'approved') {
       throw new ScoringError(
-        `FieldValue ${fv.id} has status "${fv.status}" — only approved values may be scored`,
+        `FieldValue ${fv.id} has status "${fv.status}" — only approved values may be scored`
       );
     }
   }
   for (const def of input.fieldDefinitions) {
     if (!KNOWN_NORMALIZATION_FNS.has(def.normalizationFn)) {
       throw new ScoringError(
-        `Unknown normalizationFn "${def.normalizationFn}" on field "${def.key}"`,
+        `Unknown normalizationFn "${def.normalizationFn}" on field "${def.key}"`
       );
     }
   }
@@ -187,7 +202,7 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
 
   // Step 6: Flag insufficient disclosure
   const flaggedInsufficientDisclosure = Object.values(dataCoverageByPillar).some(
-    (coverage) => coverage < INSUFFICIENT_DISCLOSURE_THRESHOLD,
+    (coverage) => coverage < INSUFFICIENT_DISCLOSURE_THRESHOLD
   );
 
   // Step 7: Aggregate sub-factors → pillar scores (re-normalize when sub-factors are
@@ -214,7 +229,7 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
   // Step 8: PAQ score — re-normalize pillar weights over pillars that have at least
   // one in-scope sub-factor, so PAQ is not diluted by entirely-out-of-scope pillars.
   const pillarsInScope = Object.keys(PILLAR_WEIGHTS).filter((p) =>
-    Object.keys(SUB_FACTOR_WEIGHTS[p] ?? {}).some((sf) => subFactorScores[sf] !== undefined),
+    Object.keys(SUB_FACTOR_WEIGHTS[p] ?? {}).some((sf) => subFactorScores[sf] !== undefined)
   );
   const pillarWeightSum = pillarsInScope.reduce((s, p) => s + (PILLAR_WEIGHTS[p] ?? 0), 0);
   const paqItems = pillarsInScope.map((p) => ({

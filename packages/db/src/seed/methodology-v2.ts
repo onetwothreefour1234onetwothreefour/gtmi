@@ -671,18 +671,252 @@ export const PHASE_3_3_PROMPT_UNCERTAIN: Record<string, string> = {
     'Boundary failure — citizenship physical-presence calculator page is JS-rendered; thin scrape on canary.',
 };
 
+// ────────────────────────────────────────────────────────────────────
+// Phase 3.5 / ADR-014 — APPROVED indicator dispositions.
+//
+// Five indicators are restructured:
+//   B.2.3 — numeric → boolean_with_annotation (hasLevy + notes).
+//   B.2.4 — numeric → boolean_with_annotation (hasMandatoryNonGovCosts + notes).
+//   D.1.3 — numeric → boolean_with_annotation (required + daysPerYear + notes).
+//   D.1.4 — numeric → boolean_with_annotation (required + daysPerYear + notes).
+//   C.3.2 — categorical → country_substitute_regional (regional default
+//           value when LLM extraction returns empty).
+//
+// Sub-factor weights are unchanged: each restructured indicator stays
+// in its original sub-factor with its original weight. The data-type
+// change does not require weight re-normalization.
+//
+// Each indicator override below specifies:
+//   - dataType: 'json' for boolean_with_annotation; 'categorical' for C.3.2.
+//   - normalizationFn: 'boolean_with_annotation' or 'country_substitute_regional'.
+//   - direction: lower_is_better (presence of levy/cost/requirement is a penalty)
+//     for B.2.3/B.2.4/D.1.3/D.1.4; higher_is_better for C.3.2 (more access better).
+//   - scoringRubricJsonb: replaced for boolean_with_annotation with a
+//     two-entry rubric so the dashboard can render rubric-aware
+//     (the engine itself reads the structured boolean directly via
+//     BOOLEAN_WITH_ANNOTATION_KEYS, not the rubric).
+//   - extractionPromptMd: requests the structured JSON output shape.
+// ────────────────────────────────────────────────────────────────────
+
+interface MethodologyV1Indicator {
+  key: string;
+  label: string;
+  dataType: string;
+  pillar: string;
+  subFactor: string;
+  weightWithinSubFactor: number;
+  extractionPromptMd: string;
+  scoringRubricJsonb: unknown;
+  normalizationFn: string;
+  direction: string;
+  sourceTierRequired: number;
+}
+
+interface IndicatorRestructure {
+  dataType: string;
+  normalizationFn: string;
+  direction: string;
+  scoringRubricJsonb: unknown;
+  extractionPromptMd: string;
+}
+
+const STRUCTURED_BOOL_RUBRIC = {
+  categories: [
+    { value: 'true', score: 0, description: 'requirement / charge present (penalised)' },
+    { value: 'false', score: 100, description: 'no requirement / charge (best case)' },
+  ],
+};
+
+const C32_REGIONAL_RUBRIC = {
+  categories: [
+    {
+      value: 'automatic',
+      score: 100,
+      description: 'public schooling automatic for visa-holder dependants',
+    },
+    {
+      value: 'fee_paying',
+      score: 40,
+      description: 'fee-paying access only (Gulf-style)',
+    },
+  ],
+};
+
+export const PHASE_3_5_INDICATOR_RESTRUCTURES: Record<string, IndicatorRestructure> = {
+  'B.2.3': {
+    dataType: 'json',
+    normalizationFn: 'boolean_with_annotation',
+    direction: 'lower_is_better',
+    scoringRubricJsonb: STRUCTURED_BOOL_RUBRIC,
+    extractionPromptMd: withPreamble(
+      `Extraction Task: B.2.3 — Employer-borne levies and skill charges (boolean+annotation)
+Question: Does this programme require the sponsoring employer to pay any government levy or skill charge?
+
+Return value: a JSON object with this exact shape:
+  { "hasLevy": boolean, "notes": string | null }
+
+Recall hints (extends Phase 3.3 v2 prompt):
+
+If the program has NO employer sponsorship requirement (Canada Express Entry FSW/CEC, NZ Skilled Migrant 189-style, AU Skilled Independent 189), return { "hasLevy": false, "notes": "no employer sponsorship requirement" }.
+Common levy names that indicate hasLevy=true: "Skilling Australians Fund (SAF) levy", "Immigration Skills Charge (ISC)", "training levy", "skills surcharge".
+notes is a one-sentence summary of the levy name and amount when present, or null when none.
+
+Edge cases:
+
+If the page is silent on employer levies but employer sponsorship IS required, do not infer hasLevy=false; return null with notes "page silent on levies".
+"Visa application fee paid by employer" is NOT a levy — it's a B.2.1 fee. Do not include.`
+    ),
+  },
+
+  'B.2.4': {
+    dataType: 'json',
+    normalizationFn: 'boolean_with_annotation',
+    direction: 'lower_is_better',
+    scoringRubricJsonb: STRUCTURED_BOOL_RUBRIC,
+    extractionPromptMd: withPreamble(
+      `Extraction Task: B.2.4 — Mandatory non-government costs (boolean+annotation)
+Question: Does this programme require any mandatory non-government costs (medical exam, document translation, police check fees, application-period health insurance) for a standard principal applicant?
+
+Return value: a JSON object with this exact shape:
+  { "hasMandatoryNonGovCosts": boolean, "notes": string | null }
+
+Recall hints:
+
+Almost every programme has at least one mandatory non-government cost (police certificate, panel-physician medical, statutory translation). Return hasMandatoryNonGovCosts=true unless the page explicitly states "no third-party costs are required".
+notes is a one-sentence summary listing the mandatory non-gov requirement(s).
+
+Edge cases:
+
+Optional agent/lawyer fees do NOT count.
+Government health surcharges (UK IHS) do NOT count — those are B.2.1 government fees.
+If the page is silent on non-gov costs entirely (rare for a major programme), return null with notes "page silent on third-party costs".`
+    ),
+  },
+
+  'D.1.3': {
+    dataType: 'json',
+    normalizationFn: 'boolean_with_annotation',
+    direction: 'lower_is_better',
+    scoringRubricJsonb: STRUCTURED_BOOL_RUBRIC,
+    extractionPromptMd: withPreamble(
+      `Extraction Task: D.1.3 — Physical presence requirement during PR accrual (boolean+annotation)
+Question: Does this programme require the visa holder to physically be present in the country for some minimum number of days each year for that year to count toward PR-qualifying time?
+
+Return value: a JSON object with this exact shape:
+  { "required": boolean, "daysPerYear": number | null, "notes": string | null }
+
+Recall hints:
+
+If the page describes a physical-presence rule during accrual, set required=true and populate daysPerYear with the figure.
+If the page describes the rule as "no more than X days outside the country", convert to required=true and daysPerYear = 365 - X.
+If presence is not required during accrual (rare for talent visas), set required=false, daysPerYear=null.
+
+Edge cases:
+
+If the source is silent on accrual presence specifically but states a per-year retention rule (D.1.4), do NOT conflate the two — return null/null with notes "accrual rule not stated; D.1.4 retention rule documented separately".
+notes can include qualifying-period framing ("e.g. 1,095 days within 5 years for Canada citizenship-from-PR" → required=true, daysPerYear=219).`
+    ),
+  },
+
+  'D.1.4': {
+    dataType: 'json',
+    normalizationFn: 'boolean_with_annotation',
+    direction: 'lower_is_better',
+    scoringRubricJsonb: STRUCTURED_BOOL_RUBRIC,
+    extractionPromptMd: withPreamble(
+      `Extraction Task: D.1.4 — PR retention rules (boolean+annotation)
+Question: After PR is granted, does this programme require the holder to maintain physical presence to keep PR status?
+
+Return value: a JSON object with this exact shape:
+  { "required": boolean, "daysPerYear": number | null, "notes": string | null }
+
+Recall hints:
+
+Common patterns to extract:
+  * Canada: PR holders must be in Canada at least 730 days in any 5-year period → required=true, daysPerYear=146 (730/5), notes "730 days in 5 years (rolling)".
+  * Australia: 5-year travel facility on PR; must apply for resident return visa to re-enter after 5 years → required=true, daysPerYear=null (binary travel-facility model), notes "RRV required after 5 years out".
+  * UK ILR: lapses if absent from UK for 2 consecutive years → required=true, daysPerYear=null, notes "ILR lapses after 2 years' absence".
+If PR is not available from this programme, return required=false, daysPerYear=null, notes "PR not available".
+
+Edge cases:
+
+If the page mentions PR as a pathway endpoint but does NOT describe the retention rule, return null/null/null with notes "retention rule not on this page".`
+    ),
+  },
+
+  'C.3.2': {
+    dataType: 'categorical',
+    normalizationFn: 'country_substitute_regional',
+    direction: 'higher_is_better',
+    scoringRubricJsonb: C32_REGIONAL_RUBRIC,
+    // The prompt is unchanged from v1 — extraction still runs first; the
+    // country-substitute mechanism only fires at publish time IF
+    // extraction returns empty AND the country has a regional default.
+    extractionPromptMd: withPreamble(
+      `Extraction Task: C.3.2 — Public education access for children of visa holders
+Question: Do children of this programme's visa holders have automatic access to the public education system (free schooling) on the same terms as citizen children?
+
+Allowed values:
+
+"automatic": yes, public-school enrolment available with no extra fees.
+"fee_paying": access available but fees apply (Gulf-style international school requirement).
+"restricted": case-by-case basis or local-authority approval.
+"none": children have no public-school access.
+
+Edge cases:
+
+If the page is silent, the publish stage will substitute the regional default
+('automatic' for OECD high-income, 'fee_paying' for GCC) — do NOT guess. Return
+empty so the substitution mechanism can fire cleanly.`
+    ),
+  },
+};
+
 /**
- * Compose v2 = v1 with phase-3.3 prompt overrides applied. Identical
- * shape to v1 — same indicators array, same weights, same rubrics.
+ * Apply Phase 3.5 indicator restructures on top of an indicator with
+ * Phase 3.3 prompt overrides already applied.
+ */
+function applyPhase3_5(ind: MethodologyV1Indicator): MethodologyV1Indicator {
+  const restructure = PHASE_3_5_INDICATOR_RESTRUCTURES[ind.key];
+  if (!restructure) return ind;
+  return {
+    ...ind,
+    dataType: restructure.dataType,
+    normalizationFn: restructure.normalizationFn,
+    direction: restructure.direction,
+    scoringRubricJsonb: restructure.scoringRubricJsonb,
+    extractionPromptMd: restructure.extractionPromptMd,
+  };
+}
+
+/**
+ * Compose v2 = v1
+ *   + Phase 3.3 prompt overrides (applied first)
+ *   + Phase 3.5 indicator restructures (applied second).
+ *
+ * Identical shape to v1 — same indicators array, same per-indicator
+ * weights, same sub-factor and pillar weights. Phase 3.5 changes
+ * dataType / normalizationFn / direction / scoringRubricJsonb /
+ * extractionPromptMd for 5 indicators (B.2.3, B.2.4, D.1.3, D.1.4,
+ * C.3.2) but does NOT change weights.
  */
 export const methodologyV2 = {
   ...methodologyV1,
-  version_tag: '1.0.1-phase-3-3-prompts',
+  // Phase 3.5 / ADR-014: methodology version bump from 1.0.1 (prompt
+  // marker only) to 2.0.0 (data-type changes for 5 indicators).
+  version_tag: '2.0.0',
   indicators: methodologyV1.indicators.map((ind) => {
-    const override = PHASE_3_3_PROMPT_OVERRIDES[ind.key];
-    return override ? { ...ind, extractionPromptMd: override } : ind;
+    // Phase 3.3 prompt overlay first.
+    const promptOverride = PHASE_3_3_PROMPT_OVERRIDES[ind.key];
+    const withPromptV2 = promptOverride ? { ...ind, extractionPromptMd: promptOverride } : ind;
+    // Phase 3.5 structural change second (Phase 3.5 prompt replaces 3.3
+    // prompt for the 5 restructured fields).
+    return applyPhase3_5(withPromptV2);
   }),
 };
 
 /** List of indicator keys whose prompts were rewritten in Phase 3.3. */
 export const PHASE_3_3_REWRITTEN_KEYS: string[] = Object.keys(PHASE_3_3_PROMPT_OVERRIDES);
+
+/** List of indicator keys whose data-type was restructured in Phase 3.5. */
+export const PHASE_3_5_RESTRUCTURED_KEYS: string[] = Object.keys(PHASE_3_5_INDICATOR_RESTRUCTURES);

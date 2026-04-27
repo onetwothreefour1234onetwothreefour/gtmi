@@ -160,8 +160,6 @@ describe('ProvenanceTrigger', () => {
     render(
       <ProvenanceTrigger provenance={tier2} status="pending_review" valueRaw="not required" />
     );
-    // Badge sits inside the popover content; it shouldn't be in the DOM until the
-    // user opens the popover.
     expect(screen.queryByTestId('tier2-source-badge')).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId('provenance-trigger'));
     const badge = await screen.findByTestId('tier2-source-badge');
@@ -183,7 +181,41 @@ describe('ProvenanceTrigger', () => {
     );
     expect(screen.queryByTestId('tier2-source-badge')).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId('provenance-trigger'));
-    // Popover is open now; the badge still must not appear.
     expect(screen.queryByTestId('tier2-source-badge')).not.toBeInTheDocument();
+  });
+
+  // Phase 3.5 / ADR-014 — Country-substitute badge inside the popover.
+  it('renders the "Country-substitute" badge when extractionModel === "country-substitute-regional"', async () => {
+    const sub: Provenance = {
+      ...COMPLETE_PROVENANCE,
+      extractionModel: 'country-substitute-regional',
+      validationModel: 'country-substitute-regional',
+      reviewer: 'auto',
+      reviewedAt: '2026-04-27T00:00:00.000Z',
+      reviewerNotes: 'Regional default applied; ADR-014.',
+    };
+    render(<ProvenanceTrigger provenance={sub} status="approved" valueRaw="automatic" />);
+    expect(screen.queryByTestId('country-substitute-badge')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    const badge = await screen.findByTestId('country-substitute-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute('role', 'note');
+    expect(badge).toHaveTextContent('Country-substitute');
+    expect(badge).toHaveTextContent(
+      'This value was inferred from regional norms, not extracted from a government source directly.'
+    );
+  });
+
+  it('does NOT render the Country-substitute badge for normal extractionModel', async () => {
+    render(
+      <ProvenanceTrigger
+        provenance={COMPLETE_PROVENANCE}
+        status="pending_review"
+        valueRaw="AUD 73,150"
+      />
+    );
+    expect(screen.queryByTestId('country-substitute-badge')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    expect(screen.queryByTestId('country-substitute-badge')).not.toBeInTheDocument();
   });
 });

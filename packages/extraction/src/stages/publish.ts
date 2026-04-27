@@ -84,7 +84,9 @@ export class PublishStageImpl implements PublishStage {
       }
     }
 
-    let valueNormalized: number | string | boolean;
+    // Phase 3.5: NormalizedValue is now a wider type (number | string |
+    // boolean | Record<string, unknown>) to support boolean_with_annotation.
+    let valueNormalized: number | string | boolean | Record<string, unknown>;
     try {
       valueNormalized = normalizeRawValue(rawForNormalization, fieldDef);
     } catch (error) {

@@ -6,11 +6,16 @@ import {
   rubricToScoreMap,
 } from './types';
 
-export type NormalizedValue = number | string | boolean;
+export type NormalizedValue = number | string | boolean | Record<string, unknown>;
 
 function isNormalizationFn(value: string): value is NormalizationFn {
   return (
-    value === 'min_max' || value === 'z_score' || value === 'categorical' || value === 'boolean'
+    value === 'min_max' ||
+    value === 'z_score' ||
+    value === 'categorical' ||
+    value === 'boolean' ||
+    value === 'boolean_with_annotation' ||
+    value === 'country_substitute_regional'
   );
 }
 
@@ -22,7 +27,7 @@ function isWrappedCategoricalRubric(value: unknown): value is WrappedCategorical
     (c) =>
       typeof c === 'object' &&
       c !== null &&
-      typeof (c as Record<string, unknown>)['value'] === 'string',
+      typeof (c as Record<string, unknown>)['value'] === 'string'
   );
 }
 
@@ -53,7 +58,7 @@ function isCategoricalRubric(value: unknown): value is CategoricalRubric {
  */
 export function normalizeRawValue(
   valueRaw: string,
-  def: { normalizationFn: string; scoringRubricJsonb: unknown },
+  def: { normalizationFn: string; scoringRubricJsonb: unknown }
 ): NormalizedValue {
   const { normalizationFn, scoringRubricJsonb } = def;
 
@@ -68,7 +73,7 @@ export function normalizeRawValue(
       const n = parseFloat(cleaned);
       if (!isFinite(n)) {
         throw new ScoringError(
-          `Cannot parse "${valueRaw}" as a number for ${normalizationFn} normalization`,
+          `Cannot parse "${valueRaw}" as a number for ${normalizationFn} normalization`
         );
       }
       return n;
@@ -76,14 +81,14 @@ export function normalizeRawValue(
     case 'categorical': {
       if (!isCategoricalRubric(scoringRubricJsonb)) {
         throw new ScoringError(
-          `Field uses categorical normalization but has no valid scoringRubricJsonb`,
+          `Field uses categorical normalization but has no valid scoringRubricJsonb`
         );
       }
       const scoreMap = rubricToScoreMap(scoringRubricJsonb);
       const trimmed = valueRaw.trim();
       if (!(trimmed in scoreMap)) {
         throw new ScoringError(
-          `Categorical value "${trimmed}" not in rubric. Valid keys: ${Object.keys(scoreMap).join(', ')}`,
+          `Categorical value "${trimmed}" not in rubric. Valid keys: ${Object.keys(scoreMap).join(', ')}`
         );
       }
       return trimmed;
@@ -93,8 +98,48 @@ export function normalizeRawValue(
       if (lower === 'yes' || lower === 'true' || lower === '1') return true;
       if (lower === 'no' || lower === 'false' || lower === '0') return false;
       throw new ScoringError(
-        `Cannot parse "${valueRaw}" as boolean. Expected yes/no/true/false/1/0`,
+        `Cannot parse "${valueRaw}" as boolean. Expected yes/no/true/false/1/0`
       );
+    }
+    case 'boolean_with_annotation': {
+      // Phase 3.5: the LLM returns the structured object as JSON text in
+      // valueRaw. Parse it; trust the publish stage to have validated the
+      // shape upstream (the scoring engine's parseIndicatorValue performs
+      // the strict shape check before scoring).
+      const trimmed = valueRaw.trim();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        throw new ScoringError(
+          `boolean_with_annotation: cannot parse valueRaw as JSON: "${trimmed.slice(0, 80)}…"`
+        );
+      }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        throw new ScoringError(
+          `boolean_with_annotation: parsed JSON must be an object, got ${typeof parsed}`
+        );
+      }
+      return parsed as Record<string, unknown>;
+    }
+    case 'country_substitute_regional': {
+      // Phase 3.5: the substituted value is written by the publish stage
+      // as a categorical string ('automatic' / 'fee_paying'); raw form is
+      // the same string. Validate against the rubric exactly like
+      // categorical so the publish stage cannot stash an unmapped label.
+      if (!isCategoricalRubric(scoringRubricJsonb)) {
+        throw new ScoringError(
+          `Field uses country_substitute_regional normalization but has no valid scoringRubricJsonb`
+        );
+      }
+      const scoreMap = rubricToScoreMap(scoringRubricJsonb);
+      const trimmed = valueRaw.trim();
+      if (!(trimmed in scoreMap)) {
+        throw new ScoringError(
+          `country_substitute_regional value "${trimmed}" not in rubric. Valid keys: ${Object.keys(scoreMap).join(', ')}`
+        );
+      }
+      return trimmed;
     }
   }
 }

@@ -134,6 +134,20 @@ export function ProvenanceTrigger({
             </div>
           )}
 
+          {p.extractionModel === 'country-substitute-regional' && (
+            <div
+              className="mt-3 inline-flex flex-col gap-0.5 rounded-button border border-purple-300/60 bg-purple-50/70 px-2.5 py-1.5 text-data-sm text-purple-900 dark:border-purple-700/60 dark:bg-purple-950/40 dark:text-purple-100"
+              data-testid="country-substitute-badge"
+              role="note"
+            >
+              <span className="font-medium">Country-substitute</span>
+              <span className="text-muted-foreground">
+                This value was inferred from regional norms, not extracted from a government source
+                directly.
+              </span>
+            </div>
+          )}
+
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-data-sm">
             <dt className="text-muted-foreground">Source</dt>
             <dd className="truncate">
