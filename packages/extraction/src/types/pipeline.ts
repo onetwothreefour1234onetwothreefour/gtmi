@@ -117,6 +117,9 @@ export interface PublishStage {
 export interface DeriveStageInputs {
   a12: import('../stages/derive').DerivedA12Input;
   d22: import('../stages/derive').DerivedD22Input;
+  /** Phase 3.6.1 / FIX 6 — D.2.3 dual citizenship derive. Optional for
+   * backwards compatibility with callers that don't pass it. */
+  d23?: import('../stages/derive').DerivedD23Input;
 }
 
 export interface DeriveStage {

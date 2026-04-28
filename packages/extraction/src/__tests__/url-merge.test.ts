@@ -113,19 +113,21 @@ describe('mergeDiscoveredUrls', () => {
     ]);
   });
 
-  it('respects the per-tier quotas (7 / 4 / 1) within the default cap', () => {
-    // Construct 10 Tier 1, 6 Tier 2, 3 Tier 3 entries → 19 total.
-    // Default cap is 12 with quotas 7/4/1.
+  it('respects the per-tier quotas (9 / 5 / 1) within the default cap', () => {
+    // Phase 3.6.1 — quotas raised from 7/4/1 → 9/5/1, default cap 12 → 15
+    // to accommodate the two new department types in discover.ts (PR
+    // pathway authority + citizenship authority).
+    // Construct 12 Tier 1, 7 Tier 2, 3 Tier 3 entries → 22 total.
     const fresh: DiscoveredUrl[] = [];
-    for (let i = 0; i < 10; i++) fresh.push(du(`https://gov.example/${i}`, 1));
-    for (let i = 0; i < 6; i++) fresh.push(du(`https://lawfirm.example/${i}`, 2));
+    for (let i = 0; i < 12; i++) fresh.push(du(`https://gov.example/${i}`, 1));
+    for (let i = 0; i < 7; i++) fresh.push(du(`https://lawfirm.example/${i}`, 2));
     for (let i = 0; i < 3; i++) fresh.push(du(`https://news.example/${i}`, 3));
     const result = mergeDiscoveredUrls({ freshFromStage0: fresh, fromSourcesTable: [] });
     const tierCounts = { 1: 0, 2: 0, 3: 0 } as Record<1 | 2 | 3, number>;
     for (const u of result) tierCounts[u.tier as 1 | 2 | 3]++;
     expect(result.length).toBeLessThanOrEqual(DEFAULT_URL_CAP);
-    expect(tierCounts[1]).toBeLessThanOrEqual(7);
-    expect(tierCounts[2]).toBeLessThanOrEqual(4);
+    expect(tierCounts[1]).toBeLessThanOrEqual(9);
+    expect(tierCounts[2]).toBeLessThanOrEqual(5);
     expect(tierCounts[3]).toBeLessThanOrEqual(1);
   });
 
@@ -141,22 +143,22 @@ describe('mergeDiscoveredUrls', () => {
   });
 
   it('falls through tier quotas when one tier is short (Tier 1 underfill backfilled by Tier 2)', () => {
-    // 3 Tier 1, 8 Tier 2, 1 Tier 3 → 12 total. Quotas 7/4/1 give 3/4/1=8;
-    // fall-through fills remaining 4 from leftover Tier 2.
+    // 3 Tier 1, 11 Tier 2, 1 Tier 3 → 15 total. Quotas 9/5/1 give 3/5/1=9;
+    // fall-through fills remaining 6 from leftover Tier 2 (cap 15).
     const fresh: DiscoveredUrl[] = [
       du('https://gov.example/a', 1),
       du('https://gov.example/b', 1),
       du('https://gov.example/c', 1),
-      ...Array.from({ length: 8 }, (_, i) => du(`https://lawfirm.example/${i}`, 2)),
+      ...Array.from({ length: 11 }, (_, i) => du(`https://lawfirm.example/${i}`, 2)),
       du('https://news.example/0', 3),
     ];
     const result = mergeDiscoveredUrls({ freshFromStage0: fresh, fromSourcesTable: [] });
-    // Cap 12 — should fill with all 3 Tier 1, all 8 Tier 2 (4 from quota + 4 fallthrough), 1 Tier 3.
-    expect(result).toHaveLength(12);
+    // Cap 15 — should fill with all 3 Tier 1, all 11 Tier 2 (5 from quota + 6 fallthrough), 1 Tier 3.
+    expect(result).toHaveLength(15);
     const tierCounts = { 1: 0, 2: 0, 3: 0 } as Record<1 | 2 | 3, number>;
     for (const u of result) tierCounts[u.tier as 1 | 2 | 3]++;
     expect(tierCounts[1]).toBe(3);
-    expect(tierCounts[2]).toBe(8);
+    expect(tierCounts[2]).toBe(11);
     expect(tierCounts[3]).toBe(1);
   });
 });

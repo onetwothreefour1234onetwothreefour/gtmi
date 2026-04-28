@@ -241,14 +241,18 @@ export class PublishStageImpl implements PublishStage {
     extraction: ExtractionOutput,
     provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> }
   ): Promise<string> {
-    if (provenance.extractionModel !== 'derived-computation') {
+    // Phase 3.6.1 / FIX 6 — accept both 'derived-computation' (A.1.2,
+    // D.2.2 — confidence 0.6) AND 'derived-knowledge' (D.2.3 — confidence
+    // 0.7). Both must be below the 0.85 auto-approve threshold.
+    const ALLOWED_DERIVE_MODELS = new Set(['derived-computation', 'derived-knowledge']);
+    if (!ALLOWED_DERIVE_MODELS.has(provenance.extractionModel)) {
       throw new Error(
-        `executeDerived refused: extractionModel must be 'derived-computation', got '${provenance.extractionModel}'`
+        `executeDerived refused: extractionModel must be 'derived-computation' or 'derived-knowledge', got '${provenance.extractionModel}'`
       );
     }
-    if (provenance.extractionConfidence !== 0.6) {
+    if (provenance.extractionConfidence >= 0.85) {
       throw new Error(
-        `executeDerived refused: extractionConfidence must be 0.6 (forces /review), got ${provenance.extractionConfidence}`
+        `executeDerived refused: extractionConfidence must be below 0.85 (forces /review), got ${provenance.extractionConfidence}`
       );
     }
 
@@ -386,6 +390,61 @@ export class PublishStageImpl implements PublishStage {
     ) {
       console.log(
         `  [${extraction.fieldDefinitionKey}] Skipped publish — value "${rawAsString}" is a coverage-gap sentinel, not data.`
+      );
+      return;
+    }
+
+    // Phase 3.6.1 / Fix 2 — `not_stated` is a different kind of sentinel:
+    // the document mentions the program but is silent on this indicator.
+    // Distinct from `not_addressed` / `not_found` (which mean the LLM
+    // failed to find anything at all). Per Q5, `not_stated` rows are
+    // PUBLISHED with a non-null value_raw (counts as POPULATED in the
+    // rollup) but with `value_indicator_score = null` so the scoring
+    // engine applies the missing-data penalty. The reviewer can replace
+    // it with a real categorical value at /review time.
+    if (fieldDef.normalizationFn === 'categorical' && rawAsString === 'not_stated') {
+      const methodologyRows = await db
+        .select({ id: methodologyVersions.id })
+        .from(methodologyVersions)
+        .where(eq(methodologyVersions.versionTag, provenance.methodologyVersion))
+        .limit(1);
+      if (methodologyRows.length === 0) {
+        throw new Error(
+          `Publish failed: no methodology_version found with version_tag "${provenance.methodologyVersion}"`
+        );
+      }
+      const methodologyVersionId = methodologyRows[0]!.id;
+      const inserted = await db
+        .insert(fieldValues)
+        .values({
+          programId: extraction.programId,
+          fieldDefinitionId,
+          valueRaw: 'not_stated',
+          valueNormalized: null,
+          valueIndicatorScore: null,
+          provenance,
+          status: 'pending_review',
+          extractedAt: extraction.extractedAt,
+          reviewedAt: provenance.reviewedAt,
+          methodologyVersionId,
+        })
+        .onConflictDoUpdate({
+          target: [fieldValues.programId, fieldValues.fieldDefinitionId],
+          set: {
+            valueRaw: 'not_stated',
+            valueNormalized: null,
+            valueIndicatorScore: null,
+            provenance,
+            status: 'pending_review',
+            extractedAt: extraction.extractedAt,
+            reviewedAt: provenance.reviewedAt,
+            methodologyVersionId,
+          },
+        })
+        .returning({ id: fieldValues.id });
+      const insertedId = inserted[0]?.id;
+      console.log(
+        `Published [${insertedId}] (not_stated, score=null) — program: ${extraction.programId}, field: ${extraction.fieldDefinitionKey}`
       );
       return;
     }

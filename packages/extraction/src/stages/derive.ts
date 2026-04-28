@@ -23,6 +23,15 @@ export const DERIVE_CONFIDENCE = 0.6;
 /** Hard-coded per ADR-016. */
 export const DERIVE_EXTRACTION_MODEL = 'derived-computation';
 
+/**
+ * Phase 3.6.1 / FIX 6 — D.2.3 dual-citizenship derive constants.
+ * The derived row carries a slightly higher confidence than the
+ * derived-computation rows because the underlying source is a published
+ * citizenship act rather than a calculation.
+ */
+export const DERIVE_KNOWLEDGE_CONFIDENCE = 0.7;
+export const DERIVE_KNOWLEDGE_MODEL = 'derived-knowledge';
+
 // ────────────────────────────────────────────────────────────────────
 // Input shapes (all values resolved by the orchestrator from the
 // extraction map / DB / static lookup tables before calling the pure
@@ -81,12 +90,32 @@ export interface DerivedD22Input {
   citizenshipResidence: CitizenshipResidenceEntry | null;
 }
 
+/** Phase 3.6.1 / FIX 6 — D.2.3 input shape. */
+export interface DualCitizenshipPolicyEntry {
+  iso3: string;
+  permitted: boolean | null;
+  notes: string;
+  sourceUrl: string;
+  sourceYear: number;
+}
+
+export interface DerivedD23Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  /** Citizenship-policy table entry, null if no entry for the country. */
+  policy: DualCitizenshipPolicyEntry | null;
+}
+
 export interface DerivedRow {
   /** Pre-built ExtractionOutput suitable for humanReview.enqueue. */
   extraction: ExtractionOutput;
   /** Pre-built ProvenanceRecord (passes checkProvenanceRow). */
   provenance: ProvenanceRecord;
-  /** Convenience: the numeric output (already in extraction.valueRaw as string). */
+  /**
+   * Convenience: the numeric output for arithmetic derives (A.1.2 / D.2.2)
+   * or 0 for non-numeric derives (D.2.3 — categorical 'permitted'/'not_permitted').
+   */
   numericValue: number;
 }
 
@@ -288,6 +317,93 @@ export function deriveD22(input: DerivedD22Input): DerivedRow | null {
   return { extraction, provenance, numericValue: total };
 }
 
+/**
+ * Phase 3.6.1 / FIX 6 — Compute D.2.3 (dual citizenship permitted).
+ *
+ * Pure deterministic legal-fact lookup. No LLM. Returns a derived row
+ * when COUNTRY_DUAL_CITIZENSHIP_POLICY has a non-null `permitted` value
+ * for the country. Skips (returns null + logs) when:
+ *   - no policy entry exists for the country, OR
+ *   - permitted is null (policy is contested/partial/undocumented)
+ *
+ * Confidence is hard-coded to DERIVE_KNOWLEDGE_CONFIDENCE (0.7) — slightly
+ * higher than the arithmetic derives because the source is a published
+ * citizenship act rather than a calculation, but still below the 0.85
+ * auto-approve threshold so every row routes to /review.
+ *
+ * The provenance carries:
+ *   - extractionModel: 'derived-knowledge'
+ *   - sourceTier: null (matches country-substitute / derived-computation)
+ *   - sourceUrl: the citizenship-act URL from the lookup
+ *   - sourceSentence: the notes field from the lookup
+ *   - derivedInputs: { 'D.2.3': { permitted, sourceUrl, sourceYear } }
+ */
+export function deriveD23(input: DerivedD23Input): DerivedRow | null {
+  if (input.policy === null) {
+    console.log(
+      `  [D.2.3] derived skip — no COUNTRY_DUAL_CITIZENSHIP_POLICY entry for ${input.countryIso}`
+    );
+    return null;
+  }
+  if (input.policy.permitted === null) {
+    console.log(
+      `  [D.2.3] derived skip — ${input.countryIso} dual-citizenship policy is contested/partial`
+    );
+    return null;
+  }
+
+  const valueRaw = input.policy.permitted ? 'permitted' : 'not_permitted';
+  const sourceSentence = input.policy.notes;
+
+  const derivedInputs = {
+    'D.2.3': {
+      permitted: input.policy.permitted,
+      sourceUrl: input.policy.sourceUrl,
+      sourceYear: input.policy.sourceYear,
+    },
+  };
+
+  const crossCheckResult: CrossCheckOutcome = 'not_checked';
+  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
+    sourceUrl: input.policy.sourceUrl,
+    geographicLevel: 'national',
+    sourceTier: null,
+    scrapeTimestamp: new Date().toISOString(),
+    contentHash: createHash('sha256')
+      .update(
+        `derived-knowledge:D.2.3:${input.programId}:${input.countryIso}:${input.policy.permitted}`,
+        'utf8'
+      )
+      .digest('hex'),
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    validationModel: DERIVE_KNOWLEDGE_MODEL,
+    validationConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    crossCheckResult,
+    crossCheckUrl: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    methodologyVersion: input.methodologyVersion,
+    reviewDecision: 'approve',
+    derivedInputs,
+  };
+
+  const extraction: ExtractionOutput = {
+    programId: input.programId,
+    fieldDefinitionKey: 'D.2.3',
+    valueRaw,
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractedAt: new Date(),
+  };
+
+  return { extraction, provenance, numericValue: 0 };
+}
+
 // ────────────────────────────────────────────────────────────────────
 // Stage orchestrator. Pure inputs (no DB) — the canary / Trigger.dev
 // caller resolves DB-backed fields and the static-table entries before
@@ -303,6 +419,10 @@ export class DeriveStageImpl implements DeriveStage {
     if (a12) out.push(a12);
     const d22 = deriveD22(inputs.d22);
     if (d22) out.push(d22);
+    if (inputs.d23) {
+      const d23 = deriveD23(inputs.d23);
+      if (d23) out.push(d23);
+    }
     return out;
   }
 }

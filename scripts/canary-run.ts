@@ -8,8 +8,10 @@ import {
   ValidateStageImpl,
   deriveA12,
   deriveD22,
+  deriveD23,
   loadProgramSourcesAsDiscovered,
   mergeDiscoveredUrls,
+  COUNTRY_DUAL_CITIZENSHIP_POLICY,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -291,7 +293,9 @@ async function main() {
     // — exclude them too so the LLM doesn't produce a competing low-
     // confidence row that would overwrite the derived row.
     const e31HandledByVdemPath = PHASE3_VDEM_ENABLED && vdemResult !== null;
-    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2']);
+    // Phase 3.6.1 / FIX 6 — D.2.3 added to derived field keys (handled by
+    // deriveD23 against the country dual-citizenship policy lookup).
+    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2', 'D.2.3']);
     const llmFields: FieldSpec[] = allFieldDefs
       .filter(
         (d) =>
@@ -593,8 +597,16 @@ async function main() {
         d12SourceUrl,
         citizenshipResidence: COUNTRY_CITIZENSHIP_RESIDENCE_YEARS[countryIso] ?? null,
       });
+      // Phase 3.6.1 / FIX 6 — D.2.3 derived-knowledge from country
+      // citizenship-policy lookup. Skips when permitted is null.
+      const d23Result = deriveD23({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: COUNTRY_DUAL_CITIZENSHIP_POLICY[countryIso] ?? null,
+      });
 
-      for (const derived of [a12Result, d22Result]) {
+      for (const derived of [a12Result, d22Result, d23Result]) {
         if (!derived) continue;
         try {
           await publish.executeDerived(derived.extraction, derived.provenance);

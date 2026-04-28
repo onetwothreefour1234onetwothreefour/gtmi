@@ -4,6 +4,7 @@ import { and, eq, gt } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import type { DiscoveredUrl, DiscoveryResult } from '../types/extraction';
 import type { DiscoverStage } from '../types/pipeline';
+import { loadProgramSourcesAsDiscovered } from '../utils/url-merge';
 
 const DISCOVERY_CACHE_TTL_DAYS = 7;
 
@@ -17,11 +18,26 @@ const SYSTEM_PROMPT =
   '(country-level government), or regional (province, state, canton, emirate-level ' +
   'government). You never fabricate URLs.';
 
-function buildUserMessage(programName: string, country: string): string {
+export function buildUserMessage(
+  programName: string,
+  country: string,
+  existingUrls: string[] = []
+): string {
+  // Phase 3.6.1 / FIX 5 — exclusion block. Only emitted when the program
+  // has registry entries from prior runs. Capped at 20 URLs regardless
+  // of registry size, to keep the prompt token-budget bounded.
+  const exclusionBlock =
+    existingUrls.length > 0
+      ? `\n\nALREADY KNOWN — do NOT return these URLs, they are already in our registry. ` +
+        `Use your 15-URL budget to find NEW pages not listed here:\n` +
+        existingUrls.slice(0, 20).join('\n') +
+        `\n\n`
+      : '';
+
   return (
-    `Find up to 10 of the most relevant and authoritative web pages for this program: ` +
+    `Find up to 15 of the most relevant and authoritative web pages for this program: ` +
     `${programName} in ${country}. Only include URLs that genuinely add value — do not ` +
-    `pad to reach 10. Return your answer as a valid JSON array with exactly this structure ` +
+    `pad to reach 15. Return your answer as a valid JSON array with exactly this structure ` +
     `— no markdown, no explanation, just the JSON array: ` +
     `[{"url": string, "tier": 1|2|3, "geographicLevel": "global"|"continental"|"national"|"regional", ` +
     `"reason": string, "isOfficial": boolean}]. ` +
@@ -87,6 +103,23 @@ function buildUserMessage(programName: string, country: string): string {
     `stability, recent changes, and forward-looking indicators. Prefer sources that cite primary ` +
     `government sources and provide analysis rather than republishing press releases. Prioritise ` +
     `the most recent publications covering this specific program. ` +
+    `DEPARTMENT BREADTH REQUIREMENT — additional departments beyond the immigration authority. ` +
+    `Many of the most useful indicator-level sources sit on different government domains than the ` +
+    `visa listing. Include pages from the following departments where relevant to this program: ` +
+    `(a) Tax authority (income tax residency rules, special expat regimes); ` +
+    `(b) Statistics bureau (median wage data, labour-market data published officially); ` +
+    `(c) Official gazette / parliamentary record (the legislation underlying the visa); ` +
+    `(d) Health authority (public-health entitlements for visa holders); ` +
+    `(e) Education authority (public-school access for visa-holder dependants); ` +
+    `(f) Permanent residence pathway authority — find the specific page describing how holders ` +
+    `of this visa type transition to permanent residence. This may be a SEPARATE visa listing ` +
+    `(e.g., an employer nomination scheme, a provincial nominee program, or a points-based PR ` +
+    `stream), not the original visa listing page. Look for pages describing the transition ` +
+    `stream, accrual period, employer nomination requirements, physical-presence rules, and ` +
+    `PR retention rules. ` +
+    `(g) Citizenship authority — find the page describing naturalisation eligibility, dual ` +
+    `citizenship policy, and citizenship tests for permanent residents of this country. This is ` +
+    `often on a SEPARATE citizenship domain or subdomain from the main immigration authority. ` +
     `EXCLUSIONS — never return: pages that require login, registration, or payment to view; ` +
     `generic immigration homepages without program-specific content; pages whose primary purpose ` +
     `is to sell visa services or capture client leads; news articles about unrelated immigration ` +
@@ -98,17 +131,22 @@ function buildUserMessage(programName: string, country: string): string {
     `(2) Remaining entries may include: additional government pages (regional, state, federal ` +
     `agency), official continental sources (e.g. EU directives), supplementary official pages ` +
     `(fees, processing times, forms), and Tier 2 law firm sources for cross-check purposes. ` +
-    `(3) Classify each URL by geographic level: global (UN, World Bank, ILO), continental ` +
+    `(3) IF this program has a permanent-residence or citizenship pathway, AT LEAST TWO of your ` +
+    `15 URLs must come from departments (f) and (g) above (PR pathway authority and citizenship ` +
+    `authority). These are the highest-value sources for D.1.x (PR), D.2.x (citizenship), and ` +
+    `family-rights indicators. ` +
+    `(4) Classify each URL by geographic level: global (UN, World Bank, ILO), continental ` +
     `(EU, ASEAN, OECD regional), national (country-level government), or regional (province, ` +
     `state, canton, emirate-level government). ` +
-    `(4) tier must be 1 for official government, intergovernmental, and national legislative ` +
+    `(5) tier must be 1 for official government, intergovernmental, and national legislative ` +
     `sources; 2 for professional advisory firms, independent research publishers, and specialist ` +
     `immigration intelligence sources; 3 for all other sources. ` +
-    `(5) isOfficial must be true for any government or intergovernmental source. ` +
-    `(6) reason must be one sentence explaining what specific field-level data (e.g. salary thresholds, ` +
+    `(6) isOfficial must be true for any government or intergovernmental source. ` +
+    `(7) reason must be one sentence explaining what specific field-level data (e.g. salary thresholds, ` +
     `occupation lists, fees, processing times) this page is expected to contain. ` +
-    `(7) Do not include duplicate URLs, redirects, or pages that do not contain ` +
-    `program-specific information.`
+    `(8) Do not include duplicate URLs, redirects, or pages that do not contain ` +
+    `program-specific information.` +
+    exclusionBlock
   );
 }
 
@@ -314,7 +352,21 @@ export class DiscoverStageImpl implements DiscoverStage {
       throw new Error('PERPLEXITY_API_KEY is not set in environment');
     }
 
-    const userMessage = buildUserMessage(programName, country);
+    // Phase 3.6.1 / FIX 5 — load existing registry URLs to deduplicate
+    // against. Take the top 20 most-recently-seen Tier 1/2 URLs and pass
+    // them to the prompt as an exclusion list so Perplexity spends its
+    // 15-URL budget on NEW pages rather than re-finding URLs we already
+    // have in the registry.
+    let existingUrls: string[] = [];
+    try {
+      const registry = await loadProgramSourcesAsDiscovered(programId);
+      existingUrls = registry.slice(0, 20).map((d) => d.url);
+    } catch {
+      // Registry read failure is non-fatal; fall back to no exclusion list.
+      existingUrls = [];
+    }
+
+    const userMessage = buildUserMessage(programName, country, existingUrls);
     const cacheKey = makeDiscoveryCacheKey(programId, SYSTEM_PROMPT, userMessage);
     const cachedUrls = await readDiscoveryCache(cacheKey);
     if (cachedUrls) {
@@ -370,7 +422,7 @@ export class DiscoverStageImpl implements DiscoverStage {
       throw new Error(`Discovery returned no text content for program ${programId}`);
     }
 
-    const parsedUrls = parseDiscoveredUrls(content, programId).slice(0, 10);
+    const parsedUrls = parseDiscoveredUrls(content, programId).slice(0, 15);
     const discoveredUrls = await verifyUrls(parsedUrls);
 
     if (discoveredUrls.length === 0) {

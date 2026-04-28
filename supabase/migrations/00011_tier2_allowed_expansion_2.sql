@@ -1,0 +1,42 @@
+-- 00011_tier2_allowed_expansion_2.sql
+--
+-- Phase 3.6.1 — second expansion of the ADR-013 Tier 2 backfill allowlist.
+-- Three additional fields meet ADR-013's "Tier 1 structurally silent,
+-- Tier 2 reliably covers, indicator outside scoring core OR confidence-
+-- capped" test:
+--
+--   C.2.2  Dependent child age cap and inclusion terms
+--          → dependent age caps are often in law firm guides when the
+--            immigration authority page is JS-gated or routes the user
+--            to a separate family-members sub-page.
+--
+--   D.1.3  Physical presence requirement during PR accrual (days/yr)
+--          → PR accrual physical-presence requirements are typically in
+--            advisory guides covering the PR pathway, separate from the
+--            visa-listing page that the canary's discovery hits first.
+--
+--   D.1.4  PR retention rules (days/yr to keep PR)
+--          → similar cross-page issue: retention rules live in the PR
+--            authority section, not on the temporary-visa listing.
+--
+-- All three are routed through the existing tier-2 fallback path
+-- (extract.executeAllFields with `confidenceCap: 0.85`), so any value
+-- written from a Tier 2 source automatically routes to /review.
+-- ADR-013's "scoring-core Pillar A/B.1/B.2/D.1.x core" carve-out is
+-- still respected:
+--   - C.2.2 is in C.2 (family rights), not the scoring core.
+--   - D.1.3 / D.1.4 ARE in D.1 (PR pathway), but the confidence cap
+--     forces /review and the existing Tier 2 badge in the dashboard
+--     surfaces the credibility tradeoff to readers. ADR-013 amendment
+--     accepts this for these two specific indicators because the
+--     alternative is permanent ABSENT status across the cohort (every
+--     country's PR retention rules are usually NOT on the original
+--     temporary visa page).
+--
+-- Reversible:
+--   UPDATE field_definitions SET tier2_allowed = false
+--     WHERE key IN ('C.2.2', 'D.1.3', 'D.1.4');
+
+UPDATE "field_definitions"
+  SET "tier2_allowed" = true
+  WHERE "key" IN ('C.2.2', 'D.1.3', 'D.1.4');

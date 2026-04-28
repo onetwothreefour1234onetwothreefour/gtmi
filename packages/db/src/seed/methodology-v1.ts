@@ -1073,29 +1073,48 @@ De facto / civil partnership recognition with similar rights to marriage counts 
 Question: What is the visa holder's access to the public healthcare system?
 Allowed values:
 
-"full_access": same basis as citizens/PRs.
-"levy_required": access upon payment of a health levy/contribution.
-"insurance_required": access contingent on private insurance.
-"emergency_only": only emergency care covered publicly.
-"no_access": no public healthcare access.
+"automatic" (alias of "full_access"): the document states unconditionally that the visa holder is entitled to the same public-health benefits as citizens or permanent residents.
+"full_access": same basis as citizens/PRs (legacy alias of "automatic"; either is acceptable).
+"conditional_rhca": the document states the visa holder's access is contingent on a bilateral or reciprocal health agreement between countries — phrasing such as "eligible for [public health system] if [country] has a Reciprocal Health Care Agreement", "bilateral health agreement", or "covered only if your country of citizenship has signed a [agreement-name]".
+"levy_required": access conditional on payment of a health levy or contribution (e.g. an annual surcharge, employer-paid contribution, or means-tested premium).
+"insurance_required": access conditional on the visa holder holding private health insurance.
+"emergency_only": only emergency care is publicly covered; routine care is not.
+"no_access": the document explicitly excludes the visa holder from public health coverage — phrasing such as "not eligible", "must arrange private health insurance", or "not covered".
+"not_stated": the page mentions this visa program but does NOT discuss healthcare access at all. Use this when the document is silent — not when access is denied. (This produces a row that scores null and surfaces the gap explicitly rather than silently.)
 
 Edge cases:
-
-Hybrid regimes (e.g., levy + private top-up): map to the primary requirement, note secondary.
-Employer-provided insurance does not change the underlying regime.`,
+- Hybrid regimes (e.g., levy + private top-up): map to the primary requirement, note secondary.
+- Employer-provided insurance does not change the underlying regime.
+- Use the generic patterns above. Apply the same pattern logic to whatever public health system the document references.`,
       scoringRubricJsonb: {
         categories: [
-          { value: 'full_access', description: 'same basis as citizens/PRs.' },
+          { value: 'full_access', score: 100, description: 'same basis as citizens/PRs.' },
+          {
+            value: 'automatic',
+            score: 100,
+            description: 'same basis as citizens/PRs (alias of full_access).',
+          },
+          {
+            value: 'conditional_rhca',
+            score: 70,
+            description: 'access contingent on a reciprocal/bilateral health agreement.',
+          },
           {
             value: 'levy_required',
+            score: 70,
             description: 'access upon payment of a health levy/contribution.',
           },
           {
             value: 'insurance_required',
+            score: 50,
             description: 'access contingent on private insurance.',
           },
-          { value: 'emergency_only', description: 'only emergency care covered publicly.' },
-          { value: 'no_access', description: 'no public healthcare access.' },
+          {
+            value: 'emergency_only',
+            score: 20,
+            description: 'only emergency care covered publicly.',
+          },
+          { value: 'no_access', score: 0, description: 'no public healthcare access.' },
         ],
       },
       normalizationFn: 'categorical',

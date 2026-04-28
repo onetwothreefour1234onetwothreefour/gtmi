@@ -10,8 +10,10 @@ import {
   ValidateStageImpl,
   deriveA12,
   deriveD22,
+  deriveD23,
   loadProgramSourcesAsDiscovered,
   mergeDiscoveredUrls,
+  COUNTRY_DUAL_CITIZENSHIP_POLICY,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -293,7 +295,7 @@ export const extractSingleProgram = task({
     // --- Stage 2: Batch extract LLM fields. Exclude E.3.2 (always API),
     // E.3.1 (when V-Dem-handled), and A.1.2 / D.2.2 (Phase 3.6 derive
     // stage owns these — see ADR-016). ---
-    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2']);
+    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2', 'D.2.3']);
     const llmFields: FieldSpec[] = allFieldDefs
       .filter(
         (d) =>
@@ -436,8 +438,15 @@ export const extractSingleProgram = task({
         d12SourceUrl,
         citizenshipResidence: COUNTRY_CITIZENSHIP_RESIDENCE_YEARS[country] ?? null,
       });
+      // Phase 3.6.1 / FIX 6 — D.2.3 derived-knowledge.
+      const d23Result = deriveD23({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: COUNTRY_DUAL_CITIZENSHIP_POLICY[country] ?? null,
+      });
 
-      for (const derived of [a12Result, d22Result]) {
+      for (const derived of [a12Result, d22Result, d23Result]) {
         if (!derived) continue;
         try {
           await publish.executeDerived(derived.extraction, derived.provenance);

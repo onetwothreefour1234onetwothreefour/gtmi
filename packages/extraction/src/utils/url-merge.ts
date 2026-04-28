@@ -14,8 +14,8 @@ import { and, eq, gt, sql } from 'drizzle-orm';
 export type DbClient = typeof db;
 import type { DiscoveredUrl, GeographicLevel, SourceTier } from '../types/extraction';
 
-export const DEFAULT_URL_CAP = 12;
-export const TIER_QUOTAS = { 1: 7, 2: 4, 3: 1 } as const;
+export const DEFAULT_URL_CAP = 15;
+export const TIER_QUOTAS = { 1: 9, 2: 5, 3: 1 } as const;
 
 /**
  * Normalise a URL for cross-source deduplication.

@@ -415,6 +415,23 @@ export async function fetchWgiScore(
   }
 }
 
+// Phase 3.6.1 / FIX 1 — manual live-API validation command for the
+// WGI indicator codes (run when refactoring this file or upgrading
+// the World Bank API client). Cannot be a vitest unit test because
+// scripts/ is outside any package's tsconfig rootDir.
+//
+//   pnpm exec tsx -e "import { fetchVdemRuleOfLawScore, fetchWgiScore } \
+//     from './scripts/country-sources'; (async () => { \
+//     for (const iso of ['AUS','SGP','CAN','GBR','HKG']) { \
+//       const ge = await fetchWgiScore(iso); \
+//       const rl = await fetchVdemRuleOfLawScore(iso); \
+//       console.log(iso, 'GE.EST=', ge?.score, 'RL.EST=', rl?.score); \
+//     } })();"
+//
+// Both fetchers must return numeric scores. The bug fixed in FIX 1 was
+// the indicator-code prefix: `RL.EST` returns "indicator not found",
+// `GOV_WGI_RL.EST` (the source=3 form) returns the data.
+//
 // Phase 3.6 / Fix A — E.3.1 Rule of Law direct fetch.
 //
 // Methodology v1 line 309 specifies E.3.1 as "Rule of law (V-Dem / World
@@ -436,7 +453,10 @@ export async function fetchVdemRuleOfLawScore(
     console.warn(`[VDEM/WGI-RL] No ISO2 mapping found for ${countryIso3}`);
     return null;
   }
-  const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/RL.EST?format=json&mrv=1&source=3`;
+  // WGI indicators under source=3 (Worldwide Governance Indicators) require
+  // the GOV_WGI_ prefix. The bare `RL.EST` returns "indicator not found";
+  // verified empirically against the API. E.3.2 already uses GOV_WGI_GE.EST.
+  const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/GOV_WGI_RL.EST?format=json&mrv=1&source=3`;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;

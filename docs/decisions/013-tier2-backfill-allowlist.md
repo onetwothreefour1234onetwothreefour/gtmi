@@ -159,3 +159,62 @@ later-discovered Tier 1 sources for any allowlisted indicator:
   UI scaffolding. The pipeline change happens at re-canary prep time
   in a separate small commit, so we can review the Tier 2 prompt
   template independently.
+
+---
+
+## Amendment v2 — Phase 3.6 (Migration 00010)
+
+Three additional fields meet the ADR-013 criteria and are added to the
+allowlist via `supabase/migrations/00010_self_improving_sources_and_methodology_v2_reconciliation.sql`:
+
+- **B.2.3** — Employer-borne levies & skill charges. Now
+  `boolean_with_annotation` per ADR-014; Tier 1 silent on the visa
+  page; KPMG / EY publish global levy roundups.
+- **B.2.4** — Mandatory non-government costs. Now
+  `boolean_with_annotation`; advisory firms publish jurisdiction-
+  specific non-gov-cost guides.
+- **D.2.4** — Civic / language / integration test burden. Citizenship
+  test details live in citizenship authority pages (not the visa
+  listing); cross-departmental gap.
+
+C.2.1 (spouse inclusion) was considered for this expansion and
+**excluded** per analyst Q2 decision: scoring-core Pillar C carve-out
+from the original ADR stands. Re-evaluate only if 5-country pilot data
+shows C.2.1 cohort coverage <50%.
+
+---
+
+## Amendment v3 — Phase 3.6.1 (Migration 00011)
+
+Three further fields are added to the allowlist via
+`supabase/migrations/00011_tier2_allowed_expansion_2.sql`:
+
+- **C.2.2** — Dependent child age cap and inclusion terms. Tier 1
+  immigration authority page often JS-gates or fragments the family-
+  member rules across multiple sub-pages; advisory firms publish a
+  consolidated answer per jurisdiction.
+- **D.1.3** — Physical presence requirement during PR accrual.
+  Tier 1 silent on the temporary visa page; PR accrual rules live in
+  the PR authority's separate listing, which discovery doesn't always
+  reach. Advisory guides reliably cover this.
+- **D.1.4** — PR retention rules (days/yr). Same cross-page issue —
+  retention rules live with the PR authority, not the visa listing.
+
+D.1.3 and D.1.4 are technically in the scoring core (Pillar D.1).
+Including them is a deliberate exception justified by:
+
+1. The 0.85 confidence cap on every Tier 2 row forces /review,
+   so analysts approve each row before it influences a public score.
+2. The Tier 2 badge in `<ProvenanceTrigger>` (already shipped in
+   Amendment v2) surfaces the credibility tradeoff to readers.
+3. The alternative is permanent ABSENT status across the cohort
+   for these indicators — most countries' PR rules are NOT on the
+   original temporary visa page that Stage 0 discovers first.
+4. Phase 3.6's self-improving sources registry (ADR-015) plus the
+   extended discovery prompt (Phase 3.6.1 / FIX 4) targeting "PR
+   pathway authority" should reduce reliance on Tier 2 for these
+   indicators over time. Tier 2 is the safety net while Tier 1
+   discovery breadth catches up.
+
+Allowlist size after amendment v3: **9 indicators** (B.3.3, C.2.4,
+D.2.3 from v1; B.2.3, B.2.4, D.2.4 from v2; C.2.2, D.1.3, D.1.4 from v3).

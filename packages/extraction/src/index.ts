@@ -39,15 +39,20 @@ export { CrossCheckStageImpl } from './stages/cross-check';
 export {
   DERIVE_CONFIDENCE,
   DERIVE_EXTRACTION_MODEL,
+  DERIVE_KNOWLEDGE_CONFIDENCE,
+  DERIVE_KNOWLEDGE_MODEL,
   DeriveStageImpl,
   deriveA12,
   deriveD22,
+  deriveD23,
 } from './stages/derive';
 export type {
   CitizenshipResidenceEntry,
   DerivedA12Input,
   DerivedD22Input,
+  DerivedD23Input,
   DerivedRow,
+  DualCitizenshipPolicyEntry,
   FxRateEntry,
   MedianWageEntry,
 } from './stages/derive';
@@ -72,3 +77,5 @@ export { ValidateStageImpl } from './stages/validate';
 export * from './data/country-median-wage';
 export * from './data/fx-rates';
 export * from './data/country-citizenship-residence';
+// Phase 3.6.1 / FIX 6 — dual-citizenship lookup for D.2.3 derive.
+export * from './data/country-citizenship-policy';
