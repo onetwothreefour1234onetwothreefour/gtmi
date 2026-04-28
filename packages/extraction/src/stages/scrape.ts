@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import { db, scrapeCache } from '@gtmi/db';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import type { DiscoveredUrl, ScrapeResult } from '../types/extraction';
@@ -7,6 +8,48 @@ import { checkScrapeContent, MIN_VISIBLE_TEXT_LENGTH } from '../scrape-guards';
 const MIN_VISIBLE_TEXT_LENGTH_LOG = MIN_VISIBLE_TEXT_LENGTH;
 
 const SCRAPE_CACHE_TTL_HOURS = 24;
+
+// ────────────────────────────────────────────────────────────────────
+// Phase 3.6 — Cloud Run identity token auth (Option B / user-account).
+//
+// When SCRAPER_URL is https://, the scraper service is on Cloud Run
+// with `--no-allow-unauthenticated`. Every request must carry a Google
+// Cloud identity token in the Authorization header. We use the gcloud
+// CLI's user-account ID token (`gcloud auth print-identity-token`,
+// no --audiences flag) because the developer account on this machine
+// is a user account, not a service account. Service-account-impersonation
+// (Option A) is the long-term posture; tracked in .env.example.
+//
+// Tokens are cached in-memory for 55 minutes (gcloud ID tokens are
+// valid for 1 hour). A single canary run is well under that window;
+// the cache eliminates ~50 redundant gcloud invocations per run.
+//
+// When SCRAPER_URL is http:// (local dev), no auth header is added.
+// ────────────────────────────────────────────────────────────────────
+interface TokenCache {
+  token: string;
+  fetchedAt: number;
+}
+
+let _tokenCache: TokenCache | null = null;
+const TOKEN_TTL_MS = 55 * 60 * 1000;
+
+function getCloudRunToken(): string {
+  const now = Date.now();
+  if (_tokenCache && now - _tokenCache.fetchedAt < TOKEN_TTL_MS) {
+    return _tokenCache.token;
+  }
+  const token = execSync('gcloud auth print-identity-token', { encoding: 'utf8' }).trim();
+  _tokenCache = { token, fetchedAt: now };
+  return token;
+}
+
+function getScraperAuthHeaders(scraperUrl: string): Record<string, string> {
+  if (scraperUrl.startsWith('https://')) {
+    return { Authorization: 'Bearer ' + getCloudRunToken() };
+  }
+  return {};
+}
 
 interface ScrapeStageOptions {
   delayMs?: number;
@@ -27,7 +70,9 @@ export class ScrapeStageImpl implements ScrapeStage {
     const SCRAPER_URL = process.env['SCRAPER_URL'] ?? 'http://localhost:8765';
 
     try {
-      const health = await fetch(`${SCRAPER_URL}/health`);
+      const health = await fetch(`${SCRAPER_URL}/health`, {
+        headers: getScraperAuthHeaders(SCRAPER_URL),
+      });
       if (!health.ok) throw new Error('unhealthy');
     } catch {
       throw new Error(
@@ -116,7 +161,10 @@ export class ScrapeStageImpl implements ScrapeStage {
 
     const response = await fetch(`${scraperUrl}/scrape`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...getScraperAuthHeaders(scraperUrl),
+      },
       body: JSON.stringify({
         url: discovered.url,
         only_main_content: true,
