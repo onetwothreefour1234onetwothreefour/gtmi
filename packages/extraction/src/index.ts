@@ -65,3 +65,10 @@ export { ExtractStageImpl, computeExtractionCacheKey } from './stages/extract';
 export { PublishStageImpl } from './stages/publish';
 export { ScrapeStageImpl } from './stages/scrape';
 export { ValidateStageImpl } from './stages/validate';
+
+// Phase 3.6 / ADR-016 — static lookup tables for the derive stage.
+// Re-exported from `packages/extraction/src/data/` (moved from `scripts/`
+// in the typecheck-fix commit so cross-package tsc respects rootDir).
+export * from './data/country-median-wage';
+export * from './data/fx-rates';
+export * from './data/country-citizenship-residence';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { COUNTRY_MEDIAN_WAGE } from '../../../scripts/country-median-wage';
-import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from '../../../scripts/country-citizenship-residence';
-import { FX_RATES } from '../../../scripts/fx-rates';
+import { COUNTRY_MEDIAN_WAGE } from '../data/country-median-wage';
+import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from '../data/country-citizenship-residence';
+import { FX_RATES } from '../data/fx-rates';
 
 // Phase 3.6 / Fix D — static cohort-completeness assertions for the
 // derived-fields lookup tables.

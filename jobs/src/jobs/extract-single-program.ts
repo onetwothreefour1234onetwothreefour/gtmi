@@ -30,9 +30,11 @@ import {
   fetchVdemRuleOfLawScore,
   fetchWgiScore,
 } from '../../../scripts/country-sources';
-import { COUNTRY_MEDIAN_WAGE } from '../../../scripts/country-median-wage';
-import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from '../../../scripts/country-citizenship-residence';
-import { FX_RATES } from '../../../scripts/fx-rates';
+import {
+  COUNTRY_MEDIAN_WAGE,
+  COUNTRY_CITIZENSHIP_RESIDENCE_YEARS,
+  FX_RATES,
+} from '@gtmi/extraction';
 import { and, eq } from 'drizzle-orm';
 
 const METHODOLOGY_VERSION = '1.0.0';

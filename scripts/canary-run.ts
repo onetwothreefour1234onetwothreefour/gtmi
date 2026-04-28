@@ -29,9 +29,11 @@ import {
   fetchWgiScore,
   ISO3_TO_ISO2,
 } from './country-sources';
-import { COUNTRY_MEDIAN_WAGE } from './country-median-wage';
-import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from './country-citizenship-residence';
-import { FX_RATES } from './fx-rates';
+import {
+  COUNTRY_MEDIAN_WAGE,
+  COUNTRY_CITIZENSHIP_RESIDENCE_YEARS,
+  FX_RATES,
+} from '@gtmi/extraction';
 import { and } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import { createHash } from 'crypto';

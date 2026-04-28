@@ -11,8 +11,7 @@
 import 'dotenv/config';
 import { db, sources, programs } from '@gtmi/db';
 import { eq } from 'drizzle-orm';
-import { COUNTRY_MEDIAN_WAGE } from './country-median-wage';
-import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from './country-citizenship-residence';
+import { COUNTRY_MEDIAN_WAGE, COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from '@gtmi/extraction';
 
 async function main(): Promise<void> {
   const rows = await db
