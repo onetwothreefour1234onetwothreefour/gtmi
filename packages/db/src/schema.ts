@@ -93,17 +93,22 @@ export const sources = pgTable(
     programId: uuid('program_id')
       .notNull()
       .references(() => programs.id),
-    url: text('url').notNull().unique(),
+    url: text('url').notNull(),
     tier: integer('tier').notNull(),
     sourceCategory: varchar('source_category', { length: 50 }).notNull(),
     isPrimary: boolean('is_primary').default(false).notNull(),
     scrapeScheduleCron: text('scrape_schedule_cron'),
     lastScrapedAt: timestamp('last_scraped_at'),
     lastContentHash: text('last_content_hash'),
+    // Phase 3.6 / ADR-015 — self-improving sources table.
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow(),
+    discoveredBy: varchar('discovered_by', { length: 50 }).default('seed'),
+    geographicLevel: varchar('geographic_level', { length: 20 }),
   },
   (table) => [
     index('idx_sources_program_id').on(table.programId),
     index('idx_sources_tier').on(table.tier),
+    uniqueIndex('sources_program_id_url_unique').on(table.programId, table.url),
     pgPolicy('Team members can write sources', {
       as: 'permissive',
       for: 'all',
