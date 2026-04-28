@@ -5,7 +5,15 @@ export const SOFT_404_PATTERNS: RegExp[] = [
   /\bthis page (doesn't|does not) exist\b/i,
 ];
 
-export const MIN_VISIBLE_TEXT_LENGTH = 300;
+// Phase 3.6 / Fix C — raised from 300 → 1500. The AUS Medicare URL
+// returned 484 chars (a redirect-stub page with the actual content one
+// layer behind a JS-gated SPA shell) and silently passed the old guard
+// while producing zero extractions. 1500 is the empirical floor below
+// which a government page is functionally an empty shell. Below this
+// threshold scrape.ts retries once via the Jina reader (force_layer=jina);
+// if Jina still returns thin content, the field is logged
+// SCRAPE_THIN_CONTENT and treated as ABSENT.
+export const MIN_VISIBLE_TEXT_LENGTH = 1500;
 
 export type ScrapeStatus =
   | 'ok'

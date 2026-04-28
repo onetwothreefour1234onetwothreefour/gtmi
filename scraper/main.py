@@ -230,6 +230,13 @@ def scrape_wayback(url: str, only_main_content: bool) -> tuple[int, str, str | N
 class ScrapeRequest(BaseModel):
     url: str
     only_main_content: bool = True
+    # Phase 3.6 / Fix C — caller can force a specific layer to retry a thin
+    # response. When set to 'jina', the Playwright + curl_cffi layers are
+    # bypassed and the Jina reader is invoked directly. Other values are
+    # ignored (cascade runs as normal). Cloud Run service must be redeployed
+    # for this field to be honoured; older deployments will silently ignore
+    # the extra body parameter (BaseModel default tolerance).
+    force_layer: str | None = None
 
 
 class ScrapeResponse(BaseModel):
@@ -252,6 +259,30 @@ async def scrape(request: ScrapeRequest):
 
     now_iso = lambda: datetime.now(timezone.utc).isoformat()
     attempts: list[str] = []
+
+    # Phase 3.6 / Fix C — short-circuit to Jina when the caller forces it.
+    # Used by scrape.ts on a `short_content` retry to escalate past
+    # Playwright (which produced the thin content in the first place).
+    if request.force_layer == "jina":
+        status3, content3, err3 = await asyncio.to_thread(scrape_jina, request.url)
+        if err3 is None and not is_challenge_body(content3) and is_usable_content(content3):
+            return ScrapeResponse(
+                url=request.url,
+                content_markdown=content3,
+                http_status=status3,
+                scraped_at=now_iso(),
+                content_hash=hashlib.sha256(content3.encode()).hexdigest(),
+                layer="jina",
+            )
+        return ScrapeResponse(
+            url=request.url,
+            content_markdown="",
+            http_status=status3 or 0,
+            scraped_at=now_iso(),
+            content_hash="",
+            error=f"force_layer=jina:http={status3},err={err3 or ('challenge' if is_challenge_body(content3) else 'thin')}",
+            layer="jina",
+        )
 
     # Layer 1: Playwright
     status, content, err = await scrape_playwright(request.url, request.only_main_content)

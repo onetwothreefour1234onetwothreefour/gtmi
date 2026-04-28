@@ -94,9 +94,32 @@ The Core Skills stream allows Australian employers to sponsor skilled workers
 from overseas when they cannot source suitably qualified Australians.
 Applicants must hold a relevant qualification and have at least two years of
 recent full-time work experience in the nominated occupation.
-    `.repeat(3);
+    `.repeat(8);
     const result = checkScrapeContent(body, 200);
     expect(result.ok).toBe(true);
+  });
+
+  // Phase 3.6 / Fix C — regression test for the AUS Medicare 484-char case.
+  it('rejects 484-char redirect-stub page (AUS Medicare regression)', () => {
+    // 484 chars of prose — passes the old 300-char threshold, fails the
+    // new 1500-char threshold. Reproduces the exact bug from the AUS
+    // re-canary where the Medicare URL produced zero extractions.
+    const body =
+      'Medicare is the Australian universal health insurance scheme. ' +
+      'It provides access to subsidised health care for eligible residents. ' +
+      'For information about eligibility, including who can enrol and what ' +
+      'documents are required, please visit the dedicated eligibility page. ' +
+      'New residents can apply online via myGov once they arrive in Australia. ' +
+      'Verification of identity may take additional time during peak periods.';
+    expect(body.length).toBeGreaterThan(300);
+    expect(body.length).toBeLessThan(1500);
+    const result = checkScrapeContent(body, 200);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe('short_content');
+  });
+
+  it('threshold is 1500 chars (Phase 3.6 / Fix C)', () => {
+    expect(MIN_VISIBLE_TEXT_LENGTH).toBe(1500);
   });
 
   it('rejects HTTP 503 (service unavailable)', () => {

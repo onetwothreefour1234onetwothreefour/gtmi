@@ -2,7 +2,9 @@ import { db, scrapeCache } from '@gtmi/db';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import type { DiscoveredUrl, ScrapeResult } from '../types/extraction';
 import type { ScrapeStage } from '../types/pipeline';
-import { checkScrapeContent } from '../scrape-guards';
+import { checkScrapeContent, MIN_VISIBLE_TEXT_LENGTH } from '../scrape-guards';
+
+const MIN_VISIBLE_TEXT_LENGTH_LOG = MIN_VISIBLE_TEXT_LENGTH;
 
 const SCRAPE_CACHE_TTL_HOURS = 24;
 
@@ -97,11 +99,19 @@ export class ScrapeStageImpl implements ScrapeStage {
     }
   }
 
-  private async scrapeOne(discovered: DiscoveredUrl, scraperUrl: string): Promise<ScrapeResult> {
-    const cached = await this.readScrapeCache(discovered.url);
-    if (cached) {
-      console.log(`  [Scrape] Cache hit: ${discovered.url}`);
-      return cached;
+  private async scrapeOne(
+    discovered: DiscoveredUrl,
+    scraperUrl: string,
+    options: { forceLayer?: 'jina' } = {}
+  ): Promise<ScrapeResult> {
+    // Cache lookup is skipped on a forceLayer retry — we explicitly want a
+    // fresh attempt against a different layer.
+    if (!options.forceLayer) {
+      const cached = await this.readScrapeCache(discovered.url);
+      if (cached) {
+        console.log(`  [Scrape] Cache hit: ${discovered.url}`);
+        return cached;
+      }
     }
 
     const response = await fetch(`${scraperUrl}/scrape`, {
@@ -110,6 +120,7 @@ export class ScrapeStageImpl implements ScrapeStage {
       body: JSON.stringify({
         url: discovered.url,
         only_main_content: true,
+        ...(options.forceLayer ? { force_layer: options.forceLayer } : {}),
       }),
       signal: AbortSignal.timeout(45000),
     }).catch((error: unknown) => {
@@ -187,6 +198,28 @@ export class ScrapeStageImpl implements ScrapeStage {
     }
     const guard = checkScrapeContent(content, data.http_status);
     if (!guard.ok) {
+      // Phase 3.6 / Fix C — on `short_content`, retry once via Jina
+      // (force_layer=jina). Playwright produced thin content; the
+      // Jina reader often resolves SPA-shell / redirect-stub pages.
+      if (guard.status === 'short_content' && !options.forceLayer) {
+        console.warn(
+          `  [Scrape] Thin content from ${data.layer ?? 'playwright'} for ${discovered.url} — retrying via Jina (force_layer=jina)`
+        );
+        const retry = await this.scrapeOne(discovered, scraperUrl, { forceLayer: 'jina' });
+        if (retry.contentMarkdown !== '') {
+          return retry;
+        }
+        console.warn(
+          `  [Scrape] SCRAPE_THIN_CONTENT ${discovered.url} — Jina retry also below ${MIN_VISIBLE_TEXT_LENGTH_LOG} chars; treating as ABSENT`
+        );
+        return {
+          url: discovered.url,
+          contentMarkdown: '',
+          contentHash: '',
+          scrapedAt: new Date(data.scraped_at),
+          httpStatus: data.http_status,
+        };
+      }
       console.warn(`  [Scrape] Rejected ${discovered.url}: ${guard.reason}`);
       return {
         url: discovered.url,
