@@ -3,7 +3,12 @@ import { db } from '@gtmi/db';
 import { unstable_cache } from 'next/cache';
 import { sql, type SQL } from 'drizzle-orm';
 
-export type PolicyChangeSeverity = 'minor' | 'material' | 'breaking';
+// Phase 3.6.2 / ITEM 6 — `'url_broken'` is written by the (paused)
+// weekly-maintenance-scrape job when a source URL backing an approved
+// row starts returning 404/410. Listed here so the dashboard's filter
+// chips and SeverityChip render it; the Phase 5 activation will add
+// dedicated styling.
+export type PolicyChangeSeverity = 'minor' | 'material' | 'breaking' | 'url_broken';
 
 export interface PolicyChangesFilters {
   severities?: PolicyChangeSeverity[];

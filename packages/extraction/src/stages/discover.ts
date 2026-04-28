@@ -21,16 +21,33 @@ const SYSTEM_PROMPT =
 export function buildUserMessage(
   programName: string,
   country: string,
-  existingUrls: string[] = []
+  existingUrls: string[] = [],
+  options: { excludeAllRegistry?: boolean; missingFieldLabels?: string[] } = {}
 ): string {
   // Phase 3.6.1 / FIX 5 — exclusion block. Only emitted when the program
-  // has registry entries from prior runs. Capped at 20 URLs regardless
-  // of registry size, to keep the prompt token-budget bounded.
+  // has registry entries from prior runs. Capped at 20 URLs by default;
+  // Phase 3.6.2 / ITEM 3 lifts the cap when `excludeAllRegistry: true`
+  // so the targeted re-run forces Perplexity to find brand-new pages.
+  const exclusionLimit = options.excludeAllRegistry ? existingUrls.length : 20;
   const exclusionBlock =
     existingUrls.length > 0
       ? `\n\nALREADY KNOWN — do NOT return these URLs, they are already in our registry. ` +
         `Use your 15-URL budget to find NEW pages not listed here:\n` +
-        existingUrls.slice(0, 20).join('\n') +
+        existingUrls.slice(0, exclusionLimit).join('\n') +
+        `\n\n`
+      : '';
+
+  // Phase 3.6.2 / ITEM 3 — precision brief. When the caller passes the
+  // human-readable labels of the still-missing indicators, prepend a short
+  // brief telling Perplexity to specifically target pages likely to contain
+  // those data points. Used by the targeted-rerun mode to spend the 15-URL
+  // budget on gap closure rather than broad re-discovery.
+  const precisionBrief =
+    options.missingFieldLabels && options.missingFieldLabels.length > 0
+      ? `\n\nPRECISION BRIEF — this is a TARGETED RE-RUN for a program that already ` +
+        `has high coverage. Spend your 15-URL budget on pages that are likely to contain ` +
+        `data for these specific still-missing indicators (these are the gaps):\n- ` +
+        options.missingFieldLabels.join('\n- ') +
         `\n\n`
       : '';
 
@@ -146,7 +163,8 @@ export function buildUserMessage(
     `occupation lists, fees, processing times) this page is expected to contain. ` +
     `(8) Do not include duplicate URLs, redirects, or pages that do not contain ` +
     `program-specific information.` +
-    exclusionBlock
+    exclusionBlock +
+    precisionBrief
   );
 }
 
@@ -346,27 +364,33 @@ async function writeDiscoveryCache(
 }
 
 export class DiscoverStageImpl implements DiscoverStage {
-  async execute(programId: string, programName: string, country: string): Promise<DiscoveryResult> {
+  async execute(
+    programId: string,
+    programName: string,
+    country: string,
+    options: { excludeAllRegistry?: boolean; missingFieldLabels?: string[] } = {}
+  ): Promise<DiscoveryResult> {
     const PERPLEXITY_API_KEY = process.env['PERPLEXITY_API_KEY'];
     if (!PERPLEXITY_API_KEY) {
       throw new Error('PERPLEXITY_API_KEY is not set in environment');
     }
 
     // Phase 3.6.1 / FIX 5 — load existing registry URLs to deduplicate
-    // against. Take the top 20 most-recently-seen Tier 1/2 URLs and pass
-    // them to the prompt as an exclusion list so Perplexity spends its
-    // 15-URL budget on NEW pages rather than re-finding URLs we already
-    // have in the registry.
+    // against. Default: top 20 most-recently-seen Tier 1/2 URLs.
+    // Phase 3.6.2 / ITEM 3: when `excludeAllRegistry: true`, the FULL
+    // registry is passed (no slice cap) so a targeted re-run forces fresh
+    // pages.
     let existingUrls: string[] = [];
     try {
       const registry = await loadProgramSourcesAsDiscovered(programId);
-      existingUrls = registry.slice(0, 20).map((d) => d.url);
+      const limit = options.excludeAllRegistry ? registry.length : 20;
+      existingUrls = registry.slice(0, limit).map((d) => d.url);
     } catch {
       // Registry read failure is non-fatal; fall back to no exclusion list.
       existingUrls = [];
     }
 
-    const userMessage = buildUserMessage(programName, country, existingUrls);
+    const userMessage = buildUserMessage(programName, country, existingUrls, options);
     const cacheKey = makeDiscoveryCacheKey(programId, SYSTEM_PROMPT, userMessage);
     const cachedUrls = await readDiscoveryCache(cacheKey);
     if (cachedUrls) {

@@ -130,8 +130,8 @@ function isPillarKey(s: string): s is PillarKey {
   return s === 'A' || s === 'B' || s === 'C' || s === 'D' || s === 'E';
 }
 
-function isSeverity(s: string): s is 'minor' | 'material' | 'breaking' {
-  return s === 'minor' || s === 'material' || s === 'breaking';
+function isSeverity(s: string): s is 'minor' | 'material' | 'breaking' | 'url_broken' {
+  return s === 'minor' || s === 'material' || s === 'breaking' || s === 'url_broken';
 }
 
 async function fetchProgramDetail(programId: string): Promise<ProgramDetail | null> {
@@ -304,7 +304,7 @@ async function fetchProgramDetail(programId: string): Promise<ProgramDetail | nu
     .map((r) => ({
       id: r.id,
       detectedAt: new Date(r.detectedAt).toISOString(),
-      severity: r.severity as 'minor' | 'material' | 'breaking',
+      severity: r.severity as 'minor' | 'material' | 'breaking' | 'url_broken',
       fieldKey: r.fieldKey,
       fieldLabel: r.fieldLabel,
       summary: r.summary ?? '',

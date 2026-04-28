@@ -76,7 +76,7 @@ export interface ProgramDetailSource {
 export interface ProgramDetailPolicyChange {
   id: string;
   detectedAt: string;
-  severity: 'minor' | 'material' | 'breaking';
+  severity: 'minor' | 'material' | 'breaking' | 'url_broken';
   fieldKey: string;
   fieldLabel: string;
   summary: string;

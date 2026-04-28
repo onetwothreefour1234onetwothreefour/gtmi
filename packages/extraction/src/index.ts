@@ -43,24 +43,36 @@ export {
   DERIVE_KNOWLEDGE_MODEL,
   DeriveStageImpl,
   deriveA12,
+  deriveB24,
+  deriveD13,
+  deriveD14,
   deriveD22,
   deriveD23,
 } from './stages/derive';
 export type {
   CitizenshipResidenceEntry,
   DerivedA12Input,
+  DerivedB24Input,
+  DerivedD13Input,
+  DerivedD14Input,
   DerivedD22Input,
   DerivedD23Input,
   DerivedRow,
   DualCitizenshipPolicyEntry,
   FxRateEntry,
   MedianWageEntry,
+  NonGovCostsPolicyEntry,
+  PrPresenceFieldEntry,
+  PrPresencePolicyEntry,
 } from './stages/derive';
 export { DiscoverStageImpl, writeToSourcesTable } from './stages/discover';
 export {
   DEFAULT_URL_CAP,
   TIER_QUOTAS,
+  dynamicTierQuotas,
+  dynamicUrlCap,
   loadProgramSourcesAsDiscovered,
+  loadProvenUrlsForMissingFields,
   mergeDiscoveredUrls,
   normaliseUrl,
 } from './utils/url-merge';
@@ -79,3 +91,6 @@ export * from './data/fx-rates';
 export * from './data/country-citizenship-residence';
 // Phase 3.6.1 / FIX 6 — dual-citizenship lookup for D.2.3 derive.
 export * from './data/country-citizenship-policy';
+// Phase 3.6.2 / ITEM 2 — country-level lookups for B.2.4 / D.1.3 / D.1.4.
+export * from './data/country-non-gov-costs';
+export * from './data/country-pr-presence';

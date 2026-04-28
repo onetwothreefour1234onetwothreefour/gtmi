@@ -339,6 +339,24 @@ Phase 3 ranks the five work-streams below by leverage. Sub-phases are intended t
 - ✅ **Commit 7 — Self-improving sources table (ADR-015)** (6fc0d12): `discover.ts` write-back (cache-hit + cache-miss paths) — every verified URL upserted with `discovered_by='stage-0-perplexity'`, never downgrade tier on conflict. `mergeDiscoveredUrls` utility deduplicates by normalised URL, orders Tier 1 → Tier 2 → Tier 3 with quotas (7/4/1) and cap 12. `loadProgramSourcesAsDiscovered` filters to `tier IN (1,2)` AND `last_seen_at > NOW() - INTERVAL '90 days'` AND `programs.status='active'`. Both `canary-run.ts` and `extract-single-program.ts` invoke the merge step at the same insertion point via the shared utility. **Live-DB integration test** runs against staging DIRECT_URL: writes test-marker URLs against a real AUS program, asserts run-2 sources are a superset of run-1 sources, cleanup verified zero residue. 24 tests pass.
 - ✅ **Commit 8 — Documentation close-out** (this commit): IMPLEMENTATION_PLAN, architecture, BRIEF, METHODOLOGY updated; ADR-015 finalized as APPROVED; ADR-016 status verified.
 
+### Phase 3.6.1 — Closure pass — ✅ COMPLETE
+
+Post-Phase-3.6 AUS canary closed at 44/48 (45/48 after the ITEM 1 rollup-classifier fix). Three closure commits landed: (a) D.2.3 derived-knowledge from `country-citizenship-policy.ts`; (b) Cloud Run scraper auth Option B via `gcloud auth print-identity-token`; (c) provenance shape verifier; (d) broken-provenance purge of pre-ADR-014 rows. Gate ≥42/48 met.
+
+### Phase 3.6.2 — Maintenance mode + gap closure (Session 13, single commit, branch `phase-3-recanary-prep`)
+
+**Trigger.** AUS at 45/48 (post-rollup-fix) — three structural gaps remained: B.2.4 (mandatory non-government costs), D.1.3 (PR-accrual physical presence), D.1.4 (PR retention rules). All three are country-deterministic per ADR-013/014 research; the right shape is a derive path against a static lookup table, not another Tier 2 fallback round.
+
+Scope (single commit "feat(pipeline): Phase 3.6.2 — maintenance mode, precision re-run, provenance pre-loading, weekly scrape scaffold, gap closure toward 48/48"):
+
+- **ITEM 1 — Rollup classifier fix.** `scripts/audit-empty-fields-rollup.ts` now classifies synthetic rows (country-substitute-regional, derived-knowledge, derived-computation, v-dem-api-direct, world-bank-api-direct) as POPULATED. Surfaces AUS at 45/48 instead of 44/48.
+- **ITEM 2 — Country-level derives for B.2.4 / D.1.3 / D.1.4.** New static lookup tables `country-non-gov-costs.ts` and `country-pr-presence.ts` (30-country cohort each, header-noted as analyst-reviewable). `deriveB24` / `deriveD13` / `deriveD14` mirror the D.2.3 pattern (derived-knowledge, confidence 0.7, routes to /review). All three added to `DERIVED_FIELD_KEYS` so the LLM batch never produces a competing low-confidence row.
+- **ITEM 3 — `PHASE3_TARGETED_RERUN` mode.** When set, Stage 0 receives a precision brief listing still-missing indicator labels, the FULL registry is excluded (lifts the 20-URL slice cap), and LLM extraction is filtered to missing fields only. Default `false`. The derive stage runs regardless of the flag — gap closure is not flag-dependent.
+- **ITEM 4 — Dynamic URL cap.** `dynamicUrlCap(populatedFieldCount)` returns 20 / 15 / 12 by coverage band (<30 / 30–41 / ≥42). `dynamicTierQuotas(cap)` scales the 60/30/10 Tier-1/2/3 ratio proportionally. Replaces the hard-coded `DEFAULT_URL_CAP=15` in canary-run + extract-single-program.
+- **ITEM 5 — Provenance-based URL pre-loading.** `loadProvenUrlsForMissingFields(programId, countryIso, missingKeys)` returns URLs that produced approved rows for the SAME field key in OTHER programs in the SAME country. Cross-country contamination prevented by `programs.country_iso = $countryIso` filter. The merge layer treats these as a third origin (registry → proven → fresh; fresh wins on conflict).
+- **ITEM 6 — Migration 00012 + weekly-scrape scaffold.** New `field_url_index` view joins `field_values` + `field_definitions` + `programs` for URL-centric queries. `weekly-maintenance-scrape.ts` registered as a Trigger.dev v3 task but PAUSED (no `schedules.task` block) — Phase 5 activates with cron `0 3 * * 1`. `policy_changes.severity` accepts `'url_broken'` (column is `varchar(20)` no CHECK; type-side widening only).
+- **ITEM 7 — Documentation.** This entry, plus architecture and METHODOLOGY notes for the new derive paths.
+
 **Phase 3.6 final test totals (`pnpm test`):**
 
 - `@gtmi/scoring`: 155 / 7 files passed

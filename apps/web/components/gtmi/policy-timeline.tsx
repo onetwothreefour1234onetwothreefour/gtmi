@@ -2,7 +2,10 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from './empty-state';
 
-export type PolicyTimelineSeverity = 'minor' | 'material' | 'breaking';
+// Phase 3.6.2 / ITEM 6 — `url_broken` reserved for the (paused) weekly
+// maintenance scrape; styled like `material` until Phase 5 designs a
+// dedicated chip.
+export type PolicyTimelineSeverity = 'minor' | 'material' | 'breaking' | 'url_broken';
 
 export interface PolicyTimelineEvent {
   id: string;
@@ -24,6 +27,7 @@ const SEVERITY_STYLE: Record<PolicyTimelineSeverity, string> = {
   minor: 'bg-muted text-muted-foreground border-border',
   material: 'bg-precalib-bg text-precalib-fg border-precalib-fg/40',
   breaking: 'bg-destructive/10 text-destructive border-destructive/40',
+  url_broken: 'bg-precalib-bg text-precalib-fg border-precalib-fg/40',
 };
 
 /**

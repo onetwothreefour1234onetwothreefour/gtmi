@@ -172,13 +172,19 @@ function DateInput({ label }: { label: string }) {
   );
 }
 
-function SeverityChip({ severity }: { severity: 'minor' | 'material' | 'breaking' }) {
+function SeverityChip({
+  severity,
+}: {
+  severity: 'minor' | 'material' | 'breaking' | 'url_broken';
+}) {
   const styles =
     severity === 'breaking'
       ? 'bg-destructive/10 text-destructive border-destructive/40'
       : severity === 'material'
         ? 'bg-precalib-bg text-precalib-fg border-precalib-fg/40'
-        : 'bg-muted text-muted-foreground border-border';
+        : severity === 'url_broken'
+          ? 'bg-precalib-bg text-precalib-fg border-precalib-fg/40'
+          : 'bg-muted text-muted-foreground border-border';
   return (
     <span
       className={`inline-flex h-5 items-center rounded-button border px-1.5 font-sans text-[10px] font-medium uppercase tracking-wider ${styles}`}

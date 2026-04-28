@@ -107,6 +107,51 @@ export interface DerivedD23Input {
   policy: DualCitizenshipPolicyEntry | null;
 }
 
+/** Phase 3.6.2 / ITEM 2 — B.2.4 derive input. */
+export interface NonGovCostsPolicyEntry {
+  iso3: string;
+  hasMandatoryNonGovCosts: boolean | null;
+  notes: string;
+  sourceUrl: string;
+  sourceYear: number;
+}
+
+export interface DerivedB24Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  policy: NonGovCostsPolicyEntry | null;
+}
+
+/** Phase 3.6.2 / ITEM 2 — D.1.3 / D.1.4 derive inputs. */
+export interface PrPresenceFieldEntry {
+  required: boolean | null;
+  daysPerYear: number | null;
+  notes: string;
+}
+
+export interface PrPresencePolicyEntry {
+  iso3: string;
+  d13: PrPresenceFieldEntry;
+  d14: PrPresenceFieldEntry;
+  sourceUrl: string;
+  sourceYear: number;
+}
+
+export interface DerivedD13Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  policy: PrPresencePolicyEntry | null;
+}
+
+export interface DerivedD14Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  policy: PrPresencePolicyEntry | null;
+}
+
 export interface DerivedRow {
   /** Pre-built ExtractionOutput suitable for humanReview.enqueue. */
   extraction: ExtractionOutput;
@@ -404,6 +449,184 @@ export function deriveD23(input: DerivedD23Input): DerivedRow | null {
   return { extraction, provenance, numericValue: 0 };
 }
 
+/**
+ * Phase 3.6.2 / ITEM 2 — Compute B.2.4 (mandatory non-government costs).
+ *
+ * Same pattern as deriveD23 — country-level derived-knowledge lookup.
+ * Writes a `boolean_with_annotation` shape `{hasMandatoryNonGovCosts, notes}`
+ * matching the methodology-v2 rubric. The publish layer's
+ * `BOOLEAN_WITH_ANNOTATION_KEYS` already maps B.2.4 → `'hasMandatoryNonGovCosts'`.
+ */
+export function deriveB24(input: DerivedB24Input): DerivedRow | null {
+  if (input.policy === null) {
+    console.log(
+      `  [B.2.4] derived skip — no COUNTRY_NON_GOV_COSTS_POLICY entry for ${input.countryIso}`
+    );
+    return null;
+  }
+  if (input.policy.hasMandatoryNonGovCosts === null) {
+    console.log(
+      `  [B.2.4] derived skip — ${input.countryIso} non-gov-costs policy is unknown/null`
+    );
+    return null;
+  }
+
+  const valueRaw = JSON.stringify({
+    hasMandatoryNonGovCosts: input.policy.hasMandatoryNonGovCosts,
+    notes: input.policy.notes,
+  });
+  const sourceSentence = input.policy.notes;
+
+  const derivedInputs = {
+    'B.2.4': {
+      hasMandatoryNonGovCosts: input.policy.hasMandatoryNonGovCosts,
+      sourceUrl: input.policy.sourceUrl,
+      sourceYear: input.policy.sourceYear,
+    },
+  };
+
+  const crossCheckResult: CrossCheckOutcome = 'not_checked';
+  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
+    sourceUrl: input.policy.sourceUrl,
+    geographicLevel: 'national',
+    sourceTier: null,
+    scrapeTimestamp: new Date().toISOString(),
+    contentHash: createHash('sha256')
+      .update(
+        `derived-knowledge:B.2.4:${input.programId}:${input.countryIso}:${input.policy.hasMandatoryNonGovCosts}`,
+        'utf8'
+      )
+      .digest('hex'),
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    validationModel: DERIVE_KNOWLEDGE_MODEL,
+    validationConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    crossCheckResult,
+    crossCheckUrl: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    methodologyVersion: input.methodologyVersion,
+    reviewDecision: 'approve',
+    derivedInputs,
+  };
+
+  const extraction: ExtractionOutput = {
+    programId: input.programId,
+    fieldDefinitionKey: 'B.2.4',
+    valueRaw,
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractedAt: new Date(),
+  };
+
+  return { extraction, provenance, numericValue: 0 };
+}
+
+function buildPrPresenceRow(
+  fieldKey: 'D.1.3' | 'D.1.4',
+  input: DerivedD13Input | DerivedD14Input,
+  entry: PrPresenceFieldEntry
+): DerivedRow | null {
+  if (input.policy === null) {
+    console.log(
+      `  [${fieldKey}] derived skip — no COUNTRY_PR_PRESENCE_POLICY entry for ${input.countryIso}`
+    );
+    return null;
+  }
+  if (entry.required === null) {
+    console.log(
+      `  [${fieldKey}] derived skip — ${input.countryIso} PR presence policy is null (no PR pathway / contested)`
+    );
+    return null;
+  }
+
+  const valueRaw = JSON.stringify({
+    required: entry.required,
+    daysPerYear: entry.daysPerYear,
+    notes: entry.notes,
+  });
+  const sourceSentence = entry.notes;
+
+  const derivedInputs = {
+    [fieldKey]: {
+      required: entry.required,
+      daysPerYear: entry.daysPerYear,
+      sourceUrl: input.policy.sourceUrl,
+      sourceYear: input.policy.sourceYear,
+    },
+  };
+
+  const crossCheckResult: CrossCheckOutcome = 'not_checked';
+  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
+    sourceUrl: input.policy.sourceUrl,
+    geographicLevel: 'national',
+    sourceTier: null,
+    scrapeTimestamp: new Date().toISOString(),
+    contentHash: createHash('sha256')
+      .update(
+        `derived-knowledge:${fieldKey}:${input.programId}:${input.countryIso}:${entry.required}:${entry.daysPerYear}`,
+        'utf8'
+      )
+      .digest('hex'),
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    validationModel: DERIVE_KNOWLEDGE_MODEL,
+    validationConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    crossCheckResult,
+    crossCheckUrl: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    methodologyVersion: input.methodologyVersion,
+    reviewDecision: 'approve',
+    derivedInputs,
+  };
+
+  const extraction: ExtractionOutput = {
+    programId: input.programId,
+    fieldDefinitionKey: fieldKey,
+    valueRaw,
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractedAt: new Date(),
+  };
+
+  return { extraction, provenance, numericValue: 0 };
+}
+
+/**
+ * Phase 3.6.2 / ITEM 2 — Compute D.1.3 (PR-accrual physical presence).
+ */
+export function deriveD13(input: DerivedD13Input): DerivedRow | null {
+  if (input.policy === null) {
+    console.log(
+      `  [D.1.3] derived skip — no COUNTRY_PR_PRESENCE_POLICY entry for ${input.countryIso}`
+    );
+    return null;
+  }
+  return buildPrPresenceRow('D.1.3', input, input.policy.d13);
+}
+
+/**
+ * Phase 3.6.2 / ITEM 2 — Compute D.1.4 (PR retention physical presence).
+ */
+export function deriveD14(input: DerivedD14Input): DerivedRow | null {
+  if (input.policy === null) {
+    console.log(
+      `  [D.1.4] derived skip — no COUNTRY_PR_PRESENCE_POLICY entry for ${input.countryIso}`
+    );
+    return null;
+  }
+  return buildPrPresenceRow('D.1.4', input, input.policy.d14);
+}
+
 // ────────────────────────────────────────────────────────────────────
 // Stage orchestrator. Pure inputs (no DB) — the canary / Trigger.dev
 // caller resolves DB-backed fields and the static-table entries before
@@ -422,6 +645,18 @@ export class DeriveStageImpl implements DeriveStage {
     if (inputs.d23) {
       const d23 = deriveD23(inputs.d23);
       if (d23) out.push(d23);
+    }
+    if (inputs.b24) {
+      const b24 = deriveB24(inputs.b24);
+      if (b24) out.push(b24);
+    }
+    if (inputs.d13) {
+      const d13 = deriveD13(inputs.d13);
+      if (d13) out.push(d13);
+    }
+    if (inputs.d14) {
+      const d14 = deriveD14(inputs.d14);
+      if (d14) out.push(d14);
     }
     return out;
   }

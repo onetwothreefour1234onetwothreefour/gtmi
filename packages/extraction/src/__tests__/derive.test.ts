@@ -1,6 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { DERIVE_CONFIDENCE, DERIVE_EXTRACTION_MODEL, deriveA12, deriveD22 } from '../stages/derive';
-import type { CitizenshipResidenceEntry, FxRateEntry, MedianWageEntry } from '../stages/derive';
+import {
+  DERIVE_CONFIDENCE,
+  DERIVE_EXTRACTION_MODEL,
+  DERIVE_KNOWLEDGE_CONFIDENCE,
+  DERIVE_KNOWLEDGE_MODEL,
+  deriveA12,
+  deriveB24,
+  deriveD13,
+  deriveD14,
+  deriveD22,
+} from '../stages/derive';
+import type {
+  CitizenshipResidenceEntry,
+  FxRateEntry,
+  MedianWageEntry,
+  NonGovCostsPolicyEntry,
+  PrPresencePolicyEntry,
+} from '../stages/derive';
 import { checkProvenanceRow } from '@gtmi/shared';
 
 // Phase 3.6 / Fix D / ADR-016 — derive stage unit tests.
@@ -245,5 +261,142 @@ describe('Derived row provenance shape (ADR-016 invariants)', () => {
     expect(d22Inputs).toHaveProperty('D.1.2');
     expect(d22Inputs).toHaveProperty('D.1.1');
     expect(d22Inputs).toHaveProperty('citizenshipResidence');
+  });
+});
+
+// Phase 3.6.2 / ITEM 2 — B.2.4 / D.1.3 / D.1.4 country-level derives.
+
+const B24_AUS: NonGovCostsPolicyEntry = {
+  iso3: 'AUS',
+  hasMandatoryNonGovCosts: true,
+  notes: 'Mandatory health insurance and skills assessment fees apply.',
+  sourceUrl:
+    'https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skill-in-demand-482',
+  sourceYear: 2025,
+};
+
+const PR_PRESENCE_AUS: PrPresencePolicyEntry = {
+  iso3: 'AUS',
+  d13: { required: true, daysPerYear: 730, notes: '730 days in 5 years (PR accrual)' },
+  d14: { required: true, daysPerYear: 730, notes: '730 days in 5 years (PR retention)' },
+  sourceUrl: 'https://immi.homeaffairs.gov.au/visas/permanent-resident',
+  sourceYear: 2025,
+};
+
+const PR_PRESENCE_GCC_NULL: PrPresencePolicyEntry = {
+  iso3: 'ARE',
+  d13: { required: null, daysPerYear: null, notes: 'No PR pathway for ARE.' },
+  d14: { required: null, daysPerYear: null, notes: 'No PR pathway for ARE.' },
+  sourceUrl: 'https://www.mohre.gov.ae/',
+  sourceYear: 2025,
+};
+
+describe('deriveB24 — mandatory non-gov costs', () => {
+  it('returns null when policy is null', () => {
+    expect(
+      deriveB24({
+        programId: 'p1',
+        countryIso: 'XYZ',
+        methodologyVersion: '1.0.0',
+        policy: null,
+      })
+    ).toBeNull();
+  });
+
+  it('returns null when hasMandatoryNonGovCosts is null (unknown)', () => {
+    expect(
+      deriveB24({
+        programId: 'p1',
+        countryIso: 'AUS',
+        methodologyVersion: '1.0.0',
+        policy: { ...B24_AUS, hasMandatoryNonGovCosts: null },
+      })
+    ).toBeNull();
+  });
+
+  it('produces a derived-knowledge row at confidence 0.7', () => {
+    const r = deriveB24({
+      programId: 'p1',
+      countryIso: 'AUS',
+      methodologyVersion: '1.0.0',
+      policy: B24_AUS,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.extraction.fieldDefinitionKey).toBe('B.2.4');
+    expect(r!.extraction.extractionConfidence).toBe(DERIVE_KNOWLEDGE_CONFIDENCE);
+    expect(r!.extraction.extractionModel).toBe(DERIVE_KNOWLEDGE_MODEL);
+    const parsed = JSON.parse(r!.extraction.valueRaw);
+    expect(parsed).toEqual({
+      hasMandatoryNonGovCosts: true,
+      notes: B24_AUS.notes,
+    });
+  });
+
+  it('confidence forces /review (below 0.85 auto-approve threshold)', () => {
+    const r = deriveB24({
+      programId: 'p1',
+      countryIso: 'AUS',
+      methodologyVersion: '1.0.0',
+      policy: B24_AUS,
+    });
+    expect(r!.provenance.extractionConfidence).toBeLessThan(0.85);
+    expect(r!.provenance.sourceTier).toBeNull();
+  });
+});
+
+describe('deriveD13 / deriveD14 — PR presence', () => {
+  it('returns null when policy is null (no entry for country)', () => {
+    expect(
+      deriveD13({ programId: 'p', countryIso: 'XYZ', methodologyVersion: '1.0.0', policy: null })
+    ).toBeNull();
+    expect(
+      deriveD14({ programId: 'p', countryIso: 'XYZ', methodologyVersion: '1.0.0', policy: null })
+    ).toBeNull();
+  });
+
+  it('returns null when required is null (no PR pathway, e.g. ARE)', () => {
+    expect(
+      deriveD13({
+        programId: 'p',
+        countryIso: 'ARE',
+        methodologyVersion: '1.0.0',
+        policy: PR_PRESENCE_GCC_NULL,
+      })
+    ).toBeNull();
+    expect(
+      deriveD14({
+        programId: 'p',
+        countryIso: 'ARE',
+        methodologyVersion: '1.0.0',
+        policy: PR_PRESENCE_GCC_NULL,
+      })
+    ).toBeNull();
+  });
+
+  it('D.1.3 produces a derived-knowledge row with required + daysPerYear', () => {
+    const r = deriveD13({
+      programId: 'p1',
+      countryIso: 'AUS',
+      methodologyVersion: '1.0.0',
+      policy: PR_PRESENCE_AUS,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.extraction.fieldDefinitionKey).toBe('D.1.3');
+    expect(r!.extraction.extractionConfidence).toBe(DERIVE_KNOWLEDGE_CONFIDENCE);
+    const parsed = JSON.parse(r!.extraction.valueRaw);
+    expect(parsed.required).toBe(true);
+    expect(parsed.daysPerYear).toBe(730);
+  });
+
+  it('D.1.4 produces a derived-knowledge row distinct from D.1.3', () => {
+    const r = deriveD14({
+      programId: 'p1',
+      countryIso: 'AUS',
+      methodologyVersion: '1.0.0',
+      policy: PR_PRESENCE_AUS,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.extraction.fieldDefinitionKey).toBe('D.1.4');
+    expect(r!.extraction.extractionModel).toBe(DERIVE_KNOWLEDGE_MODEL);
   });
 });

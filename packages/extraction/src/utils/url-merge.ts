@@ -18,6 +18,35 @@ export const DEFAULT_URL_CAP = 15;
 export const TIER_QUOTAS = { 1: 9, 2: 5, 3: 1 } as const;
 
 /**
+ * Phase 3.6.2 / ITEM 4 — dynamic URL cap based on current field coverage.
+ *
+ * Rationale: a program already at high coverage doesn't benefit from a
+ * wide URL set; the marginal field is more efficiently targeted by
+ * precision discovery. A program at low coverage benefits from breadth.
+ *
+ * Bands:
+ *   populated < 30 → cap = 20 (broad discovery to bootstrap coverage)
+ *   30 ≤ populated < 42 → cap = 15 (default; balanced)
+ *   populated ≥ 42 → cap = 12 (precision; rely on registry + targeted)
+ */
+export function dynamicUrlCap(populatedFieldCount: number): number {
+  if (populatedFieldCount < 30) return 20;
+  if (populatedFieldCount < 42) return 15;
+  return 12;
+}
+
+/**
+ * Per-cap tier quotas. Scaled proportionally so quotas always sum to the
+ * cap (preserves the 60/30/10 Tier 1 / Tier 2 / Tier 3 ratio used since
+ * Phase 3.6.1 with quotas 9/5/1 = 60%/33%/7%).
+ */
+export function dynamicTierQuotas(cap: number): { 1: number; 2: number; 3: number } {
+  if (cap <= 12) return { 1: 7, 2: 4, 3: 1 };
+  if (cap <= 15) return { 1: 9, 2: 5, 3: 1 };
+  return { 1: 12, 2: 7, 3: 1 };
+}
+
+/**
  * Normalise a URL for cross-source deduplication.
  * - lowercases scheme and host
  * - strips trailing slash from the path (preserves "/" alone)
@@ -59,7 +88,13 @@ export function normaliseUrl(raw: string): string {
 interface MergeArgs {
   freshFromStage0: DiscoveredUrl[];
   fromSourcesTable: DiscoveredUrl[];
+  /** Phase 3.6.2 / ITEM 5 — URLs that produced approved values for the
+   * currently-missing fields in OTHER programs in the same country. */
+  fromProvenance?: DiscoveredUrl[];
   cap?: number;
+  /** Phase 3.6.2 / ITEM 4 — explicit per-tier quota override. When unset,
+   * dynamicTierQuotas(cap) is used. */
+  quotas?: { 1: number; 2: number; 3: number };
 }
 
 /**
@@ -73,15 +108,24 @@ interface MergeArgs {
  */
 export function mergeDiscoveredUrls(args: MergeArgs): DiscoveredUrl[] {
   const cap = args.cap ?? DEFAULT_URL_CAP;
+  const quotas = args.quotas ?? dynamicTierQuotas(cap);
 
   // Tag each entry with its origin so we can implement "registry first within tier".
-  type Tagged = { url: DiscoveredUrl; origin: 'registry' | 'fresh'; normalised: string };
+  type Tagged = {
+    url: DiscoveredUrl;
+    origin: 'registry' | 'fresh' | 'proven';
+    normalised: string;
+  };
   const seen = new Map<string, Tagged>();
 
-  // Seed with registry first; fresh overrides on conflict.
+  // Seed with registry first; proven overlays on conflict; fresh overrides everything.
   for (const u of args.fromSourcesTable) {
     const n = normaliseUrl(u.url);
     seen.set(n, { url: u, origin: 'registry', normalised: n });
+  }
+  for (const u of args.fromProvenance ?? []) {
+    const n = normaliseUrl(u.url);
+    if (!seen.has(n)) seen.set(n, { url: u, origin: 'proven', normalised: n });
   }
   for (const u of args.freshFromStage0) {
     const n = normaliseUrl(u.url);
@@ -95,17 +139,19 @@ export function mergeDiscoveredUrls(args: MergeArgs): DiscoveredUrl[] {
     if (t === 1 || t === 2 || t === 3) byTier[t].push(tagged);
   }
 
-  // Within each tier, registry first then fresh (stable within each origin).
+  // Within each tier, order: registry → proven → fresh (stable within each origin).
+  const ORIGIN_RANK: Record<Tagged['origin'], number> = {
+    registry: 0,
+    proven: 1,
+    fresh: 2,
+  };
   for (const t of [1, 2, 3] as const) {
-    byTier[t].sort((a, b) => {
-      if (a.origin === b.origin) return 0;
-      return a.origin === 'registry' ? -1 : 1;
-    });
+    byTier[t].sort((a, b) => ORIGIN_RANK[a.origin] - ORIGIN_RANK[b.origin]);
   }
 
   // Apply per-tier quotas, then fall through if a tier is short.
   const out: DiscoveredUrl[] = [];
-  const remainingByTier = { 1: TIER_QUOTAS[1], 2: TIER_QUOTAS[2], 3: TIER_QUOTAS[3] };
+  const remainingByTier = { 1: quotas[1], 2: quotas[2], 3: quotas[3] };
   for (const t of [1, 2, 3] as const) {
     const take = Math.min(remainingByTier[t], byTier[t].length, cap - out.length);
     for (let i = 0; i < take; i++) {
@@ -162,4 +208,70 @@ export async function loadProgramSourcesAsDiscovered(
     reason: `From sources registry (${r.sourceCategory ?? 'unknown'})`,
     isOfficial: r.tier === 1,
   }));
+}
+
+/**
+ * Phase 3.6.2 / ITEM 5 — provenance-based URL pre-loading.
+ *
+ * For each missing field key in the current program, find URLs that
+ * produced an APPROVED value for the SAME field key in OTHER programs
+ * in the SAME country. Cross-country contamination is prevented by the
+ * `programs.country_iso = $countryIso` filter (URLs from other countries
+ * cannot leak — by construction).
+ *
+ * Excludes:
+ *   - the current program (proven URLs from the same program are already
+ *     in the sources registry)
+ *   - synthetic provenance markers (derived-*, country-substitute,
+ *     internal:*, World Bank API endpoints)
+ *
+ * Cap: returns at most `cap` distinct URLs (default 10). The merge layer
+ * will further trim against the per-tier quotas.
+ */
+export async function loadProvenUrlsForMissingFields(
+  programId: string,
+  countryIso: string,
+  missingFieldKeys: string[],
+  database: DbClient = db,
+  cap: number = 10
+): Promise<DiscoveredUrl[]> {
+  if (missingFieldKeys.length === 0) return [];
+  const rows = await database.execute<{
+    url: string;
+    field_key: string;
+    program_name: string;
+  }>(
+    sql`
+      SELECT DISTINCT ON (provenance->>'sourceUrl')
+        (provenance->>'sourceUrl') AS url,
+        fd.key AS field_key,
+        p.name AS program_name
+      FROM field_values fv
+      JOIN field_definitions fd ON fd.id = fv.field_definition_id
+      JOIN programs p ON p.id = fv.program_id
+      WHERE fv.status = 'approved'
+        AND fv.program_id <> ${programId}
+        AND p.country_iso = ${countryIso}
+        AND fd.key = ANY(${missingFieldKeys}::text[])
+        AND fv.provenance->>'sourceUrl' IS NOT NULL
+        AND fv.provenance->>'sourceUrl' NOT LIKE 'derived-%'
+        AND fv.provenance->>'sourceUrl' NOT LIKE 'internal:%'
+        AND fv.provenance->>'sourceUrl' NOT LIKE 'https://api.worldbank.org/%'
+      LIMIT ${cap}
+    `
+  );
+
+  // postgres-driven Drizzle: rows is iterable.
+  const list: DiscoveredUrl[] = [];
+  const iter = Array.isArray(rows) ? rows : ((rows as unknown as { rows?: unknown[] }).rows ?? []);
+  for (const r of iter as Array<{ url: string; field_key: string; program_name: string }>) {
+    list.push({
+      url: r.url,
+      tier: 1,
+      geographicLevel: 'national',
+      reason: `Proven — produced approved value for ${r.field_key} in "${r.program_name}"`,
+      isOfficial: true,
+    });
+  }
+  return list;
 }

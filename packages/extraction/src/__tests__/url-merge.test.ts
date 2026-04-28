@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { mergeDiscoveredUrls, normaliseUrl, DEFAULT_URL_CAP } from '../utils/url-merge';
+import {
+  dynamicTierQuotas,
+  dynamicUrlCap,
+  mergeDiscoveredUrls,
+  normaliseUrl,
+  DEFAULT_URL_CAP,
+} from '../utils/url-merge';
 import type { DiscoveredUrl } from '../types/extraction';
 
 // Phase 3.6 / ADR-015 — URL merge utility tests.
@@ -160,5 +166,104 @@ describe('mergeDiscoveredUrls', () => {
     expect(tierCounts[1]).toBe(3);
     expect(tierCounts[2]).toBe(11);
     expect(tierCounts[3]).toBe(1);
+  });
+});
+
+// Phase 3.6.2 / ITEM 4 — dynamic cap + tier quotas.
+describe('dynamicUrlCap', () => {
+  it('returns 20 for under-covered programs (<30 populated)', () => {
+    expect(dynamicUrlCap(0)).toBe(20);
+    expect(dynamicUrlCap(15)).toBe(20);
+    expect(dynamicUrlCap(29)).toBe(20);
+  });
+
+  it('returns 15 in the default band (30..41 populated)', () => {
+    expect(dynamicUrlCap(30)).toBe(15);
+    expect(dynamicUrlCap(35)).toBe(15);
+    expect(dynamicUrlCap(41)).toBe(15);
+  });
+
+  it('returns 12 for well-covered programs (>=42 populated)', () => {
+    expect(dynamicUrlCap(42)).toBe(12);
+    expect(dynamicUrlCap(45)).toBe(12);
+    expect(dynamicUrlCap(48)).toBe(12);
+  });
+});
+
+describe('dynamicTierQuotas', () => {
+  it('preserves the 60/30/10 ratio across all three caps', () => {
+    expect(dynamicTierQuotas(12)).toEqual({ 1: 7, 2: 4, 3: 1 });
+    expect(dynamicTierQuotas(15)).toEqual({ 1: 9, 2: 5, 3: 1 });
+    expect(dynamicTierQuotas(20)).toEqual({ 1: 12, 2: 7, 3: 1 });
+  });
+
+  it('quotas always sum to the cap', () => {
+    for (const cap of [12, 15, 20]) {
+      const q = dynamicTierQuotas(cap);
+      expect(q[1] + q[2] + q[3]).toBe(cap);
+    }
+  });
+});
+
+// Phase 3.6.2 / ITEM 5 — proven URLs are a third merge origin
+// (registry → proven → fresh; fresh wins on URL conflict).
+describe('mergeDiscoveredUrls — proven URL origin', () => {
+  it('includes proven URLs after registry but before fresh in same tier', () => {
+    const registry = [du('https://reg.example/a', 1)];
+    const proven = [du('https://proven.example/b', 1)];
+    const fresh = [du('https://fresh.example/c', 1)];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: registry,
+      fromProvenance: proven,
+    });
+    expect(result.map((u) => u.url)).toEqual([
+      'https://reg.example/a',
+      'https://proven.example/b',
+      'https://fresh.example/c',
+    ]);
+  });
+
+  it('fresh wins on URL conflict with a proven entry', () => {
+    const proven = [du('https://x.example/p', 1, 'national', 'proven reason')];
+    const fresh = [du('https://x.example/p', 1, 'national', 'fresh reason')];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: [],
+      fromProvenance: proven,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.reason).toBe('fresh reason');
+  });
+
+  it('registry wins on URL conflict with a proven entry', () => {
+    const registry = [du('https://x.example/p', 1, 'national', 'registry reason')];
+    const proven = [du('https://x.example/p', 1, 'national', 'proven reason')];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: [],
+      fromSourcesTable: registry,
+      fromProvenance: proven,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.reason).toBe('registry reason');
+  });
+
+  it('respects an explicit quotas override', () => {
+    const fresh = [
+      du('https://t1.example/a', 1),
+      du('https://t1.example/b', 1),
+      du('https://t1.example/c', 1),
+      du('https://t2.example/a', 2),
+      du('https://t2.example/b', 2),
+    ];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: [],
+      cap: 4,
+      quotas: { 1: 2, 2: 2, 3: 0 },
+    });
+    expect(result).toHaveLength(4);
+    expect(result.filter((u) => u.tier === 1)).toHaveLength(2);
+    expect(result.filter((u) => u.tier === 2)).toHaveLength(2);
   });
 });

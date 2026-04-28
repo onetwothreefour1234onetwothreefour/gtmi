@@ -1,5 +1,4 @@
 import {
-  DEFAULT_URL_CAP,
   DiscoverStageImpl,
   ExtractStageImpl,
   HumanReviewStageImpl,
@@ -7,11 +6,19 @@ import {
   ScrapeStageImpl,
   ValidateStageImpl,
   deriveA12,
+  deriveB24,
+  deriveD13,
+  deriveD14,
   deriveD22,
   deriveD23,
+  dynamicTierQuotas,
+  dynamicUrlCap,
   loadProgramSourcesAsDiscovered,
+  loadProvenUrlsForMissingFields,
   mergeDiscoveredUrls,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
+  COUNTRY_NON_GOV_COSTS_POLICY,
+  COUNTRY_PR_PRESENCE_POLICY,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -23,6 +30,7 @@ import type {
   ScrapeResult,
 } from '@gtmi/extraction';
 import { db, fieldDefinitions, fieldValues, programs } from '@gtmi/db';
+import { sql } from 'drizzle-orm';
 import { ACTIVE_FIELD_CODES } from './wave-config';
 import {
   COUNTRY_LEVEL_SOURCES,
@@ -55,6 +63,13 @@ const TIER2_FALLBACK_CONFIDENCE_CAP = 0.85;
 // Default true per analyst Q5 decision (methodology requires E.3.1).
 // Set PHASE3_VDEM_ENABLED=false to disable for staged rollouts.
 const PHASE3_VDEM_ENABLED = process.env['PHASE3_VDEM_ENABLED'] !== 'false';
+
+// Phase 3.6.2 / ITEM 3 — targeted precision re-run mode.
+// When 'true': compute missing fields, pass them as a precision brief
+// to Stage 0, exclude ALL registry URLs (not just top 20), filter
+// extraction to only the missing fields. Cheaper than full canary when
+// coverage is already ≥42/48.
+const PHASE3_TARGETED_RERUN = process.env['PHASE3_TARGETED_RERUN'] === 'true';
 
 async function main() {
   const countryArgIdx = process.argv.indexOf('--country');
@@ -215,21 +230,113 @@ async function main() {
     console.log(
       `  [Phase 2] Searching for program-specific URLs for: ${programName} (${countryIso})...`
     );
-    const discoveryResult = await discover.execute(programId, programName, countryIso);
+
+    // Phase 3.6.2 / ITEM 3 — when targeted-rerun is on, compute missing
+    // field labels first so we can pass them as a precision brief and
+    // exclude the full registry from re-discovery.
+    const fieldDefByKeyForBrief = new Map(allFieldDefs.map((d) => [d.key, d]));
+    let preDiscoveryMissingKeys: string[] = [];
+    if (PHASE3_TARGETED_RERUN) {
+      const presentRows = await db.execute<{ key: string }>(sql`
+        SELECT fd.key
+        FROM field_values fv
+        JOIN field_definitions fd ON fd.id = fv.field_definition_id
+        WHERE fv.program_id = ${programId}
+          AND fv.status IN ('approved', 'pending_review')
+          AND (
+            fv.value_raw IS NOT NULL AND fv.value_raw <> ''
+            OR fv.value_normalized IS NOT NULL
+          )
+      `);
+      const iter = Array.isArray(presentRows)
+        ? presentRows
+        : ((presentRows as unknown as { rows?: { key: string }[] }).rows ?? []);
+      const presentNow = new Set((iter as { key: string }[]).map((r) => r.key));
+      preDiscoveryMissingKeys = allFieldDefs.map((d) => d.key).filter((k) => !presentNow.has(k));
+    }
+    const discoveryOptions = PHASE3_TARGETED_RERUN
+      ? {
+          excludeAllRegistry: true,
+          missingFieldLabels: preDiscoveryMissingKeys
+            .map((k) => fieldDefByKeyForBrief.get(k))
+            .filter((d): d is NonNullable<typeof d> => d !== undefined)
+            .map((d) => `${d.key} — ${d.label}`),
+        }
+      : undefined;
+    if (PHASE3_TARGETED_RERUN) {
+      console.log(
+        `[Targeted re-run] PHASE3_TARGETED_RERUN=true — precision brief on ${preDiscoveryMissingKeys.length} missing field(s); excluding full registry from new discovery`
+      );
+    }
+
+    const discoveryResult = await discover.execute(
+      programId,
+      programName,
+      countryIso,
+      discoveryOptions
+    );
     console.log(`Stage 0 complete: ${discoveryResult.discoveredUrls.length} URLs discovered`);
 
     // Phase 3.6 / ADR-015 — merge fresh Stage 0 results with the
     // sources-table registry from prior runs. Self-improving discovery:
     // every successful run grows the registry monotonically; subsequent
     // runs benefit from the union.
+    //
+    // Phase 3.6.2 / ITEMs 4+5 — dynamic cap based on current coverage and
+    // proven-URL pre-loading from same-country other-program approved rows.
+    const populatedCountRows = await db.execute<{ n: number }>(sql`
+      SELECT COUNT(*)::int AS n
+      FROM field_values
+      WHERE program_id = ${programId}
+        AND status IN ('approved', 'pending_review')
+        AND (
+          value_raw IS NOT NULL AND value_raw <> ''
+          OR value_normalized IS NOT NULL
+        )
+    `);
+    const populatedCountIter = Array.isArray(populatedCountRows)
+      ? populatedCountRows
+      : ((populatedCountRows as unknown as { rows?: { n: number }[] }).rows ?? []);
+    const populatedFieldCount = (populatedCountIter[0]?.n ?? 0) as number;
+    const cap = dynamicUrlCap(populatedFieldCount);
+    const quotas = dynamicTierQuotas(cap);
+
+    // Compute missing field keys for proven-URL pre-loading.
+    const presentKeysRows = await db.execute<{ key: string }>(sql`
+      SELECT fd.key
+      FROM field_values fv
+      JOIN field_definitions fd ON fd.id = fv.field_definition_id
+      WHERE fv.program_id = ${programId}
+        AND fv.status IN ('approved', 'pending_review')
+        AND (
+          fv.value_raw IS NOT NULL AND fv.value_raw <> ''
+          OR fv.value_normalized IS NOT NULL
+        )
+    `);
+    const presentKeysIter = Array.isArray(presentKeysRows)
+      ? presentKeysRows
+      : ((presentKeysRows as unknown as { rows?: { key: string }[] }).rows ?? []);
+    const presentKeys = new Set((presentKeysIter as { key: string }[]).map((r) => r.key));
+    const missingFieldKeys = allFieldDefs.map((d) => d.key).filter((k) => !presentKeys.has(k));
+
+    const provenUrls = await loadProvenUrlsForMissingFields(
+      programId,
+      countryIso,
+      missingFieldKeys
+    );
     const registryUrls = await loadProgramSourcesAsDiscovered(programId);
     const mergedDiscoveredUrls = mergeDiscoveredUrls({
       freshFromStage0: discoveryResult.discoveredUrls,
       fromSourcesTable: registryUrls,
-      cap: DEFAULT_URL_CAP,
+      fromProvenance: provenUrls,
+      cap,
+      quotas,
     });
     console.log(
-      `[Discovery merge] fresh=${discoveryResult.discoveredUrls.length} + registry=${registryUrls.length} → merged=${mergedDiscoveredUrls.length} (cap=${DEFAULT_URL_CAP})`
+      `[Discovery merge] populated=${populatedFieldCount} → cap=${cap} (quotas T1=${quotas[1]} T2=${quotas[2]} T3=${quotas[3]})`
+    );
+    console.log(
+      `[Discovery merge] fresh=${discoveryResult.discoveredUrls.length} + registry=${registryUrls.length} + proven=${provenUrls.length} → merged=${mergedDiscoveredUrls.length}`
     );
 
     console.log('Discovered URLs (post-merge):');
@@ -295,15 +402,22 @@ async function main() {
     const e31HandledByVdemPath = PHASE3_VDEM_ENABLED && vdemResult !== null;
     // Phase 3.6.1 / FIX 6 — D.2.3 added to derived field keys (handled by
     // deriveD23 against the country dual-citizenship policy lookup).
-    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2', 'D.2.3']);
+    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2', 'D.2.3', 'B.2.4', 'D.1.3', 'D.1.4']);
+    const targetedMissingSet = PHASE3_TARGETED_RERUN ? new Set(missingFieldKeys) : null;
     const llmFields: FieldSpec[] = allFieldDefs
       .filter(
         (d) =>
           d.key !== 'E.3.2' &&
           !(d.key === 'E.3.1' && e31HandledByVdemPath) &&
-          !DERIVED_FIELD_KEYS.has(d.key)
+          !DERIVED_FIELD_KEYS.has(d.key) &&
+          (targetedMissingSet === null || targetedMissingSet.has(d.key))
       )
       .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd, label: d.label }));
+    if (PHASE3_TARGETED_RERUN) {
+      console.log(
+        `[Targeted re-run] LLM extraction filtered to ${llmFields.length} missing field(s)`
+      );
+    }
 
     let fieldsExtracted = 0;
     let fieldsAutoApproved = 0;
@@ -606,7 +720,28 @@ async function main() {
         policy: COUNTRY_DUAL_CITIZENSHIP_POLICY[countryIso] ?? null,
       });
 
-      for (const derived of [a12Result, d22Result, d23Result]) {
+      // Phase 3.6.2 / ITEM 2 — B.2.4 / D.1.3 / D.1.4 country-level derives.
+      const b24Result = deriveB24({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: COUNTRY_NON_GOV_COSTS_POLICY[countryIso] ?? null,
+      });
+      const prPresence = COUNTRY_PR_PRESENCE_POLICY[countryIso] ?? null;
+      const d13Result = deriveD13({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: prPresence,
+      });
+      const d14Result = deriveD14({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: prPresence,
+      });
+
+      for (const derived of [a12Result, d22Result, d23Result, b24Result, d13Result, d14Result]) {
         if (!derived) continue;
         try {
           await publish.executeDerived(derived.extraction, derived.provenance);

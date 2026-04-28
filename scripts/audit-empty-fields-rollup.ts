@@ -246,12 +246,32 @@ async function main() {
     const cachedContents =
       progCachedContents.length > 0 ? progCachedContents : hasAnyUrl ? allCachedContents : [];
 
+    // Phase 3.6.2 / ITEM 1 — synthetic provenance markers that legitimately
+    // produce rows with null/empty value_raw. The audit rollup must classify
+    // these as POPULATED, not ABSENT.
+    const SYNTHETIC_MODELS = new Set([
+      'country-substitute-regional',
+      'derived-knowledge',
+      'derived-computation',
+      'v-dem-api-direct',
+      'world-bank-api-direct',
+    ]);
     for (const def of activeDefs) {
       const fv = fvByKey.get(`${program.id}|${def.id}`);
       const valueRaw = fv?.valueRaw?.trim() ?? '';
       const provenance = (fv?.provenance ?? null) as Record<string, unknown> | null;
+      const hasIndicatorScore = fv?.valueIndicatorScore != null;
+      const hasNormalizedValue = fv?.valueNormalized != null;
+      const extractionModel =
+        typeof provenance?.['extractionModel'] === 'string'
+          ? (provenance['extractionModel'] as string)
+          : '';
+      const isSyntheticModel = SYNTHETIC_MODELS.has(extractionModel);
       let classification: Classification;
-      if (fv && valueRaw !== '') {
+      if (
+        fv &&
+        (valueRaw !== '' || hasIndicatorScore || (hasNormalizedValue && isSyntheticModel))
+      ) {
         classification = 'POPULATED';
       } else {
         classification = classifyEmpty(extractKeywords(def.label), cachedContents);

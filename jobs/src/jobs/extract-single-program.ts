@@ -1,7 +1,6 @@
 import { task } from '@trigger.dev/sdk/v3';
 import { REQUIRED_ENV_VARS } from '../../trigger.config';
 import {
-  DEFAULT_URL_CAP,
   DiscoverStageImpl,
   ExtractStageImpl,
   HumanReviewStageImpl,
@@ -9,11 +8,19 @@ import {
   ScrapeStageImpl,
   ValidateStageImpl,
   deriveA12,
+  deriveB24,
+  deriveD13,
+  deriveD14,
   deriveD22,
   deriveD23,
+  dynamicTierQuotas,
+  dynamicUrlCap,
   loadProgramSourcesAsDiscovered,
+  loadProvenUrlsForMissingFields,
   mergeDiscoveredUrls,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
+  COUNTRY_NON_GOV_COSTS_POLICY,
+  COUNTRY_PR_PRESENCE_POLICY,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -25,6 +32,7 @@ import type {
   ScrapeResult,
 } from '@gtmi/extraction';
 import { db, fieldDefinitions, fieldValues } from '@gtmi/db';
+import { sql } from 'drizzle-orm';
 import { ACTIVE_FIELD_CODES } from '../../../scripts/wave-config';
 import {
   COUNTRY_LEVEL_SOURCES,
@@ -96,14 +104,58 @@ export const extractSingleProgram = task({
 
     // Phase 3.6 / ADR-015 — merge fresh Stage 0 results with the
     // sources-table registry from prior runs. Self-improving discovery.
+    //
+    // Phase 3.6.2 / ITEMs 4+5 — dynamic cap based on coverage and proven-URL
+    // pre-loading from same-country other-program approved rows.
+    const populatedRows = await db.execute<{ n: number }>(sql`
+      SELECT COUNT(*)::int AS n
+      FROM field_values
+      WHERE program_id = ${programId}
+        AND status IN ('approved', 'pending_review')
+        AND (
+          value_raw IS NOT NULL AND value_raw <> ''
+          OR value_normalized IS NOT NULL
+        )
+    `);
+    const populatedIter = Array.isArray(populatedRows)
+      ? populatedRows
+      : ((populatedRows as unknown as { rows?: { n: number }[] }).rows ?? []);
+    const populatedFieldCount = ((populatedIter[0] as { n?: number } | undefined)?.n ??
+      0) as number;
+    const cap = dynamicUrlCap(populatedFieldCount);
+    const quotas = dynamicTierQuotas(cap);
+
+    const presentKeysRows = await db.execute<{ key: string }>(sql`
+      SELECT fd.key
+      FROM field_values fv
+      JOIN field_definitions fd ON fd.id = fv.field_definition_id
+      WHERE fv.program_id = ${programId}
+        AND fv.status IN ('approved', 'pending_review')
+        AND (
+          fv.value_raw IS NOT NULL AND fv.value_raw <> ''
+          OR fv.value_normalized IS NOT NULL
+        )
+    `);
+    const presentIter = Array.isArray(presentKeysRows)
+      ? presentKeysRows
+      : ((presentKeysRows as unknown as { rows?: { key: string }[] }).rows ?? []);
+    const presentKeys = new Set((presentIter as { key: string }[]).map((r) => r.key));
+    const missingFieldKeys = allFieldDefs.map((d) => d.key).filter((k) => !presentKeys.has(k));
+
+    const provenUrls = await loadProvenUrlsForMissingFields(programId, country, missingFieldKeys);
     const registryUrls = await loadProgramSourcesAsDiscovered(programId);
     const mergedDiscoveredUrls = mergeDiscoveredUrls({
       freshFromStage0: discoveryResult.discoveredUrls,
       fromSourcesTable: registryUrls,
-      cap: DEFAULT_URL_CAP,
+      fromProvenance: provenUrls,
+      cap,
+      quotas,
     });
     console.log(
-      `[Discovery merge] fresh=${discoveryResult.discoveredUrls.length} + registry=${registryUrls.length} → merged=${mergedDiscoveredUrls.length} (cap=${DEFAULT_URL_CAP})`
+      `[Discovery merge] populated=${populatedFieldCount} → cap=${cap} (quotas T1=${quotas[1]} T2=${quotas[2]} T3=${quotas[3]})`
+    );
+    console.log(
+      `[Discovery merge] fresh=${discoveryResult.discoveredUrls.length} + registry=${registryUrls.length} + proven=${provenUrls.length} → merged=${mergedDiscoveredUrls.length}`
     );
 
     // --- Stage 1: Scrape discovered URLs + global country-level sources ---
@@ -295,7 +347,7 @@ export const extractSingleProgram = task({
     // --- Stage 2: Batch extract LLM fields. Exclude E.3.2 (always API),
     // E.3.1 (when V-Dem-handled), and A.1.2 / D.2.2 (Phase 3.6 derive
     // stage owns these — see ADR-016). ---
-    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2', 'D.2.3']);
+    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2', 'D.2.3', 'B.2.4', 'D.1.3', 'D.1.4']);
     const llmFields: FieldSpec[] = allFieldDefs
       .filter(
         (d) =>
@@ -446,7 +498,28 @@ export const extractSingleProgram = task({
         policy: COUNTRY_DUAL_CITIZENSHIP_POLICY[country] ?? null,
       });
 
-      for (const derived of [a12Result, d22Result, d23Result]) {
+      // Phase 3.6.2 / ITEM 2 — B.2.4 / D.1.3 / D.1.4 country-level derives.
+      const b24Result = deriveB24({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: COUNTRY_NON_GOV_COSTS_POLICY[country] ?? null,
+      });
+      const prPresence = COUNTRY_PR_PRESENCE_POLICY[country] ?? null;
+      const d13Result = deriveD13({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: prPresence,
+      });
+      const d14Result = deriveD14({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: prPresence,
+      });
+
+      for (const derived of [a12Result, d22Result, d23Result, b24Result, d13Result, d14Result]) {
         if (!derived) continue;
         try {
           await publish.executeDerived(derived.extraction, derived.provenance);
