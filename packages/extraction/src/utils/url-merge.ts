@@ -236,6 +236,13 @@ export async function loadProvenUrlsForMissingFields(
   cap: number = 10
 ): Promise<DiscoveredUrl[]> {
   if (missingFieldKeys.length === 0) return [];
+  // drizzle's tagged-template `${array}` expands as a record tuple
+  // `($1,$2,$3)`, not a Postgres `text[]`. Use sql.join to inline each
+  // element as a separate bound parameter inside an IN clause.
+  const keysList = sql.join(
+    missingFieldKeys.map((k) => sql`${k}`),
+    sql`, `
+  );
   const rows = await database.execute<{
     url: string;
     field_key: string;
@@ -252,7 +259,7 @@ export async function loadProvenUrlsForMissingFields(
       WHERE fv.status = 'approved'
         AND fv.program_id <> ${programId}
         AND p.country_iso = ${countryIso}
-        AND fd.key = ANY(${missingFieldKeys}::text[])
+        AND fd.key IN (${keysList})
         AND fv.provenance->>'sourceUrl' IS NOT NULL
         AND fv.provenance->>'sourceUrl' NOT LIKE 'derived-%'
         AND fv.provenance->>'sourceUrl' NOT LIKE 'internal:%'
