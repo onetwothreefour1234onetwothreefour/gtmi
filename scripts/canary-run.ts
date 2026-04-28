@@ -20,6 +20,7 @@ import { ACTIVE_FIELD_CODES } from './wave-config';
 import {
   COUNTRY_LEVEL_SOURCES,
   getCountryLevelSources,
+  fetchVdemRuleOfLawScore,
   fetchWgiScore,
   ISO3_TO_ISO2,
 } from './country-sources';
@@ -36,6 +37,11 @@ const AUTO_APPROVE_CONFIDENCE_THRESHOLD = 0.85;
 // provenance `sourceTier` is set to 2.
 const PHASE3_TIER2_FALLBACK = process.env['PHASE3_TIER2_FALLBACK'] === 'true';
 const TIER2_FALLBACK_CONFIDENCE_CAP = 0.85;
+
+// Phase 3.6 / Fix A — E.3.1 V-Dem (WGI Rule of Law) direct fetch gate.
+// Default true per analyst Q5 decision (methodology requires E.3.1).
+// Set PHASE3_VDEM_ENABLED=false to disable for staged rollouts.
+const PHASE3_VDEM_ENABLED = process.env['PHASE3_VDEM_ENABLED'] !== 'false';
 
 async function main() {
   const countryArgIdx = process.argv.indexOf('--country');
@@ -115,6 +121,26 @@ async function main() {
     console.log(`  [WGI] ${countryArg}: score=${wgiResult.score}, year=${wgiResult.year}`);
   } else {
     console.warn(`  [WGI] ${countryArg}: World Bank API returned no score`);
+  }
+
+  // --- Phase 1: pre-fetch V-Dem (WGI Rule of Law) score for E.3.1.
+  // Gated on PHASE3_VDEM_ENABLED. When disabled, E.3.1 falls through to
+  // the LLM extraction batch (legacy behaviour).
+  let vdemResult: Awaited<ReturnType<typeof fetchVdemRuleOfLawScore>> = null;
+  if (PHASE3_VDEM_ENABLED) {
+    console.log('\nPhase 1: Fetching V-Dem / WGI Rule of Law score for E.3.1...');
+    vdemResult = await fetchVdemRuleOfLawScore(countryArg);
+    if (vdemResult) {
+      console.log(
+        `  [VDEM/WGI-RL] ${countryArg}: score=${vdemResult.score}, year=${vdemResult.year}`
+      );
+    } else {
+      console.warn(`  [VDEM/WGI-RL] ${countryArg}: World Bank API returned no Rule of Law score`);
+    }
+  } else {
+    console.log(
+      '\nPhase 1: PHASE3_VDEM_ENABLED=false — skipping V-Dem fetch; E.3.1 falls through to LLM extraction.'
+    );
   }
 
   // --- Find target program for --country argument ---
@@ -233,9 +259,11 @@ async function main() {
       }
     }
 
-    // E.3.2 is handled via direct World Bank API — exclude from LLM batch
+    // E.3.2 (WGI GE.EST) and E.3.1 (WGI RL.EST when PHASE3_VDEM_ENABLED) are
+    // handled via direct World Bank API — exclude both from the LLM batch.
+    const e31HandledByVdemPath = PHASE3_VDEM_ENABLED && vdemResult !== null;
     const llmFields: FieldSpec[] = allFieldDefs
-      .filter((d) => d.key !== 'E.3.2')
+      .filter((d) => d.key !== 'E.3.2' && !(d.key === 'E.3.1' && e31HandledByVdemPath))
       .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd, label: d.label }));
 
     let fieldsExtracted = 0;
@@ -292,6 +320,64 @@ async function main() {
         console.log(`  ↳ [E.3.2] Published — AUTO-APPROVED`);
       } else {
         console.warn(`  ↳ [E.3.2] No WGI score available for ${countryArg} — skipping`);
+      }
+    }
+
+    // ── E.3.1: direct World Bank WGI Rule of Law API (Phase 3.6 / Fix A) ─
+    // Gated on PHASE3_VDEM_ENABLED. When disabled, E.3.1 stays in llmFields
+    // and goes through normal extraction (which produces empty for ABSENT
+    // countries — the legacy behaviour).
+    const e31def = allFieldDefs.find((d) => d.key === 'E.3.1');
+    if (e31def && PHASE3_VDEM_ENABLED) {
+      if (vdemResult) {
+        console.log(
+          `  ↳ [E.3.1] Using pre-fetched V-Dem/WGI Rule of Law score: ${vdemResult.score} (${vdemResult.year})`
+        );
+        const vdemExtraction: ExtractionOutput = {
+          fieldDefinitionKey: 'E.3.1',
+          programId,
+          valueRaw: vdemResult.score,
+          sourceSentence: `World Bank WGI Rule of Law estimate for ${vdemResult.countryName}: ${vdemResult.score} (${vdemResult.year})`,
+          characterOffsets: { start: 0, end: 0 },
+          extractionModel: 'v-dem-api-direct',
+          extractionConfidence: 1.0,
+          extractedAt: new Date(),
+        };
+        const vdemValidation = {
+          isValid: true,
+          validationConfidence: 1.0,
+          validationModel: 'v-dem-api-direct',
+          notes: 'Direct World Bank API source (WGI Rule of Law) — no LLM extraction needed',
+        };
+        const vdemProvenance: ProvenanceRecord = {
+          sourceUrl: `https://api.worldbank.org/v2/country/${ISO3_TO_ISO2[countryArg]}/indicator/RL.EST?format=json&mrv=1&source=3`,
+          geographicLevel: 'global',
+          sourceTier: 1,
+          scrapeTimestamp: new Date().toISOString(),
+          contentHash: createHash('sha256')
+            .update(`vdem-rl:${vdemResult.score}:${vdemResult.year}:${vdemResult.countryName}`)
+            .digest('hex'),
+          sourceSentence: vdemExtraction.sourceSentence,
+          characterOffsets: { start: 0, end: 0 },
+          extractionModel: 'v-dem-api-direct',
+          extractionConfidence: 1.0,
+          validationModel: 'v-dem-api-direct',
+          validationConfidence: 1.0,
+          crossCheckResult: 'not_checked',
+          crossCheckUrl: null,
+          reviewedBy: 'auto',
+          reviewedAt: new Date(),
+          methodologyVersion: METHODOLOGY_VERSION,
+          reviewDecision: 'approve',
+        };
+        await publish.execute(vdemExtraction, vdemValidation, vdemProvenance);
+        fieldsExtracted++;
+        fieldsAutoApproved++;
+        console.log(`  ↳ [E.3.1] Published — AUTO-APPROVED`);
+      } else {
+        console.warn(
+          `  ↳ [E.3.1] No Rule of Law score available for ${countryArg} — falling through to LLM extraction`
+        );
       }
     }
 

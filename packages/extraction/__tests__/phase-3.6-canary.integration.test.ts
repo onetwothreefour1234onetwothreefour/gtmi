@@ -98,7 +98,7 @@ describe('Phase 3.6 — publish.executeCountrySubstitute guard (post-migration)'
       ScoringError: class extends Error {},
     }));
 
-    const { PublishStageImpl } = await import('../src/stages/publish');
+    const { PublishStageImpl } = await import('../src/stages/publish.js');
     const publish = new PublishStageImpl();
 
     await expect(

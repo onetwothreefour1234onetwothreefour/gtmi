@@ -415,6 +415,50 @@ export async function fetchWgiScore(
   }
 }
 
+// Phase 3.6 / Fix A — E.3.1 Rule of Law direct fetch.
+//
+// Methodology v1 line 309 specifies E.3.1 as "Rule of law (V-Dem / World
+// Bank WGI)". Both are accepted; we use the World Bank WGI Rule of Law
+// indicator (`RL.EST`) because it has the same fetch shape, latency, and
+// availability profile as the existing E.3.2 (`GE.EST`) path. V-Dem's
+// `v2x_rule` series can be wired later as a cross-check; for the canary
+// the WGI value is the deterministic primary source.
+//
+// Gate: `PHASE3_VDEM_ENABLED` env var (default true post-commit-3 per
+// analyst Q5 decision). When false/unset, `executeE31VdemFetch` returns
+// null and the field falls through to the LLM extraction batch (which
+// will produce empty for ABSENT countries — same as today).
+export async function fetchVdemRuleOfLawScore(
+  countryIso3: string
+): Promise<{ score: string; year: string; countryName: string } | null> {
+  const iso2 = ISO3_TO_ISO2[countryIso3];
+  if (!iso2) {
+    console.warn(`[VDEM/WGI-RL] No ISO2 mapping found for ${countryIso3}`);
+    return null;
+  }
+  const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/RL.EST?format=json&mrv=1&source=3`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const json = (await res.json()) as unknown[];
+    const record = (json?.[1] as unknown[])?.[0] as
+      | {
+          value?: number | null;
+          date?: string;
+          country?: { value?: string };
+        }
+      | undefined;
+    if (!record || record.value === null || record.value === undefined) return null;
+    return {
+      score: String(Math.round(record.value * 100) / 100),
+      year: String(record.date),
+      countryName: record.country?.value ?? countryIso3,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchAllWgiScores(
   countryIsos: string[]
 ): Promise<Map<string, { score: string; year: string; countryName: string }>> {

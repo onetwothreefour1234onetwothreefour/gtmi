@@ -22,6 +22,7 @@ import { ACTIVE_FIELD_CODES } from '../../../scripts/wave-config';
 import {
   COUNTRY_LEVEL_SOURCES,
   ISO3_TO_ISO2,
+  fetchVdemRuleOfLawScore,
   fetchWgiScore,
 } from '../../../scripts/country-sources';
 
@@ -32,6 +33,11 @@ const AUTO_APPROVE_CONFIDENCE_THRESHOLD = 0.85;
 // Default OFF. Mirrors the canary-run.ts behaviour.
 const PHASE3_TIER2_FALLBACK = process.env['PHASE3_TIER2_FALLBACK'] === 'true';
 const TIER2_FALLBACK_CONFIDENCE_CAP = 0.85;
+
+// Phase 3.6 / Fix A — E.3.1 V-Dem (WGI Rule of Law) direct fetch gate.
+// Default true per analyst Q5 decision. Set PHASE3_VDEM_ENABLED=false to
+// disable for staged rollouts.
+const PHASE3_VDEM_ENABLED = process.env['PHASE3_VDEM_ENABLED'] !== 'false';
 
 interface PipelineResult {
   programId: string;
@@ -203,9 +209,68 @@ export const extractSingleProgram = task({
       }
     }
 
-    // --- Stage 2: Batch extract LLM fields (E.3.2 excluded — sourced via API above) ---
+    // --- E.3.1: direct World Bank WGI Rule of Law API (Phase 3.6 / Fix A) ---
+    // Gated on PHASE3_VDEM_ENABLED. When disabled or fetch returns null,
+    // E.3.1 stays in llmFields and goes through normal extraction.
+    let e31HandledByVdemPath = false;
+    const e31def = allFieldDefs.find((d) => d.key === 'E.3.1');
+    if (e31def && PHASE3_VDEM_ENABLED) {
+      const vdemResult = await fetchVdemRuleOfLawScore(country);
+      if (vdemResult) {
+        e31HandledByVdemPath = true;
+        const vdemExtraction: ExtractionOutput = {
+          fieldDefinitionKey: 'E.3.1',
+          programId,
+          valueRaw: vdemResult.score,
+          sourceSentence: `World Bank WGI Rule of Law estimate for ${vdemResult.countryName}: ${vdemResult.score} (${vdemResult.year})`,
+          characterOffsets: { start: 0, end: 0 },
+          extractionModel: 'v-dem-api-direct',
+          extractionConfidence: 1.0,
+          extractedAt: new Date(),
+        };
+        const vdemValidation = {
+          isValid: true,
+          validationConfidence: 1.0,
+          validationModel: 'v-dem-api-direct',
+          notes: 'Direct World Bank API source (WGI Rule of Law) — no LLM extraction needed',
+        };
+        const iso2 = ISO3_TO_ISO2[country];
+        const vdemProvenance: ProvenanceRecord = {
+          sourceUrl: iso2
+            ? `https://api.worldbank.org/v2/country/${iso2}/indicator/RL.EST?format=json&mrv=1&source=3`
+            : 'https://api.worldbank.org/v2/wgi-rl',
+          geographicLevel: 'global',
+          sourceTier: 1,
+          scrapeTimestamp: new Date().toISOString(),
+          contentHash: '',
+          sourceSentence: vdemExtraction.sourceSentence,
+          characterOffsets: { start: 0, end: 0 },
+          extractionModel: 'v-dem-api-direct',
+          extractionConfidence: 1.0,
+          validationModel: 'v-dem-api-direct',
+          validationConfidence: 1.0,
+          crossCheckResult: 'not_checked',
+          crossCheckUrl: null,
+          reviewedBy: 'auto',
+          reviewedAt: new Date(),
+          methodologyVersion: METHODOLOGY_VERSION,
+          reviewDecision: 'approve',
+        };
+        await publish.execute(vdemExtraction, vdemValidation, vdemProvenance);
+        fieldsExtracted++;
+        fieldsAutoApproved++;
+        console.log(`  [E.3.1] Published from World Bank WGI Rule of Law API — AUTO-APPROVED`);
+      } else {
+        console.warn(
+          `  [E.3.1] No Rule of Law score available for ${country} — falling through to LLM extraction`
+        );
+      }
+    }
+
+    // --- Stage 2: Batch extract LLM fields (E.3.2, E.3.1 when V-Dem-handled,
+    // excluded — sourced via API above) ---
     const llmFields: FieldSpec[] = allFieldDefs
-      .filter((d) => d.key !== 'E.3.2')
+      .filter((d) => d.key !== 'E.3.2' && !(d.key === 'E.3.1' && e31HandledByVdemPath))
       .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd, label: d.label }));
 
     const allExtractionResults = await extract.executeAllFields(
