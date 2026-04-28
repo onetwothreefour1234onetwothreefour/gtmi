@@ -79,6 +79,7 @@ Daily 15-minute sync or async in Slack. Architectural decisions captured as ADRs
 
 ## 5. Technical stack (non-negotiable unless a counter-proposal is agreed)
 
+- **URL discovery cap**: 12 URLs per program merged set (raised from 10 in Phase 3.6 to make room for sources-table registry entries alongside fresh Stage 0 results).
 - **Frontend**: Next.js 15 with App Router, React Server Components, TypeScript strict mode.
 - **UI**: Tailwind CSS, shadcn/ui, Recharts for visualizations, Framer Motion for interactions.
 - **Backend**: Supabase (Postgres 15, Row Level Security, Auth, Storage for raw scrape snapshots).
@@ -104,9 +105,12 @@ Daily 15-minute sync or async in Slack. Architectural decisions captured as ADRs
 The extraction pipeline now has **seven stages**, not five. Stage 0 (URL Discovery) was added during Phase 2 implementation.
 
 ```
-Stage 0 — Discover    → find up to 10 URLs per program using Perplexity API (sonar) [NEW v5]
-Stage 1 — Scrape      → Python/Playwright scraper service scrapes each discovered URL [NEW v5]
+Stage 0 — Discover    → find up to 12 URLs per program (Perplexity sonar-pro fresh
+                        results + sources-table registry merged; ADR-015) [v7]
+Stage 1 — Scrape      → Python/Playwright scraper service scrapes each merged URL
 Stage 2 — Extract     → claude-sonnet-4-6 extracts field values with confidence + provenance
+Stage 6.5 — Derive    → pure arithmetic; no LLM. Computes A.1.2 and D.2.2 from
+                        already-extracted inputs + static lookup tables (ADR-016) [v7]
 Stage 3 — Validate    → separate Claude call verifies source-sentence alignment
 Stage 4 — Cross-check → compare against Tier 2 source for disagreement detection
 Stage 5 — Human review → queue for values below confidence threshold or with disagreements
@@ -146,6 +150,8 @@ Before scraping begins, a discovery stage finds the most relevant URLs for each 
 - Enforces a five-category source mix: (1) official government and intergovernmental sources (up to 5 URLs, Tier 1), (2) global and regional institutional sources (Tier 1 if intergovernmental), (3) established immigration law and advisory firms (Tier 2, ranked by field coverage depth), (4) independent visa and residency research publishers (Tier 2, ranked by field coverage depth), and (5) specialist immigration news and professional intelligence sources (Tier 2, ranked by recency and policy-change coverage). An explicit EXCLUSIONS list prohibits login-gated pages, lead-generation pages, social media, forum threads, and non-English pages where an English equivalent exists.
 
 **Model used:** Perplexity API `sonar` model (`PERPLEXITY_API_KEY`) [NEW v5] — URL discovery is the highest-leverage step in the pipeline; wrong URLs at this stage corrupt everything downstream. The `MODEL_DISCOVERY` constant (`claude-sonnet-4-6`) remains defined in `anthropic.ts` but is not used by `discover.ts`.
+
+**Self-improving sources table [NEW v7 — ADR-015 / Phase 3.6]:** After each discovery run, verified URLs are persisted to the `sources` table (`discovered_by='stage-0-perplexity'`). Before Stage 1 scrapes, the canary merges Stage 0's output with all sources-table entries for the program from the last 90 days. Result: the discovery set is self-improving across runs. From the second run onward, every URL that any prior run successfully verified is guaranteed in the scrape set, regardless of Perplexity's current output. `mergeDiscoveredUrls` deduplicates by normalised URL, orders Tier 1 → Tier 2 → Tier 3 with quotas (7/4/1), and caps at 12. Never downgrades tier on conflict.
 
 **Geographic source levels:** Sources are classified at four levels — see Section 6.3.
 
@@ -261,15 +267,17 @@ Weekly re-scrape of all Tier 1 sources. Content hash comparison triggers re-extr
 
 ## 9. Model assignment by task [NEW]
 
-| Task                           | Model / Service                    | Constant / Key         | Reason                                                                            |
-| ------------------------------ | ---------------------------------- | ---------------------- | --------------------------------------------------------------------------------- |
-| URL Discovery (Stage 0)        | Perplexity API `sonar` [NEW v5]    | `PERPLEXITY_API_KEY`   | Live web search; highest-leverage step — wrong URLs corrupt everything downstream |
-| Scraping (Stage 1)             | Python/Playwright service [NEW v5] | `SCRAPER_URL`          | Full browser rendering for JS-heavy government pages; no Firecrawl API needed     |
-| Primary extraction (Stage 2)   | `claude-sonnet-4-6`                | `MODEL_EXTRACTION`     | Accuracy and instruction-following for structured extraction                      |
-| Validation (Stage 3)           | `claude-sonnet-4-6`                | `MODEL_VALIDATION`     | Independent verification requires same capability level                           |
-| Cross-check (Stage 4)          | `claude-sonnet-4-6`                | `MODEL_CROSSCHECK`     | Same capability level as extraction for reliable agreement detection              |
-| Bulk summaries                 | `claude-sonnet-4-6`                | `MODEL_SUMMARY`        | Speed and cost efficiency for high-volume summarisation                           |
-| E.3.2 Government Effectiveness | World Bank API (direct) [NEW v5]   | `ISO3_TO_ISO2` mapping | Direct authoritative source; no LLM extraction needed; confidence 1.0             |
+| Task                           | Model / Service                                        | Constant / Key                                    | Reason                                                                                                                                   |
+| ------------------------------ | ------------------------------------------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| URL Discovery (Stage 0)        | Perplexity API `sonar` [NEW v5]                        | `PERPLEXITY_API_KEY`                              | Live web search; highest-leverage step — wrong URLs corrupt everything downstream                                                        |
+| Scraping (Stage 1)             | Python/Playwright service [NEW v5]                     | `SCRAPER_URL`                                     | Full browser rendering for JS-heavy government pages; no Firecrawl API needed                                                            |
+| Primary extraction (Stage 2)   | `claude-sonnet-4-6`                                    | `MODEL_EXTRACTION`                                | Accuracy and instruction-following for structured extraction                                                                             |
+| Validation (Stage 3)           | `claude-sonnet-4-6`                                    | `MODEL_VALIDATION`                                | Independent verification requires same capability level                                                                                  |
+| Cross-check (Stage 4)          | `claude-sonnet-4-6`                                    | `MODEL_CROSSCHECK`                                | Same capability level as extraction for reliable agreement detection                                                                     |
+| Bulk summaries                 | `claude-sonnet-4-6`                                    | `MODEL_SUMMARY`                                   | Speed and cost efficiency for high-volume summarisation                                                                                  |
+| E.3.2 Government Effectiveness | World Bank API (direct) [NEW v5]                       | `ISO3_TO_ISO2` mapping                            | Direct authoritative source; no LLM extraction needed; confidence 1.0                                                                    |
+| E.3.1 Rule of Law              | World Bank WGI Rule of Law (`RL.EST`) direct [NEW v7]  | `fetchVdemRuleOfLawScore` / `PHASE3_VDEM_ENABLED` | Methodology accepts "V-Dem / World Bank WGI"; same fetch shape as E.3.2; auto-approved at confidence 1.0                                 |
+| A.1.2, D.2.2                   | derived-computation (pure arithmetic, no LLM) [NEW v7] | Stage 6.5 / `derive.ts` (ADR-016)                 | A.1.2 from A.1.1 + median-wage table + FX; D.2.2 from D.1.2 + citizenship-residence table. Confidence hard-coded 0.6; routes to /review. |
 
 ---
 
@@ -280,7 +288,7 @@ countries (iso_code PK, name, region, imd_rank, imd_appeal_score, imd_appeal_sco
 
 programs (id PK, country_iso FK, name, category, status [active|suspended|closed], launch_year, closure_year, description_md, created_at, updated_at)
 
-sources (id PK, program_id FK, url UNIQUE, tier [1|2|3], geographic_level [global|continental|national|regional], source_category [imm_authority|tax_authority|gazette|stats|lawfirm|news|external_index], is_primary, scrape_schedule_cron, last_scraped_at, last_content_hash)
+sources (id PK, program_id FK, url, tier [1|2|3], geographic_level [global|continental|national|regional], source_category [imm_authority|tax_authority|gazette|stats|lawfirm|news|external_index], is_primary, scrape_schedule_cron, last_scraped_at, last_content_hash, last_seen_at TIMESTAMPTZ DEFAULT NOW(), discovered_by VARCHAR(50) DEFAULT 'seed', UNIQUE(program_id, url))    -- v7: UNIQUE(url) → UNIQUE(program_id, url) so two programmes can share a source URL row; last_seen_at + discovered_by support the self-improving registry (ADR-015)
 
 field_definitions (id PK, key UNIQUE, label, data_type, pillar, sub_factor, weight_within_sub_factor, extraction_prompt_md, scoring_rubric_jsonb, normalization_fn, direction, source_tier_required, version_introduced)
 
@@ -492,6 +500,7 @@ Onboard the remaining 60 programmes to reach the full 85-programme cohort across
 - Do not rebuild the n8n workflow. Migrate, do not port.
 - Do not ship without provenance display on every data point.
 - Do not import the existing 25 extracted rows. Re-extract from scratch.
+- Do not manually inject URLs per country or per program. The pipeline is self-improving via Stage 0 write-back. Add missing URLs by improving discovery prompts or by seeding the sources table once; the pipeline will persist and reuse them automatically.
 
 ---
 

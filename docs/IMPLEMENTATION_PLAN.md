@@ -1,6 +1,6 @@
 # GTMI Implementation Plan
 
-> **Last updated:** Session 10 — 27 Apr 2026 (plan restructured 27 Apr 2026). **Phase 2 closed.** Session 9 close-out shipped: field-aware content windowing (utils/window.ts), Wave 2 enabled (ACTIVE_FIELD_CODES drives all consumers), HumanReviewStage provenance shape fixed, /review reject flow patched, ADR-008 (Wayback deferral to Phase 6). Session 10 polish: stale Tier-1 URLs refreshed, ATO sources added for AUS tax fields, 6 LLM_MISS prompts tuned. Both AUS and SGP canaries scored deterministically with `phase2Placeholder: true`. **Plan restructured:** Coverage maximization pulled forward as Phase 3 (before the 5-country pilot); 5-country pilot moves to Phase 5; Living Index becomes Phase 6; Scale and Enrichment becomes Phase 7.
+> **Last updated:** Session 12 — 28 Apr 2026. **Phase 3.6 closed (8 commits, branch `phase-3-recanary-prep`).** Self-improving sources table (ADR-015), V-Dem direct-API for E.3.1 (Fix A), C.3.2 country-substitute wiring (Fix B), scrape thin-content threshold + Jina escalation (Fix C), derived fields A.1.2 + D.2.2 (ADR-016 / Fix D), Tier 2 allowlist expansion to B.2.3 / B.2.4 / D.2.4 (Fix E). 401 tests passing across 28 test files; live-DB integration test for ADR-015 verified against staging. Re-canary pending (commit 8 is the documentation close-out; user signs off before push). **Phase 2 closed** — Session 9 close-out shipped: field-aware content windowing (utils/window.ts), Wave 2 enabled (ACTIVE_FIELD_CODES drives all consumers), HumanReviewStage provenance shape fixed, /review reject flow patched, ADR-008 (Wayback deferral to Phase 6). Session 10 polish: stale Tier-1 URLs refreshed, ATO sources added for AUS tax fields, 6 LLM_MISS prompts tuned. Both AUS and SGP canaries scored deterministically with `phase2Placeholder: true`. **Plan restructured:** Coverage maximization pulled forward as Phase 3 (before the 5-country pilot); 5-country pilot moves to Phase 5; Living Index becomes Phase 6; Scale and Enrichment becomes Phase 7.
 > This document tracks the full build sequence for the Global Talent Mobility Index, combining the phase roadmap with methodology deliverables. Status is updated as work completes.
 
 ---
@@ -276,14 +276,16 @@ The realistic per-programme ceiling is **42–44/48**, not 48/48. The remaining 
 
 Phase 3 ranks the five work-streams below by leverage. Sub-phases are intended to ship in order; each is independently useful even if a later one slips.
 
-### Phase 3.1 — V-Dem direct-API (~1 day engineering)
+### Phase 3.1 — V-Dem direct-API — ✅ COMPLETE (Session 12 / Phase 3.6 commit 3)
 
 **Unlocks**: E.3.1 (Rule of law) cohort-wide, deterministic confidence 1.0. Mirrors the World Bank API direct-fetch already shipped for E.3.2 in Phase 2.
 
-- ⬜ V-Dem fetcher in `scripts/country-sources.ts`: `fetchVdemRuleOfLawScore(iso3)` calling V-Dem's API
-- ⬜ Wired into canary Phase 1 alongside `fetchWgiScore`
-- ⬜ E.3.1 published with `extractionModel: 'v-dem-api-direct'`, auto-approved at confidence 1.0
-- ⬜ ISO3 mapping table extended for any V-Dem-vs-ISO3166 discrepancies (e.g. Hong Kong, Taiwan)
+- ✅ V-Dem fetcher in `scripts/country-sources.ts`: `fetchVdemRuleOfLawScore(iso3)` calling World Bank WGI Rule of Law (`RL.EST`) — methodology line 309 explicitly accepts "V-Dem / World Bank WGI"; same fetch shape as E.3.2 (`GE.EST`).
+- ✅ Wired into canary Phase 1 alongside `fetchWgiScore`; mirror in Trigger.dev `extract-single-program`
+- ✅ E.3.1 published with `extractionModel: 'v-dem-api-direct'`, auto-approved at confidence 1.0
+- ✅ Gated on `PHASE3_VDEM_ENABLED` (default-on per analyst Q5 decision; `.env.example` flipped to `true`)
+- ✅ When flag is `'false'` or fetch returns null, E.3.1 falls through to LLM extraction (legacy)
+- ✅ 9 vitest tests covering gate semantics + fetcher-skip-when-disabled
 
 ### Phase 3.2 — Cross-departmental discovery audit
 
@@ -324,14 +326,43 @@ Phase 3 ranks the five work-streams below by leverage. Sub-phases are intended t
 - ⬜ Methodology v2.0.0 published; weights re-normalized; `methodology_versions` row added; existing scores keep their v1 stamp (no retroactive recomputation per dispatch §14)
 - ⬜ Re-canary the cohort under v2 to produce v2-tagged scores for direct comparison
 
+### Phase 3.6 — Re-canary prep + self-improving discovery — ✅ COMPLETE (Session 12, branch `phase-3-recanary-prep`, 8 commits)
+
+**Trigger.** The Phase 3 AUS re-canary surfaced that fields populated in earlier runs went empty when Stage 0 (Perplexity) returned a different URL set on the second run — discovery is non-deterministic across runs. Combined coverage across runs was 37/48 for AUS Skills in Demand 482 — Core Skills Stream pre-fix; 11 fields remained empty (9 ABSENT + 2 LLM_MISS). Six work-streams ship in Phase 3.6 — five country-agnostic fixes + a structural change to make Stage 0 self-improving.
+
+- ✅ **Commit 1 — Migration 00010** (3d4779b): bundled three concerns approved together (per ADR-012 single-file convention). (a) `sources` schema additions: `last_seen_at`, `discovered_by`, `geographic_level`; replaced `UNIQUE(url)` with `UNIQUE(program_id, url)` per analyst Q1. (b) Methodology v2 column reconciliation — migration 00009 had updated `methodology_versions.normalization_choices` JSONB but not `field_definitions.normalization_fn`; now aligned for C.3.2 → `country_substitute_regional` and B.2.3/B.2.4/D.1.3/D.1.4 → `boolean_with_annotation`. (c) Tier 2 allowlist expansion to B.2.3, B.2.4, D.2.4 (C.2.1 excluded per Q2). 10 shape tests pass.
+- ✅ **Commit 2 — C.3.2 country-substitute verification** (14b3187): integration test pinning the canary's `executeCountrySubstitute` dispatch filter; live-DB verification query confirms the post-migration column values. 4 tests pass.
+- ✅ **Commit 3 — V-Dem direct-API for E.3.1** (f766cb1): `fetchVdemRuleOfLawScore` mirrors the E.3.2 WGI pattern (World Bank `RL.EST`); gated on `PHASE3_VDEM_ENABLED` (default-on per Q5); falls through to LLM batch when the flag is `'false'` or the fetch returns null. 9 tests pass.
+- ✅ **Commit 4 — Scrape thin-content threshold + Jina escalation** (566fd78): `MIN_VISIBLE_TEXT_LENGTH` raised 300 → 1500 (the AUS Medicare URL returned 484-char redirect-stub content and silently passed the old guard); `scrape.ts` now retries once with `force_layer: 'jina'` on `short_content`; Python scraper accepts `force_layer` body parameter. **DEPLOYMENT NOTE (in commit body):** `scraper/main.py` must be redeployed to Cloud Run before any re-canary, otherwise `force_layer=jina` is silently ignored. 5 tests pass.
+- ✅ **Commit 5 — Country median wage + FX + citizenship-residence static tables + ADR-016 drafted** (e05c750): three hand-curated 30-cohort lookup tables. OECD AAW primary for OECD members, ILOSTAT mean-earnings fallback for non-OECD per Q3. `check-median-wage-coverage.ts` live-DB gate. ADR-016 status: Proposed → analyst review. 11 tests pass.
+- ✅ **Commit 6 — Stage 6.5 Derive (ADR-016 APPROVED)** (ed77be9): pure deterministic computation of A.1.2 (salary as % of local median wage) and D.2.2 (total years to citizenship). Zero LLM calls (verified via grep). `extractionConfidence` hard-coded to 0.6 — never auto-approves; always routes to /review. `publish.executeDerived` writes `pending_review` rows preserving the full provenance including the `derivedInputs` JSONB extension. `<ProvenanceTrigger>` popover renders a "Computed from:" block when `derivedInputs` is present. 24 tests pass (22 derive + 2 provenance-trigger).
+- ✅ **Commit 7 — Self-improving sources table (ADR-015)** (6fc0d12): `discover.ts` write-back (cache-hit + cache-miss paths) — every verified URL upserted with `discovered_by='stage-0-perplexity'`, never downgrade tier on conflict. `mergeDiscoveredUrls` utility deduplicates by normalised URL, orders Tier 1 → Tier 2 → Tier 3 with quotas (7/4/1) and cap 12. `loadProgramSourcesAsDiscovered` filters to `tier IN (1,2)` AND `last_seen_at > NOW() - INTERVAL '90 days'` AND `programs.status='active'`. Both `canary-run.ts` and `extract-single-program.ts` invoke the merge step at the same insertion point via the shared utility. **Live-DB integration test** runs against staging DIRECT_URL: writes test-marker URLs against a real AUS program, asserts run-2 sources are a superset of run-1 sources, cleanup verified zero residue. 24 tests pass.
+- ✅ **Commit 8 — Documentation close-out** (this commit): IMPLEMENTATION_PLAN, architecture, BRIEF, METHODOLOGY updated; ADR-015 finalized as APPROVED; ADR-016 status verified.
+
+**Phase 3.6 final test totals (`pnpm test`):**
+
+- `@gtmi/scoring`: 155 / 7 files passed
+- `@gtmi/extraction`: 116 / 11 files passed (was 25 pre-Phase-3.6; +91 across 6 new files)
+- `@gtmi/web`: 130 / 10 files passed (+2 from Phase 3.6 / commit 6)
+- **Total: 401 / 28 files passed.**
+
 ### Phase 3 close-out target
 
 After 3.1–3.5, expected per-programme coverage **42–44/48** (43 average). Gate for Phase 5 (5-country pilot): every canary programme (AUS, SGP, CAN) must reach ≥42/48 before Phase 5 begins. Phase 5 then extends this improved pipeline to GBR and HKG. Programmes still flagged `insufficient_disclosure` are by-design exclusions, not pipeline failures.
+
+**Pre-Phase-3.6 baseline (AUS Skills in Demand 482 — Core Skills Stream):** 37/48 POPULATED, 9 ABSENT, 2 LLM_MISS. The AUS re-canary on the new pipeline (post commit-7 + scraper redeploy) is the gate measurement; expected to land at or above the 42/48 floor for the canary programmes.
 
 ### Operational artefacts shipped during Phase 3 (running list)
 
 - `scripts/check-source-departments.ts` — diagnostic that lists expected vs discovered source departments per country.
 - `scripts/audit-empty-fields-rollup.ts` — extends `diag-empty-fields.ts` to roll up TRUNCATION/LLM_MISS/ABSENT counts across the cohort.
+- `scripts/country-median-wage.ts` — 30-country lookup for A.1.2 derivation (OECD primary, ILO fallback). Phase 3.6 / commit 5.
+- `scripts/fx-rates.ts` — annual-average LCU-per-USD for cohort currencies. Phase 3.6 / commit 5.
+- `scripts/country-citizenship-residence.ts` — years-as-PR before naturalisation; null for no-pathway countries (GCC monarchies). Phase 3.6 / commit 5.
+- `scripts/check-median-wage-coverage.ts` — live-DB pre-canary gate; asserts both lookup tables cover every cohort country with `is_primary=true` Tier 1 sources. Phase 3.6 / commit 5.
+- `packages/extraction/src/utils/url-merge.ts` — dedupe + tier-ordered merge of fresh Stage 0 results with the sources-table registry. Phase 3.6 / commit 7.
+- `packages/extraction/src/stages/derive.ts` — Stage 6.5; pure deterministic computation of A.1.2 and D.2.2. Phase 3.6 / commit 6.
+- `scripts/phase3-wipe-discovery-cache-aus.ts` — one-off reset for AUS re-canary preparation.
 
 ---
 
@@ -521,3 +552,9 @@ Session 7 changes (Stage 0 five-category source mix expansion, publish.ts normal
 Session 8 changes (Perplexity API for Stage 0, Python/Playwright scraper replacing Firecrawl, E.3.2 World Bank API direct, canary cross-check bypass, extract/validate resilience improvements) are tooling, operational, and bug-fix decisions. No ADRs raised.
 
 Session 9 changes (currency preservation in provenance JSONB, batch extraction + tier-2 fallback, scrape/extraction caches, Phase 2 PAQ scoring, /review web app with Supabase auth, Cloud Run deployment with NEXT_PUBLIC_APP_URL canonical-origin fix) are operational. ADR-008 to be raised on Phase 2 closeout for Wayback deferral to Phase 6.
+
+Phase 3.6 (Session 12) introduced two ADRs, both approved by Szabolcs Fulop on 2026-04-28:
+
+- **ADR-013** amended (not superseded) by Phase 3.6 commit 1: Tier 2 allowlist expanded from {B.3.3, C.2.4, D.2.3} to {B.3.3, C.2.4, D.2.3, B.2.3, B.2.4, D.2.4}. C.2.1 was considered and excluded per analyst Q2.
+- **ADR-015** — Self-improving sources table (Stage 0 write-back + URL merge). Approved 2026-04-28.
+- **ADR-016** — Derived fields (Stage 6.5: deterministic computation for A.1.2 and D.2.2). Approved 2026-04-28.
