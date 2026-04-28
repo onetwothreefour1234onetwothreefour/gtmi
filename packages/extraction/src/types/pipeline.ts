@@ -100,12 +100,34 @@ export interface PublishStage {
     fieldDefinitionKey: string,
     methodologyVersion: string
   ): Promise<boolean>;
+  /**
+   * Phase 3.6 / ADR-016: write a derived row (A.1.2 / D.2.2) with
+   * status='pending_review'. extractionModel must be
+   * 'derived-computation' and extractionConfidence must be 0.6.
+   */
+  executeDerived(extraction: ExtractionOutput, provenance: ProvenanceRecord): Promise<string>;
+}
+
+// Phase 3.6 / ADR-016 — Stage 6.5: Derive.
+//
+// Pure deterministic computation of A.1.2 and D.2.2 from already-extracted
+// inputs plus static lookup tables. No LLM calls. Inputs are resolved by
+// the caller (canary-run.ts / extract-single-program.ts) from the
+// extraction map and the static tables in `scripts/`.
+export interface DeriveStageInputs {
+  a12: import('../stages/derive').DerivedA12Input;
+  d22: import('../stages/derive').DerivedD22Input;
+}
+
+export interface DeriveStage {
+  execute(inputs: DeriveStageInputs): import('../stages/derive').DerivedRow[];
 }
 
 export interface ExtractionPipeline {
   discover: DiscoverStage;
   scrape: ScrapeStage;
   extract: ExtractStage;
+  derive: DeriveStage;
   validate: ValidateStage;
   crossCheck: CrossCheckStage;
   humanReview: HumanReviewStage;

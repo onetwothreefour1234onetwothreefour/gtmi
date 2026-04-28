@@ -218,4 +218,54 @@ describe('ProvenanceTrigger', () => {
     await userEvent.click(screen.getByTestId('provenance-trigger'));
     expect(screen.queryByTestId('country-substitute-badge')).not.toBeInTheDocument();
   });
+
+  // Phase 3.6 / ADR-016 — derivedInputs block inside the popover.
+  it('renders the "Computed from:" derivedInputs block when present in provenance', async () => {
+    const derived = {
+      ...COMPLETE_PROVENANCE,
+      extractionModel: 'derived-computation',
+      validationModel: 'derived-computation',
+      extractionConfidence: 0.6,
+      validationConfidence: 0.6,
+      sourceUrl: 'derived-computation:A.1.2',
+      derivedInputs: {
+        'A.1.1': {
+          valueRaw: 'AUD 73,150',
+          valueCurrency: 'AUD',
+          sourceUrl: 'https://immi.homeaffairs.gov.au/visas/skills-in-demand-482',
+        },
+        medianWage: {
+          value: 60_200,
+          year: 2023,
+          source: 'OECD',
+          sourceUrl: 'https://stats.oecd.org/Index.aspx?DataSetCode=AV_AN_WAGE',
+        },
+      },
+    } as unknown as Provenance;
+    render(<ProvenanceTrigger provenance={derived} status="pending_review" valueRaw="80" />);
+    expect(screen.queryByTestId('derived-inputs')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    const block = await screen.findByTestId('derived-inputs');
+    expect(block).toBeInTheDocument();
+    expect(block).toHaveAttribute('role', 'note');
+    expect(block).toHaveTextContent('Computed from:');
+    expect(block).toHaveTextContent('A.1.1');
+    expect(block).toHaveTextContent('medianWage');
+    // Source URLs render as links labelled "View source".
+    const links = block.querySelectorAll('a');
+    expect(links.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('does NOT render the "Computed from:" derivedInputs block when absent', async () => {
+    render(
+      <ProvenanceTrigger
+        provenance={COMPLETE_PROVENANCE}
+        status="pending_review"
+        valueRaw="AUD 73,150"
+      />
+    );
+    expect(screen.queryByTestId('derived-inputs')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    expect(screen.queryByTestId('derived-inputs')).not.toBeInTheDocument();
+  });
 });

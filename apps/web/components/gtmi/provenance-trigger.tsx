@@ -86,6 +86,13 @@ export function ProvenanceTrigger({
   const confExtraction = Math.round(p.extractionConfidence * 100);
   const confValidation = Math.round(p.validationConfidence * 100);
 
+  // Phase 3.6 / ADR-016 — derived rows carry an extra `derivedInputs`
+  // JSONB key (not in the ProvenanceCoreFields contract) that lists the
+  // input field-keys, values, and source URLs the analyst should audit.
+  // Rendered only when present.
+  const derivedInputs = (p as unknown as { derivedInputs?: Record<string, DerivedInputValue> })
+    .derivedInputs;
+
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
@@ -131,6 +138,28 @@ export function ProvenanceTrigger({
                 This value was sourced from a law firm or advisory publication, not a government
                 source directly.
               </span>
+            </div>
+          )}
+
+          {derivedInputs && (
+            <div
+              className="mt-3 rounded-button border border-amber-300/60 bg-amber-50/70 p-2.5 text-data-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100"
+              data-testid="derived-inputs"
+              role="note"
+            >
+              <p className="font-medium">Computed from:</p>
+              <dl className="mt-1.5 space-y-1.5">
+                {Object.entries(derivedInputs).map(([key, value]) => (
+                  <div key={key} className="grid grid-cols-[auto_1fr] gap-x-2">
+                    <dt className="font-mono text-[11px] text-amber-900/80 dark:text-amber-100/80">
+                      {key}
+                    </dt>
+                    <dd className="text-data-sm">
+                      <DerivedInputDisplay value={value} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           )}
 
@@ -246,6 +275,45 @@ function ConfidenceBar({ value }: { value: number }) {
         />
       </span>
       <span className="font-mono text-[10px] tnum text-muted-foreground">{value}%</span>
+    </span>
+  );
+}
+
+// Phase 3.6 / ADR-016 — derivedInputs JSONB shape. Each input is an
+// object whose fields vary per derived computation (A.1.2 / D.2.2);
+// we render any string field as text and pull `sourceUrl` if present.
+type DerivedInputValue = Record<string, unknown>;
+
+function DerivedInputDisplay({ value }: { value: DerivedInputValue }) {
+  const sourceUrl = typeof value['sourceUrl'] === 'string' ? (value['sourceUrl'] as string) : null;
+  // Render the value object as compact "key: value" pairs, hiding sourceUrl
+  // (it gets its own link) and undefined/null entries.
+  const entries = Object.entries(value).filter(
+    ([k, v]) => k !== 'sourceUrl' && v !== null && v !== undefined
+  );
+  return (
+    <span>
+      {entries.map(([k, v], i) => (
+        <span key={k}>
+          {i > 0 ? ' · ' : null}
+          <span className="text-amber-900/80 dark:text-amber-100/80">{k}</span>
+          {': '}
+          <span className="font-mono text-[11px]">{String(v)}</span>
+        </span>
+      ))}
+      {sourceUrl && (
+        <>
+          {' '}
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-accent underline-offset-4 hover:underline"
+          >
+            View source
+          </a>
+        </>
+      )}
     </span>
   );
 }

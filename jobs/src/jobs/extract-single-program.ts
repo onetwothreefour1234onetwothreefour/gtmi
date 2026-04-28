@@ -7,6 +7,8 @@ import {
   PublishStageImpl,
   ScrapeStageImpl,
   ValidateStageImpl,
+  deriveA12,
+  deriveD22,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -17,7 +19,7 @@ import type {
   ProvenanceRecord,
   ScrapeResult,
 } from '@gtmi/extraction';
-import { db, fieldDefinitions } from '@gtmi/db';
+import { db, fieldDefinitions, fieldValues } from '@gtmi/db';
 import { ACTIVE_FIELD_CODES } from '../../../scripts/wave-config';
 import {
   COUNTRY_LEVEL_SOURCES,
@@ -25,6 +27,10 @@ import {
   fetchVdemRuleOfLawScore,
   fetchWgiScore,
 } from '../../../scripts/country-sources';
+import { COUNTRY_MEDIAN_WAGE } from '../../../scripts/country-median-wage';
+import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from '../../../scripts/country-citizenship-residence';
+import { FX_RATES } from '../../../scripts/fx-rates';
+import { and, eq } from 'drizzle-orm';
 
 const METHODOLOGY_VERSION = '1.0.0';
 const AUTO_APPROVE_CONFIDENCE_THRESHOLD = 0.85;
@@ -267,10 +273,17 @@ export const extractSingleProgram = task({
       }
     }
 
-    // --- Stage 2: Batch extract LLM fields (E.3.2, E.3.1 when V-Dem-handled,
-    // excluded — sourced via API above) ---
+    // --- Stage 2: Batch extract LLM fields. Exclude E.3.2 (always API),
+    // E.3.1 (when V-Dem-handled), and A.1.2 / D.2.2 (Phase 3.6 derive
+    // stage owns these — see ADR-016). ---
+    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2']);
     const llmFields: FieldSpec[] = allFieldDefs
-      .filter((d) => d.key !== 'E.3.2' && !(d.key === 'E.3.1' && e31HandledByVdemPath))
+      .filter(
+        (d) =>
+          d.key !== 'E.3.2' &&
+          !(d.key === 'E.3.1' && e31HandledByVdemPath) &&
+          !DERIVED_FIELD_KEYS.has(d.key)
+      )
       .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd, label: d.label }));
 
     const allExtractionResults = await extract.executeAllFields(
@@ -321,6 +334,107 @@ export const extractSingleProgram = task({
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(`[Tier-2 fallback] batch failed: ${msg}`);
+      }
+    }
+
+    // ── Stage 6.5 — Derive (Phase 3.6 / ADR-016). Pure arithmetic; no LLM.
+    {
+      const fieldDefByKey = new Map(allFieldDefs.map((d) => [d.key, d]));
+      async function readApprovedFieldValue(key: string): Promise<{
+        valueRaw: string | null;
+        valueCurrency: string | null;
+        sourceUrl: string | null;
+      } | null> {
+        const fd = fieldDefByKey.get(key);
+        if (!fd) return null;
+        const rows = await db
+          .select({
+            valueRaw: fieldValues.valueRaw,
+            provenance: fieldValues.provenance,
+            status: fieldValues.status,
+          })
+          .from(fieldValues)
+          .where(
+            and(eq(fieldValues.programId, programId), eq(fieldValues.fieldDefinitionId, fd.id))
+          )
+          .limit(1);
+        if (rows.length === 0) return null;
+        const row = rows[0]!;
+        if (row.status !== 'approved' && row.status !== 'pending_review') return null;
+        const prov = (row.provenance ?? {}) as Record<string, unknown>;
+        return {
+          valueRaw: row.valueRaw,
+          valueCurrency:
+            typeof prov['valueCurrency'] === 'string' ? (prov['valueCurrency'] as string) : null,
+          sourceUrl: typeof prov['sourceUrl'] === 'string' ? (prov['sourceUrl'] as string) : null,
+        };
+      }
+      const lookupExtraction = (key: string) => {
+        const r = allExtractionResults.get(key);
+        return r && r.output.valueRaw !== '' ? r : null;
+      };
+
+      const a11Live = lookupExtraction('A.1.1');
+      const a11Db = a11Live ? null : await readApprovedFieldValue('A.1.1');
+      const a11ValueRaw = a11Live?.output.valueRaw ?? a11Db?.valueRaw ?? null;
+      let a11ValueCurrency: string | null = a11Db?.valueCurrency ?? null;
+      if (a11ValueCurrency === null && a11ValueRaw) {
+        const m = a11ValueRaw.match(/^([A-Z]{3})\b/);
+        if (m && m[1]) a11ValueCurrency = m[1];
+      }
+      const a11SourceUrl = a11Live?.sourceUrl ?? a11Db?.sourceUrl ?? null;
+
+      const d11Live = lookupExtraction('D.1.1');
+      const d11Db = d11Live ? null : await readApprovedFieldValue('D.1.1');
+      const d11Raw = d11Live?.output.valueRaw ?? d11Db?.valueRaw ?? null;
+      const d11Boolean: boolean | null =
+        d11Raw === null ? null : ['true', 'yes', '1'].includes(d11Raw.toLowerCase().trim());
+
+      const d12Live = lookupExtraction('D.1.2');
+      const d12Db = d12Live ? null : await readApprovedFieldValue('D.1.2');
+      const d12Raw = d12Live?.output.valueRaw ?? d12Db?.valueRaw ?? null;
+      const d12Years: number | null = (() => {
+        if (d12Raw === null) return null;
+        const n = Number.parseFloat(d12Raw.replace(/[^0-9.]/g, ''));
+        return Number.isFinite(n) ? n : null;
+      })();
+      const d12SourceUrl = d12Live?.sourceUrl ?? d12Db?.sourceUrl ?? null;
+
+      const a12Result = deriveA12({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        a11ValueRaw,
+        a11ValueCurrency,
+        a11SourceUrl,
+        medianWage: COUNTRY_MEDIAN_WAGE[country] ?? null,
+        fxRate: a11ValueCurrency ? (FX_RATES[a11ValueCurrency.toUpperCase()] ?? null) : null,
+      });
+      const d22Result = deriveD22({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        d11Boolean,
+        d12Years,
+        d12SourceUrl,
+        citizenshipResidence: COUNTRY_CITIZENSHIP_RESIDENCE_YEARS[country] ?? null,
+      });
+
+      for (const derived of [a12Result, d22Result]) {
+        if (!derived) continue;
+        try {
+          await publish.executeDerived(derived.extraction, derived.provenance);
+          fieldsExtracted++;
+          fieldsQueued++;
+          console.log(
+            `  [${derived.extraction.fieldDefinitionKey}] Derived — pending_review (confidence ${derived.extraction.extractionConfidence})`
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `  [${derived.extraction.fieldDefinitionKey}] Derived publish failed: ${msg}`
+          );
+        }
       }
     }
 

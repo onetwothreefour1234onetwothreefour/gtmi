@@ -5,6 +5,8 @@ import {
   PublishStageImpl,
   ScrapeStageImpl,
   ValidateStageImpl,
+  deriveA12,
+  deriveD22,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -15,7 +17,7 @@ import type {
   ProvenanceRecord,
   ScrapeResult,
 } from '@gtmi/extraction';
-import { db, fieldDefinitions, programs } from '@gtmi/db';
+import { db, fieldDefinitions, fieldValues, programs } from '@gtmi/db';
 import { ACTIVE_FIELD_CODES } from './wave-config';
 import {
   COUNTRY_LEVEL_SOURCES,
@@ -24,6 +26,10 @@ import {
   fetchWgiScore,
   ISO3_TO_ISO2,
 } from './country-sources';
+import { COUNTRY_MEDIAN_WAGE } from './country-median-wage';
+import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from './country-citizenship-residence';
+import { FX_RATES } from './fx-rates';
+import { and } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import { createHash } from 'crypto';
 
@@ -261,9 +267,18 @@ async function main() {
 
     // E.3.2 (WGI GE.EST) and E.3.1 (WGI RL.EST when PHASE3_VDEM_ENABLED) are
     // handled via direct World Bank API — exclude both from the LLM batch.
+    // A.1.2 and D.2.2 are computed by the derive stage (Phase 3.6 / ADR-016)
+    // — exclude them too so the LLM doesn't produce a competing low-
+    // confidence row that would overwrite the derived row.
     const e31HandledByVdemPath = PHASE3_VDEM_ENABLED && vdemResult !== null;
+    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2']);
     const llmFields: FieldSpec[] = allFieldDefs
-      .filter((d) => d.key !== 'E.3.2' && !(d.key === 'E.3.1' && e31HandledByVdemPath))
+      .filter(
+        (d) =>
+          d.key !== 'E.3.2' &&
+          !(d.key === 'E.3.1' && e31HandledByVdemPath) &&
+          !DERIVED_FIELD_KEYS.has(d.key)
+      )
       .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd, label: d.label }));
 
     let fieldsExtracted = 0;
@@ -454,6 +469,126 @@ async function main() {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(`[Tier-2 fallback] batch failed: ${msg}`);
+      }
+    }
+
+    // ── Stage 6.5 — Derive (Phase 3.6 / ADR-016). Pure arithmetic; no LLM.
+    // Computes A.1.2 and D.2.2 from already-extracted inputs + static
+    // lookup tables. Skip conditions return null and emit a one-line log.
+    // Successful derived rows are written to field_values with
+    // status='pending_review' (confidence 0.6, never auto-approves).
+    {
+      // Resolve A.1.1 / D.1.1 / D.1.2 from the extraction map first; fall
+      // back to existing approved field_values rows if the current run
+      // didn't re-extract them.
+      const lookupExtraction = (key: string) => {
+        const r = allExtractionResults.get(key);
+        return r && r.output.valueRaw !== '' ? r : null;
+      };
+
+      const fieldDefByKey = new Map(allFieldDefs.map((d) => [d.key, d]));
+      async function readApprovedFieldValue(key: string): Promise<{
+        valueRaw: string | null;
+        valueCurrency: string | null;
+        sourceUrl: string | null;
+        valueNormalized: unknown;
+      } | null> {
+        const fd = fieldDefByKey.get(key);
+        if (!fd) return null;
+        const rows = await db
+          .select({
+            valueRaw: fieldValues.valueRaw,
+            provenance: fieldValues.provenance,
+            valueNormalized: fieldValues.valueNormalized,
+            status: fieldValues.status,
+          })
+          .from(fieldValues)
+          .where(
+            and(eq(fieldValues.programId, programId), eq(fieldValues.fieldDefinitionId, fd.id))
+          )
+          .limit(1);
+        if (rows.length === 0) return null;
+        const row = rows[0]!;
+        if (row.status !== 'approved' && row.status !== 'pending_review') return null;
+        const prov = (row.provenance ?? {}) as Record<string, unknown>;
+        return {
+          valueRaw: row.valueRaw,
+          valueCurrency:
+            typeof prov['valueCurrency'] === 'string' ? (prov['valueCurrency'] as string) : null,
+          sourceUrl: typeof prov['sourceUrl'] === 'string' ? (prov['sourceUrl'] as string) : null,
+          valueNormalized: row.valueNormalized,
+        };
+      }
+
+      // A.1.1 — prefer this run's extraction; fall back to DB.
+      const a11Live = lookupExtraction('A.1.1');
+      const a11Db = a11Live ? null : await readApprovedFieldValue('A.1.1');
+      const a11ValueRaw = a11Live?.output.valueRaw ?? a11Db?.valueRaw ?? null;
+      // The live extraction map doesn't carry valueCurrency directly; the
+      // currency is detected at publish-time. For derive's purposes we read
+      // it from the DB row when available; if A.1.1 was just freshly
+      // extracted this run and has not yet been published, fall back to
+      // string-prefix detection on the raw value.
+      let a11ValueCurrency: string | null = a11Db?.valueCurrency ?? null;
+      if (a11ValueCurrency === null && a11ValueRaw) {
+        const m = a11ValueRaw.match(/^([A-Z]{3})\b/);
+        if (m && m[1]) a11ValueCurrency = m[1];
+      }
+      const a11SourceUrl = a11Live?.sourceUrl ?? a11Db?.sourceUrl ?? null;
+
+      // D.1.1 — boolean.
+      const d11Live = lookupExtraction('D.1.1');
+      const d11Db = d11Live ? null : await readApprovedFieldValue('D.1.1');
+      const d11Raw = d11Live?.output.valueRaw ?? d11Db?.valueRaw ?? null;
+      const d11Boolean: boolean | null =
+        d11Raw === null ? null : ['true', 'yes', '1'].includes(d11Raw.toLowerCase().trim());
+
+      // D.1.2 — years to PR.
+      const d12Live = lookupExtraction('D.1.2');
+      const d12Db = d12Live ? null : await readApprovedFieldValue('D.1.2');
+      const d12Raw = d12Live?.output.valueRaw ?? d12Db?.valueRaw ?? null;
+      const d12Years: number | null = (() => {
+        if (d12Raw === null) return null;
+        const n = Number.parseFloat(d12Raw.replace(/[^0-9.]/g, ''));
+        return Number.isFinite(n) ? n : null;
+      })();
+      const d12SourceUrl = d12Live?.sourceUrl ?? d12Db?.sourceUrl ?? null;
+
+      const a12Result = deriveA12({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        a11ValueRaw,
+        a11ValueCurrency,
+        a11SourceUrl,
+        medianWage: COUNTRY_MEDIAN_WAGE[countryIso] ?? null,
+        fxRate: a11ValueCurrency ? (FX_RATES[a11ValueCurrency.toUpperCase()] ?? null) : null,
+      });
+      const d22Result = deriveD22({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        d11Boolean,
+        d12Years,
+        d12SourceUrl,
+        citizenshipResidence: COUNTRY_CITIZENSHIP_RESIDENCE_YEARS[countryIso] ?? null,
+      });
+
+      for (const derived of [a12Result, d22Result]) {
+        if (!derived) continue;
+        try {
+          await publish.executeDerived(derived.extraction, derived.provenance);
+          fieldsExtracted++;
+          fieldsQueued++;
+          console.log(
+            `  ↳ [${derived.extraction.fieldDefinitionKey}] Derived — pending_review (confidence ${derived.extraction.extractionConfidence})`
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `  ↳ [${derived.extraction.fieldDefinitionKey}] Derived publish failed: ${msg}`
+          );
+        }
       }
     }
 

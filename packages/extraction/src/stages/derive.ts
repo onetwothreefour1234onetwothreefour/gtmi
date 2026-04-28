@@ -1,0 +1,308 @@
+// Phase 3.6 / Fix D / ADR-016 — Stage 6.5: Derive.
+//
+// Pure deterministic computation of two PAQ indicators that cannot be
+// sourced as a literal sentence on any government page:
+//
+//   A.1.2 — Salary threshold as % of local median wage
+//   D.2.2 — Total minimum years from initial visa entry to citizenship eligibility
+//
+// THIS FILE CONTAINS ZERO LLM CALLS. Same inputs → same output, byte-
+// identical across runs. extractionModel is hard-coded to the literal
+// string 'derived-computation'. extractionConfidence and
+// validationConfidence are hard-coded to 0.6 so derived rows ALWAYS
+// route to /review (auto-approve threshold is 0.85). Skip conditions
+// log a one-line message and return null — no row is written, no
+// error is thrown.
+
+import { createHash } from 'crypto';
+import type { ExtractionOutput } from '../types/extraction';
+import type { CrossCheckOutcome, ProvenanceRecord } from '../types/provenance';
+
+/** Hard-coded per ADR-016. Forces /review for every derived row. */
+export const DERIVE_CONFIDENCE = 0.6;
+/** Hard-coded per ADR-016. */
+export const DERIVE_EXTRACTION_MODEL = 'derived-computation';
+
+// ────────────────────────────────────────────────────────────────────
+// Input shapes (all values resolved by the orchestrator from the
+// extraction map / DB / static lookup tables before calling the pure
+// derive functions).
+// ────────────────────────────────────────────────────────────────────
+
+export interface MedianWageEntry {
+  iso3: string;
+  usdYear: number;
+  medianWageUsd: number;
+  source: 'OECD' | 'ILO';
+  sourceUrl: string;
+}
+
+export interface FxRateEntry {
+  code: string;
+  year: number;
+  lcuPerUsd: number;
+  sourceUrl: string;
+}
+
+export interface CitizenshipResidenceEntry {
+  iso3: string;
+  yearsAsPr: number | null;
+  sourceUrl: string;
+  notes?: string;
+}
+
+export interface DerivedA12Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  /** A.1.1 raw value from field_values (e.g. "AUD 73,150" or "73150"). null if A.1.1 is not POPULATED. */
+  a11ValueRaw: string | null;
+  /** A.1.1 ISO 4217 currency from provenance.valueCurrency. null if absent. */
+  a11ValueCurrency: string | null;
+  /** A.1.1 source URL from provenance (recorded in derivedInputs for /review audit). */
+  a11SourceUrl: string | null;
+  /** Median-wage table entry for this country, null if missing. */
+  medianWage: MedianWageEntry | null;
+  /** FX rate for the A.1.1 currency, null if missing or currency null. */
+  fxRate: FxRateEntry | null;
+}
+
+export interface DerivedD22Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  /** D.1.1 — PR provision available. null = D.1.1 not POPULATED. */
+  d11Boolean: boolean | null;
+  /** D.1.2 — Years to PR. null = D.1.2 not POPULATED. */
+  d12Years: number | null;
+  /** D.1.2 source URL from provenance. */
+  d12SourceUrl: string | null;
+  /** Citizenship-residence table entry, null if missing. */
+  citizenshipResidence: CitizenshipResidenceEntry | null;
+}
+
+export interface DerivedRow {
+  /** Pre-built ExtractionOutput suitable for humanReview.enqueue. */
+  extraction: ExtractionOutput;
+  /** Pre-built ProvenanceRecord (passes checkProvenanceRow). */
+  provenance: ProvenanceRecord;
+  /** Convenience: the numeric output (already in extraction.valueRaw as string). */
+  numericValue: number;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Pure functions: zero side effects, return null on any skip condition.
+// ────────────────────────────────────────────────────────────────────
+
+/** Strip non-numeric chars (currency codes, commas, whitespace) and parse. */
+function parseNumeric(raw: string): number | null {
+  const cleaned = raw.replace(/[^0-9.\-]/g, '');
+  if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
+  const n = Number.parseFloat(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+function buildBaseProvenance(args: {
+  fieldKey: 'A.1.2' | 'D.2.2';
+  contentHashSeed: string;
+  sourceSentence: string;
+  methodologyVersion: string;
+  derivedInputs: Record<string, unknown>;
+}): ProvenanceRecord {
+  const crossCheckResult: CrossCheckOutcome = 'not_checked';
+  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
+    sourceUrl: `derived-computation:${args.fieldKey}`,
+    geographicLevel: 'global',
+    sourceTier: null,
+    scrapeTimestamp: new Date().toISOString(),
+    contentHash: createHash('sha256').update(args.contentHashSeed, 'utf8').digest('hex'),
+    sourceSentence: args.sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionModel: DERIVE_EXTRACTION_MODEL,
+    extractionConfidence: DERIVE_CONFIDENCE,
+    validationModel: DERIVE_EXTRACTION_MODEL,
+    validationConfidence: DERIVE_CONFIDENCE,
+    crossCheckResult,
+    crossCheckUrl: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    methodologyVersion: args.methodologyVersion,
+    reviewDecision: 'approve',
+    derivedInputs: args.derivedInputs,
+  };
+  return provenance;
+}
+
+/**
+ * Compute A.1.2 (salary as % of local median wage). Pure. Returns null
+ * on any skip condition. Skips emit a one-line console.log.
+ */
+export function deriveA12(input: DerivedA12Input): DerivedRow | null {
+  if (input.a11ValueRaw === null || input.a11ValueRaw === '') {
+    console.log(`  [A.1.2] derived skip — A.1.1 not POPULATED for ${input.countryIso}`);
+    return null;
+  }
+  if (input.a11ValueCurrency === null || input.a11ValueCurrency === '') {
+    console.log(`  [A.1.2] derived skip — A.1.1 has no valueCurrency for ${input.countryIso}`);
+    return null;
+  }
+  if (input.medianWage === null) {
+    console.log(`  [A.1.2] derived skip — no COUNTRY_MEDIAN_WAGE entry for ${input.countryIso}`);
+    return null;
+  }
+  if (input.fxRate === null) {
+    console.log(
+      `  [A.1.2] derived skip — no FX_RATES entry for currency ${input.a11ValueCurrency}`
+    );
+    return null;
+  }
+
+  const a11Numeric = parseNumeric(input.a11ValueRaw);
+  if (a11Numeric === null || a11Numeric <= 0) {
+    console.log(
+      `  [A.1.2] derived skip — A.1.1 valueRaw "${input.a11ValueRaw}" did not parse to a positive number`
+    );
+    return null;
+  }
+
+  const amountUsd =
+    input.a11ValueCurrency.toUpperCase() === 'USD'
+      ? a11Numeric
+      : a11Numeric / input.fxRate.lcuPerUsd;
+
+  const percent = Math.round((amountUsd / input.medianWage.medianWageUsd) * 1000) / 10;
+
+  const sourceSentence =
+    `Derived from A.1.1 (${input.a11ValueCurrency} ${a11Numeric.toLocaleString('en-US')}) ` +
+    `÷ ${input.countryIso} median wage USD ${input.medianWage.medianWageUsd.toLocaleString('en-US')} ` +
+    `(${input.medianWage.source} ${input.medianWage.usdYear}) × 100 = ${percent}%`;
+
+  const derivedInputs = {
+    'A.1.1': {
+      valueRaw: input.a11ValueRaw,
+      valueCurrency: input.a11ValueCurrency,
+      sourceUrl: input.a11SourceUrl,
+    },
+    medianWage: {
+      value: input.medianWage.medianWageUsd,
+      year: input.medianWage.usdYear,
+      source: input.medianWage.source,
+      sourceUrl: input.medianWage.sourceUrl,
+    },
+    fxRate: {
+      code: input.fxRate.code,
+      year: input.fxRate.year,
+      lcuPerUsd: input.fxRate.lcuPerUsd,
+      sourceUrl: input.fxRate.sourceUrl,
+    },
+  };
+
+  const valueRaw = String(percent);
+  const provenance = buildBaseProvenance({
+    fieldKey: 'A.1.2',
+    contentHashSeed: `derived-computation:A.1.2:${input.programId}:${input.a11ValueRaw}:${input.a11ValueCurrency}:${input.medianWage.medianWageUsd}:${input.fxRate.lcuPerUsd}`,
+    sourceSentence,
+    methodologyVersion: input.methodologyVersion,
+    derivedInputs,
+  });
+
+  const extraction: ExtractionOutput = {
+    programId: input.programId,
+    fieldDefinitionKey: 'A.1.2',
+    valueRaw,
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionConfidence: DERIVE_CONFIDENCE,
+    extractionModel: DERIVE_EXTRACTION_MODEL,
+    extractedAt: new Date(),
+  };
+
+  return { extraction, provenance, numericValue: percent };
+}
+
+/**
+ * Compute D.2.2 (total years to citizenship). Pure. Returns null on any
+ * skip condition. Skips emit a one-line console.log.
+ */
+export function deriveD22(input: DerivedD22Input): DerivedRow | null {
+  if (input.d12Years === null) {
+    console.log(`  [D.2.2] derived skip — D.1.2 not POPULATED for ${input.countryIso}`);
+    return null;
+  }
+  if (input.d11Boolean === false) {
+    console.log(`  [D.2.2] derived skip — D.1.1 is false (no PR pathway) for ${input.countryIso}`);
+    return null;
+  }
+  if (input.citizenshipResidence === null) {
+    console.log(
+      `  [D.2.2] derived skip — no COUNTRY_CITIZENSHIP_RESIDENCE_YEARS entry for ${input.countryIso}`
+    );
+    return null;
+  }
+  if (input.citizenshipResidence.yearsAsPr === null) {
+    console.log(
+      `  [D.2.2] derived skip — ${input.countryIso} has no realistic citizenship pathway (yearsAsPr=null)`
+    );
+    return null;
+  }
+
+  const total = Math.round((input.d12Years + input.citizenshipResidence.yearsAsPr) * 2) / 2;
+
+  const sourceSentence =
+    `Derived from D.1.2 (${input.d12Years} yrs to PR) + ` +
+    `${input.countryIso} citizenship residence requirement ` +
+    `(${input.citizenshipResidence.yearsAsPr} yrs as PR) = ${total} yrs`;
+
+  const derivedInputs = {
+    'D.1.2': {
+      years: input.d12Years,
+      sourceUrl: input.d12SourceUrl,
+    },
+    'D.1.1': { boolean: input.d11Boolean },
+    citizenshipResidence: {
+      yearsAsPr: input.citizenshipResidence.yearsAsPr,
+      sourceUrl: input.citizenshipResidence.sourceUrl,
+      notes: input.citizenshipResidence.notes ?? null,
+    },
+  };
+
+  const provenance = buildBaseProvenance({
+    fieldKey: 'D.2.2',
+    contentHashSeed: `derived-computation:D.2.2:${input.programId}:${input.d12Years}:${input.citizenshipResidence.yearsAsPr}`,
+    sourceSentence,
+    methodologyVersion: input.methodologyVersion,
+    derivedInputs,
+  });
+
+  const extraction: ExtractionOutput = {
+    programId: input.programId,
+    fieldDefinitionKey: 'D.2.2',
+    valueRaw: String(total),
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionConfidence: DERIVE_CONFIDENCE,
+    extractionModel: DERIVE_EXTRACTION_MODEL,
+    extractedAt: new Date(),
+  };
+
+  return { extraction, provenance, numericValue: total };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Stage orchestrator. Pure inputs (no DB) — the canary / Trigger.dev
+// caller resolves DB-backed fields and the static-table entries before
+// calling execute().
+// ────────────────────────────────────────────────────────────────────
+
+import type { DeriveStage, DeriveStageInputs } from '../types/pipeline';
+
+export class DeriveStageImpl implements DeriveStage {
+  execute(inputs: DeriveStageInputs): DerivedRow[] {
+    const out: DerivedRow[] = [];
+    const a12 = deriveA12(inputs.a12);
+    if (a12) out.push(a12);
+    const d22 = deriveD22(inputs.d22);
+    if (d22) out.push(d22);
+    return out;
+  }
+}

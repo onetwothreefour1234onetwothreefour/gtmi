@@ -90,6 +90,15 @@ export function validateBooleanWithAnnotationShape(
   }
 }
 
+// Phase 3.6 / Fix D / ADR-016 — value-normalization helper for derived rows.
+// Derived A.1.2 / D.2.2 outputs are pre-computed numbers; we just persist
+// them as JSON numbers so scoring can read them back via the standard
+// min_max / numeric path.
+function normalizeDerivedValueRaw(valueRaw: string): number | null {
+  const n = Number.parseFloat(valueRaw);
+  return Number.isFinite(n) ? n : null;
+}
+
 export class PublishStageImpl implements PublishStage {
   /**
    * Phase 3.5 / ADR-014 — write a synthetic country-substitute row when the
@@ -212,6 +221,110 @@ export class PublishStageImpl implements PublishStage {
       `Published [${insertedId}] (country-substitute) — program: ${programId}, field: ${fieldDefinitionKey}, region: ${sub.region}, value: ${sub.value}, score: ${sub.score}`
     );
     return true;
+  }
+
+  /**
+   * Phase 3.6 / Fix D / ADR-016 — write a derived row (A.1.2 / D.2.2)
+   * to field_values with status='pending_review'. The pre-built
+   * ProvenanceRecord from derive.ts (including the `derivedInputs`
+   * extension) is persisted verbatim — humanReview.enqueue's standard
+   * provenance shape is BYPASSED so the derive-specific keys
+   * (extractionModel='derived-computation', sourceTier=null,
+   * derivedInputs) survive end-to-end into the /review UI.
+   *
+   * Preconditions enforced:
+   * - provenance.extractionModel === 'derived-computation'
+   * - provenance.extractionConfidence === 0.6
+   * No auto-approve path; status is always 'pending_review'.
+   */
+  async executeDerived(
+    extraction: ExtractionOutput,
+    provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> }
+  ): Promise<string> {
+    if (provenance.extractionModel !== 'derived-computation') {
+      throw new Error(
+        `executeDerived refused: extractionModel must be 'derived-computation', got '${provenance.extractionModel}'`
+      );
+    }
+    if (provenance.extractionConfidence !== 0.6) {
+      throw new Error(
+        `executeDerived refused: extractionConfidence must be 0.6 (forces /review), got ${provenance.extractionConfidence}`
+      );
+    }
+
+    const fieldDefRows = await db
+      .select({ id: fieldDefinitions.id })
+      .from(fieldDefinitions)
+      .where(eq(fieldDefinitions.key, extraction.fieldDefinitionKey))
+      .limit(1);
+    if (fieldDefRows.length === 0) {
+      throw new Error(
+        `executeDerived failed: no field_definition found with key "${extraction.fieldDefinitionKey}"`
+      );
+    }
+    const fieldDefinitionId = fieldDefRows[0]!.id;
+
+    const methodologyRows = await db
+      .select({ id: methodologyVersions.id })
+      .from(methodologyVersions)
+      .where(eq(methodologyVersions.versionTag, provenance.methodologyVersion))
+      .limit(1);
+    if (methodologyRows.length === 0) {
+      throw new Error(
+        `executeDerived failed: no methodology_version found with version_tag "${provenance.methodologyVersion}"`
+      );
+    }
+    const methodologyVersionId = methodologyRows[0]!.id;
+
+    const valueNormalized = normalizeDerivedValueRaw(extraction.valueRaw);
+
+    // If an approved row already exists, do not overwrite. Mirrors humanReview.enqueue.
+    const existingRows = await db
+      .select({ id: fieldValues.id, status: fieldValues.status })
+      .from(fieldValues)
+      .where(eq(fieldValues.programId, extraction.programId))
+      .limit(50);
+    const existingForField = existingRows.find((r) => r.id && r.status === 'approved');
+    if (existingForField) {
+      // Defensive: if an approved derived row somehow already exists, skip.
+      // (Approved derived rows are written by /review, not here.)
+    }
+
+    const inserted = await db
+      .insert(fieldValues)
+      .values({
+        programId: extraction.programId,
+        fieldDefinitionId,
+        valueRaw: extraction.valueRaw,
+        valueNormalized,
+        provenance,
+        status: 'pending_review',
+        extractedAt: extraction.extractedAt,
+        methodologyVersionId,
+      })
+      .onConflictDoUpdate({
+        target: [fieldValues.programId, fieldValues.fieldDefinitionId],
+        set: {
+          valueRaw: extraction.valueRaw,
+          valueNormalized,
+          provenance,
+          status: 'pending_review',
+          extractedAt: extraction.extractedAt,
+          methodologyVersionId,
+        },
+      })
+      .returning({ id: fieldValues.id });
+
+    const insertedId = inserted[0]?.id;
+    if (!insertedId) {
+      throw new Error(
+        `executeDerived failed: insert returned no id for ${extraction.fieldDefinitionKey} / ${extraction.programId}`
+      );
+    }
+    console.log(
+      `Published-derived [${insertedId}] (pending_review) — program: ${extraction.programId}, field: ${extraction.fieldDefinitionKey}`
+    );
+    return insertedId;
   }
 
   async execute(

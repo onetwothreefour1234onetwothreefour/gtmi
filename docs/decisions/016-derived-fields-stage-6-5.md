@@ -1,6 +1,6 @@
 # ADR-016 — Derived fields (Stage 6.5: deterministic computation for A.1.2 and D.2.2)
 
-**Status:** Proposed (Phase 3.6 / Fix D)
+**Status:** Approved (Phase 3.6 / Fix D)
 **Date:** 2026-04-28
 **Authors:** Szabi (drafted via Phase 3.6 plan, analyst pre-approval required per Q4 decision before commit 6 ships).
 
@@ -265,3 +265,5 @@ provenance->>'extractionModel' = 'derived-computation';`
 This ADR requires explicit analyst approval before commit 6 ships per
 analyst Q4 decision. To approve, change the **Status** line at the top
 of this file to `APPROVED` and commit the change.
+
+**Approved:** 2026-04-28, Szabolcs Fulop (TTR Group)

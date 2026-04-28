@@ -24,6 +24,8 @@ export type { CrossCheckOutcome, ProvenanceRecord } from './types/provenance';
 
 export type {
   CrossCheckStage,
+  DeriveStage,
+  DeriveStageInputs,
   DiscoverStage,
   ExtractStage,
   ExtractionPipeline,
@@ -34,6 +36,21 @@ export type {
 } from './types/pipeline';
 
 export { CrossCheckStageImpl } from './stages/cross-check';
+export {
+  DERIVE_CONFIDENCE,
+  DERIVE_EXTRACTION_MODEL,
+  DeriveStageImpl,
+  deriveA12,
+  deriveD22,
+} from './stages/derive';
+export type {
+  CitizenshipResidenceEntry,
+  DerivedA12Input,
+  DerivedD22Input,
+  DerivedRow,
+  FxRateEntry,
+  MedianWageEntry,
+} from './stages/derive';
 export { DiscoverStageImpl } from './stages/discover';
 export { HumanReviewStageImpl } from './stages/human-review';
 export { ExtractStageImpl, computeExtractionCacheKey } from './stages/extract';
