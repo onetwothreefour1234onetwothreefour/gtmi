@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { db, discoveryCache } from '@gtmi/db';
+import { db, discoveryCache, sources, programs } from '@gtmi/db';
 import { and, eq, gt } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import type { DiscoveredUrl, DiscoveryResult } from '../types/extraction';
@@ -209,6 +209,85 @@ async function readDiscoveryCache(cacheKey: string): Promise<DiscoveredUrl[] | n
   }
 }
 
+/**
+ * Phase 3.6 / ADR-015 — self-improving sources table.
+ *
+ * After verifyUrls() succeeds (cache-hit OR cache-miss path), persist
+ * each surviving discovered URL to `sources` so subsequent runs can
+ * merge the registry with fresh Stage 0 results.
+ *
+ * - INSERT...ON CONFLICT (program_id, url) — idempotent; never creates
+ *   duplicate rows.
+ * - On conflict: bump last_seen_at and set discovered_by to
+ *   'stage-0-perplexity'. NEVER downgrade tier — if the existing row
+ *   already had Tier 1, we keep Tier 1 even if Stage 0 re-classified
+ *   it Tier 2 today (the lower-numbered tier is "better").
+ * - Counts new vs existing rows for a one-line summary log.
+ *
+ * Programs without an existing programs row (synthetic test ids) are
+ * skipped silently — sources.program_id has a FK to programs.id.
+ */
+export async function writeToSourcesTable(programId: string, urls: DiscoveredUrl[]): Promise<void> {
+  if (urls.length === 0) return;
+  // Verify the program exists; skip silently if not (test fixtures).
+  const programRows = await db
+    .select({ id: programs.id })
+    .from(programs)
+    .where(eq(programs.id, programId))
+    .limit(1);
+  if (programRows.length === 0) return;
+
+  let inserted = 0;
+  let updated = 0;
+  for (const u of urls) {
+    // Read existing row (if any) so we can:
+    // (1) detect insert vs update for the summary log
+    // (2) preserve the existing (lower-numbered) tier on conflict
+    const existing = await db
+      .select({ tier: sources.tier, sourceCategory: sources.sourceCategory })
+      .from(sources)
+      .where(and(eq(sources.programId, programId), eq(sources.url, u.url)))
+      .limit(1);
+    const existingTier = existing[0]?.tier;
+    const existingCategory = existing[0]?.sourceCategory;
+    // Never downgrade: keep min(existingTier, freshTier).
+    const tierToWrite = existingTier !== undefined ? Math.min(existingTier, u.tier) : u.tier;
+    const categoryToWrite =
+      existingCategory ?? (u.isOfficial ? 'imm_authority' : u.tier === 2 ? 'lawfirm' : 'news');
+
+    try {
+      await db
+        .insert(sources)
+        .values({
+          programId,
+          url: u.url,
+          tier: tierToWrite,
+          sourceCategory: categoryToWrite,
+          isPrimary: false,
+          geographicLevel: u.geographicLevel,
+          discoveredBy: 'stage-0-perplexity',
+          lastSeenAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [sources.programId, sources.url],
+          set: {
+            tier: tierToWrite,
+            geographicLevel: u.geographicLevel,
+            discoveredBy: 'stage-0-perplexity',
+            lastSeenAt: new Date(),
+          },
+        });
+      if (existingTier === undefined) inserted++;
+      else updated++;
+    } catch {
+      // FK violation on programId or other write failure — non-fatal.
+    }
+  }
+  console.log(
+    `[Discovery] Persisted ${inserted} new URLs to sources table for program ${programId} (${updated} already present).`
+  );
+}
+
 async function writeDiscoveryCache(
   cacheKey: string,
   programId: string,
@@ -244,6 +323,9 @@ export class DiscoverStageImpl implements DiscoverStage {
       );
       const verified = await verifyUrls(cachedUrls);
       if (verified.length > 0) {
+        // Phase 3.6 / ADR-015 — write-back runs on cache-hit too so
+        // last_seen_at bumps for cached URLs (registry stays warm).
+        await writeToSourcesTable(programId, verified);
         return {
           programId,
           programName,
@@ -296,6 +378,8 @@ export class DiscoverStageImpl implements DiscoverStage {
     }
 
     await writeDiscoveryCache(cacheKey, programId, discoveredUrls);
+    // Phase 3.6 / ADR-015 — persist verified URLs to sources registry.
+    await writeToSourcesTable(programId, discoveredUrls);
 
     return {
       programId,

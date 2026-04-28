@@ -1,6 +1,7 @@
 import { task } from '@trigger.dev/sdk/v3';
 import { REQUIRED_ENV_VARS } from '../../trigger.config';
 import {
+  DEFAULT_URL_CAP,
   DiscoverStageImpl,
   ExtractStageImpl,
   HumanReviewStageImpl,
@@ -9,6 +10,8 @@ import {
   ValidateStageImpl,
   deriveA12,
   deriveD22,
+  loadProgramSourcesAsDiscovered,
+  mergeDiscoveredUrls,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -87,9 +90,21 @@ export const extractSingleProgram = task({
       `Stage 0 complete for ${programId}: ${discoveryResult.discoveredUrls.length} URLs discovered`
     );
 
+    // Phase 3.6 / ADR-015 — merge fresh Stage 0 results with the
+    // sources-table registry from prior runs. Self-improving discovery.
+    const registryUrls = await loadProgramSourcesAsDiscovered(programId);
+    const mergedDiscoveredUrls = mergeDiscoveredUrls({
+      freshFromStage0: discoveryResult.discoveredUrls,
+      fromSourcesTable: registryUrls,
+      cap: DEFAULT_URL_CAP,
+    });
+    console.log(
+      `[Discovery merge] fresh=${discoveryResult.discoveredUrls.length} + registry=${registryUrls.length} → merged=${mergedDiscoveredUrls.length} (cap=${DEFAULT_URL_CAP})`
+    );
+
     // --- Stage 1: Scrape discovered URLs + global country-level sources ---
     const scrape = new ScrapeStageImpl();
-    const scrapeResults = await scrape.execute(discoveryResult.discoveredUrls);
+    const scrapeResults = await scrape.execute(mergedDiscoveredUrls);
     console.log(`Stage 1 complete for ${programId}: ${scrapeResults.length} URLs scraped`);
 
     const applicableGlobalSources = COUNTRY_LEVEL_SOURCES.filter(
@@ -121,7 +136,7 @@ export const extractSingleProgram = task({
     const scrapeByUrl = new Map<string, ScrapeResult>();
     for (const sr of scrapeResults) scrapeByUrl.set(sr.url, sr);
     const discoveredByUrl = new Map<string, DiscoveredUrl>();
-    for (const du of discoveryResult.discoveredUrls) discoveredByUrl.set(du.url, du);
+    for (const du of mergedDiscoveredUrls) discoveredByUrl.set(du.url, du);
 
     const hasUsableContent = (sr: ScrapeResult) =>
       sr.httpStatus >= 200 && sr.httpStatus < 400 && sr.contentMarkdown.trim().length > 0;

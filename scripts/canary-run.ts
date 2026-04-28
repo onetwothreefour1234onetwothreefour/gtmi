@@ -1,4 +1,5 @@
 import {
+  DEFAULT_URL_CAP,
   DiscoverStageImpl,
   ExtractStageImpl,
   HumanReviewStageImpl,
@@ -7,6 +8,8 @@ import {
   ValidateStageImpl,
   deriveA12,
   deriveD22,
+  loadProgramSourcesAsDiscovered,
+  mergeDiscoveredUrls,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -210,14 +213,29 @@ async function main() {
     );
     const discoveryResult = await discover.execute(programId, programName, countryIso);
     console.log(`Stage 0 complete: ${discoveryResult.discoveredUrls.length} URLs discovered`);
-    console.log('Discovered URLs:');
-    for (const url of discoveryResult.discoveredUrls) {
+
+    // Phase 3.6 / ADR-015 — merge fresh Stage 0 results with the
+    // sources-table registry from prior runs. Self-improving discovery:
+    // every successful run grows the registry monotonically; subsequent
+    // runs benefit from the union.
+    const registryUrls = await loadProgramSourcesAsDiscovered(programId);
+    const mergedDiscoveredUrls = mergeDiscoveredUrls({
+      freshFromStage0: discoveryResult.discoveredUrls,
+      fromSourcesTable: registryUrls,
+      cap: DEFAULT_URL_CAP,
+    });
+    console.log(
+      `[Discovery merge] fresh=${discoveryResult.discoveredUrls.length} + registry=${registryUrls.length} → merged=${mergedDiscoveredUrls.length} (cap=${DEFAULT_URL_CAP})`
+    );
+
+    console.log('Discovered URLs (post-merge):');
+    for (const url of mergedDiscoveredUrls) {
       console.log(`  [Tier ${url.tier}][${url.geographicLevel}] ${url.url}`);
     }
 
     // Phase 2: Stage 1 — scrape program-specific URLs
     const scrapeResults: ScrapeResult[] = [];
-    for (const u of discoveryResult.discoveredUrls) {
+    for (const u of mergedDiscoveredUrls) {
       console.log(`  [Stage 1] Scraping: ${u.url}`);
       const [result] = await scrape.execute([u]);
       if (result) {
@@ -233,7 +251,7 @@ async function main() {
     for (const sr of scrapeResults) scrapeByUrl.set(sr.url, sr);
 
     const discoveredByUrl = new Map<string, DiscoveredUrl>();
-    for (const du of discoveryResult.discoveredUrls) discoveredByUrl.set(du.url, du);
+    for (const du of mergedDiscoveredUrls) discoveredByUrl.set(du.url, du);
 
     const hasUsableContent = (sr: ScrapeResult): boolean =>
       sr.httpStatus >= 200 && sr.httpStatus < 400 && sr.contentMarkdown.trim().length > 0;
@@ -738,6 +756,7 @@ async function main() {
     console.log(`\n--- Canary Run Summary: ${programName} (${countryIso}) ---`);
     console.table({
       'URLs discovered': discoveryResult.discoveredUrls.length,
+      'URLs merged (fresh + registry)': mergedDiscoveredUrls.length,
       'URLs scraped': scrapeResults.length,
       'Fields extracted': fieldsExtracted,
       'Fields auto-approved': fieldsAutoApproved,

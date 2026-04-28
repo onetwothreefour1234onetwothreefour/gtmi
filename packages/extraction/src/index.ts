@@ -51,7 +51,15 @@ export type {
   FxRateEntry,
   MedianWageEntry,
 } from './stages/derive';
-export { DiscoverStageImpl } from './stages/discover';
+export { DiscoverStageImpl, writeToSourcesTable } from './stages/discover';
+export {
+  DEFAULT_URL_CAP,
+  TIER_QUOTAS,
+  loadProgramSourcesAsDiscovered,
+  mergeDiscoveredUrls,
+  normaliseUrl,
+} from './utils/url-merge';
+export type { DbClient } from './utils/url-merge';
 export { HumanReviewStageImpl } from './stages/human-review';
 export { ExtractStageImpl, computeExtractionCacheKey } from './stages/extract';
 export { PublishStageImpl } from './stages/publish';

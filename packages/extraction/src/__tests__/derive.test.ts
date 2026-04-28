@@ -235,11 +235,13 @@ describe('Derived row provenance shape (ADR-016 invariants)', () => {
   });
 
   it('derivedInputs JSONB extension carries the input values', () => {
-    const a12Inputs = (a12.provenance as { derivedInputs: Record<string, unknown> }).derivedInputs;
+    const a12Inputs = (a12.provenance as unknown as { derivedInputs: Record<string, unknown> })
+      .derivedInputs;
     expect(a12Inputs).toHaveProperty('A.1.1');
     expect(a12Inputs).toHaveProperty('medianWage');
     expect(a12Inputs).toHaveProperty('fxRate');
-    const d22Inputs = (d22.provenance as { derivedInputs: Record<string, unknown> }).derivedInputs;
+    const d22Inputs = (d22.provenance as unknown as { derivedInputs: Record<string, unknown> })
+      .derivedInputs;
     expect(d22Inputs).toHaveProperty('D.1.2');
     expect(d22Inputs).toHaveProperty('D.1.1');
     expect(d22Inputs).toHaveProperty('citizenshipResidence');
