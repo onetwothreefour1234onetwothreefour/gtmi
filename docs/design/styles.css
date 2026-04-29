@@ -1,0 +1,261 @@
+/* GTMI design system tokens — editorial + institutional */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Surfaces — warm paper */
+  --paper:        #F7F4ED;
+  --paper-2:      #F2EEE3;
+  --paper-3:      #EAE4D3;
+  --rule:         #D9D2BE;
+  --rule-soft:    #E5DEC9;
+
+  /* Ink */
+  --ink:          #1A1A1A;
+  --ink-2:        #2E2A22;
+  --ink-3:        #5C4A2E;       /* espresso */
+  --ink-4:        #8A7456;       /* taupe */
+  --ink-5:        #B0A289;       /* mute */
+
+  /* Single accent — oxblood (heat / score change / impact) */
+  --accent:       #B8412A;
+  --accent-2:     #8E2F1E;
+  --accent-soft:  #E9C4B6;
+
+  /* Secondary accent — deep navy (peer-review / methodology / citation) */
+  --navy:         #1B2540;
+  --navy-2:       #2A3656;
+  --navy-soft:    #C7CCDB;
+
+  /* States */
+  --positive:     #4F6B3E;       /* mossy green */
+  --warning:      #B8862A;       /* amber */
+  --negative:     #8E2F1E;
+
+  /* Pillars (5) — derived warm-cool spectrum, low chroma */
+  --pillar-a:     #5C4A2E;
+  --pillar-b:     #846A3F;
+  --pillar-c:     #4F6B3E;
+  --pillar-d:     #2C4159;
+  --pillar-e:     #6E3A2E;
+
+  /* Type */
+  --serif:        'Fraunces', 'Source Serif Pro', Georgia, serif;
+  --sans:         'Inter Tight', 'Inter', -apple-system, sans-serif;
+  --mono:         'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Scale */
+  --fs-display:   72px;
+  --fs-h1:        44px;
+  --fs-h2:        28px;
+  --fs-h3:        20px;
+  --fs-body:      15px;
+  --fs-small:     13px;
+  --fs-micro:     11px;
+
+  /* Spacing — 4px base */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+}
+
+* { box-sizing: border-box; }
+
+body, html {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Paper grain — applied to the artboard surface (not body) because the
+   design-canvas keeps body transparent for its own grid backdrop. */
+.gtmi-artboard {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.36   0 0 0 0 0.29   0 0 0 0 0.18   0 0 0 0.05 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>");
+}
+
+/* Reusable atoms */
+
+.serif { font-family: var(--serif); font-weight: 400; letter-spacing: -0.01em; }
+.serif-tight { font-family: var(--serif); font-weight: 500; letter-spacing: -0.02em; }
+.mono { font-family: var(--mono); font-feature-settings: 'tnum' 1, 'zero' 1; }
+.sans { font-family: var(--sans); }
+
+.eyebrow {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.rule { border: 0; border-top: 1px solid var(--rule); }
+.rule-thick { border: 0; border-top: 2px solid var(--ink); }
+.rule-soft { border: 0; border-top: 1px solid var(--rule-soft); }
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Score bar — used everywhere */
+.score-bar {
+  position: relative;
+  height: 4px;
+  background: var(--rule-soft);
+  width: 100%;
+  overflow: hidden;
+}
+.score-bar > span {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  background: var(--ink);
+}
+
+/* Chip */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink-3);
+  border-radius: 0;
+}
+.chip-amber { color: var(--warning); border-color: #E0C896; background: #FBF3DC; }
+.chip-accent { color: var(--accent); border-color: var(--accent-soft); background: #F8E4DA; }
+.chip-mute { color: var(--ink-4); border-color: var(--rule); }
+.chip-ink { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+.chip-navy { color: var(--paper); background: var(--navy); border-color: var(--navy); letter-spacing: 0.06em; }
+.chip-navy-soft { color: var(--navy); background: rgba(27, 37, 64, 0.06); border-color: var(--navy-soft); }
+
+/* Drop cap — editorial */
+.dropcap::first-letter {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 5em;
+  line-height: 0.85;
+  float: left;
+  margin: 6px 14px -4px 0;
+  color: var(--accent);
+  letter-spacing: -0.04em;
+  font-feature-settings: 'ss01' 1;
+}
+
+/* Hairline rule weights */
+.rule-hairline { border: 0; border-top: 1px solid var(--rule); }
+.rule-double {
+  border: 0;
+  height: 5px;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+
+/* Peer-review marginalia (navy) */
+.peer-note {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--navy);
+  line-height: 1.5;
+  border-left: 2px solid var(--navy);
+  padding-left: 12px;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.btn:hover { background: var(--ink-2); }
+.btn-ghost { background: transparent; color: var(--ink); }
+.btn-ghost:hover { background: var(--paper-3); }
+.btn-link {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  height: auto;
+  padding: 0 0 1px 0;
+  color: var(--ink);
+}
+.btn-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Focus */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Table primitives */
+table.gtmi {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.gtmi thead th {
+  text-align: left;
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ink);
+  white-space: nowrap;
+}
+table.gtmi tbody td {
+  padding: 12px;
+  border-bottom: 1px solid var(--rule-soft);
+  vertical-align: middle;
+}
+table.gtmi tbody tr:hover { background: rgba(255,255,255,0.5); }
+table.gtmi tbody tr:hover td { cursor: pointer; }
+
+/* Numerals */
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 500; }
+.num-l { font-family: var(--serif); font-weight: 500; font-feature-settings: 'tnum' 1; letter-spacing: -0.02em; }
+
+/* Subtle texture for paper feel */
+.paper-grain {
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(92, 74, 46, 0.025) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(92, 74, 46, 0.02) 0%, transparent 40%);
+}
+
+/* Skeleton hatch — for placeholder sources */
+.hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--paper-3) 0 6px,
+    var(--paper-2) 6px 12px
+  );
+}

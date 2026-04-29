@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>GTMI — Front-end design</title>
+<link rel="stylesheet" href="styles.css"/>
+
+<script type='text/javascript' nonce='EvPtVrxOZ9pW/yJ+4OJ+QA==' src='https://claude.ai/n3kk1Ho7P6mAtsa0I1pE52Bjt_1omSZFqWk6EqRIIFsZwe90vKkLK8D5Q8csPBIUW1Z26tWdgnQ7XJs7yT2hstsTq0JRMCYLZZ7gq8OV_6IquwvFA7bpbMTj507TAZ8xJyWUTAGM29FfhLuK9IVC7PCe1iPzorD2ifa2NbhOz-TvMVN1cgJVoddjTjxP6HfYFNv4gTdzKPPKioHI7eSLKLJ-6PpsntX6iXdm0G93H-iQ-cSV91TEMT-QHcDDIh6wvWcB0P8i2m32d4YFfxDbgB7379nmjrNaqGD8t8PE23Va0bYtPrnnZbrGchXrJrfflibhlKtpheU8hAuCVqPmqW827ITmdhivTL9mFe8xxxTbgLIJJRrHNMCZfv1KScJaKx8gwQ4DdfQhD8Ov51bB9QxKmFbf2tZ0BYzTRFcCkz8Tn_lltZMUW5ld6yjUMMgP4vtFIALUcQH8Z9Ux4vLoAgy1EGqN8Bmur4ZwJqpAHb9pdYVXhWbCAQtEBvY6KNJmqhjGEJ8m6_S598dRfT7JZeFYdC--27xVSCOC6hvEQYwf4sLRJ3-TJs1eEz8'></script><script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<style>
+  /* hide scrollbars inside artboards for cleaner presentation */
+  .gtmi-artboard { overflow: hidden; position: relative; }
+  .gtmi-artboard > div { transform-origin: top left; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="primitives.jsx"></script>
+<script type="text/babel" src="screen-rankings.jsx"></script>
+<script type="text/babel" src="screen-rankings-v2.jsx"></script>
+<script type="text/babel" src="screen-program.jsx"></script>
+<script type="text/babel" src="screen-methodology.jsx"></script>
+<script type="text/babel" src="screen-country-changes.jsx"></script>
+<script type="text/babel" src="screen-internal.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+  // Wrapper that fits a 1440-wide screen into a smaller artboard via scale.
+  function ScaledScreen({ children, width = 1440, height = 900, scale = 0.5 }) {
+    return (
+      <div className="gtmi-artboard" style={{ width: width * scale, height: height * scale, background: 'var(--paper)' }}>
+        <div style={{ width, transform: `scale(${scale})` }}>
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  function App() {
+    return (
+      <DesignCanvas
+        title="GTMI — Front-end design system"
+        subtitle="Editorial / institutional direction · One refined direction"
+      >
+        <DCSection id="overview" title="Public site — primary screens" subtitle="The 30/70 composite, rendered for sovereign clients.">
+          <DCArtboard id="rankings-v2" label="01 · Landing v2 — full editorial flow" width={720} height={1400}>
+            <ScaledScreen width={1440} height={2800} scale={0.5}>
+              <RankingsScreenV2 />
+            </ScaledScreen>
+          </DCArtboard>
+          <DCArtboard id="rankings" label="01a · Landing v1 (compact)" width={720} height={1100}>
+            <ScaledScreen width={1440} height={2200} scale={0.5}>
+              <RankingsScreen />
+            </ScaledScreen>
+          </DCArtboard>
+          <DCArtboard id="program" label="02 · Programme detail + provenance drawer" width={720} height={1100}>
+            <ScaledScreen width={1440} height={2200} scale={0.5}>
+              <ProgramDetailScreen />
+            </ScaledScreen>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="trust" title="Trust & methodology" subtitle="Falsifiability is the product. These pages are the proof.">
+          <DCArtboard id="methodology" label="03 · Methodology" width={720} height={1100}>
+            <ScaledScreen width={1440} height={2200} scale={0.5}>
+              <MethodologyScreen />
+            </ScaledScreen>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="exploration" title="Country profile" subtitle="Cross-programme view, anchored on the radar.">
+          <DCArtboard id="country" label="04 · Country (Switzerland)" width={720} height={900}>
+            <ScaledScreen width={1440} height={1800} scale={0.5}>
+              <CountryScreen />
+            </ScaledScreen>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="internal" title="Internal tools — TTR Group only" subtitle="Not exposed publicly. Editorial review queue and changes audit.">
+          <DCArtboard id="review" label="I-01 · Review value (internal)" width={720} height={900}>
+            <ScaledScreen width={1440} height={1800} scale={0.5}>
+              <ReviewValueScreen />
+            </ScaledScreen>
+          </DCArtboard>
+          <DCArtboard id="changes" label="I-02 · Changes audit (internal)" width={720} height={1100}>
+            <ScaledScreen width={1440} height={2200} scale={0.5}>
+              <ChangesScreenInternal />
+            </ScaledScreen>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+</body>
+</html>
