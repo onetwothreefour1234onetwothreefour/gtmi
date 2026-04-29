@@ -1,0 +1,241 @@
+country,programId,programName,fieldKey,fieldLabel,pillar,subFactor,status,classification,valueRawTrunc,sourceUrl,sourceTier,extractionConfidence,validationConfidence
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),A.1.1,Minimum salary threshold (USD-equivalent),A,A.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),A.1.2,Salary threshold as % of local median wage,A,A.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),A.1.3,"Alternative qualification pathways (points, capital, patent)",A,A.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),A.2.1,Minimum educational requirement,A,A.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),A.2.2,Minimum work experience (years),A,A.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),A.2.3,Language proficiency requirement (level + acceptance list),A,A.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),A.3.1,Occupation list constraint (open / restricted list / shortage list),A,A.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),A.3.2,Annual quota presence and size,A,A.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),A.3.3,Applicant age cap,A,A.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),B.1.1,Published SLA processing time (days),B,B.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),B.1.2,Fast-track option availability and SLA,B,B.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),B.1.3,Number of application steps,B,B.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),B.2.1,Principal applicant fees (USD),B,B.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),B.2.2,Per-dependant fees (USD),B,B.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),B.2.3,Employer-borne levies and skill charges (USD),B,B.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),B.2.4,"Mandatory non-government costs (agents, translation, medicals)",B,B.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),B.3.1,Online application availability,B,B.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),B.3.2,In-person / biometric requirement (count of visits),B,B.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),B.3.3,Appeal and refusal process clarity,B,B.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),C.1.1,Employer-sponsorship requirement,C,C.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),C.1.2,Ability to switch employers (no re-application vs. re-application),C,C.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),C.1.3,Self-employment and secondary income rights,C,C.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),C.1.4,Labor market test requirement,C,C.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),C.2.1,Spouse inclusion and work rights (automatic / by permit / none),C,C.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),C.2.2,Dependent child age cap and inclusion terms,C,C.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),C.2.3,Parent or extended family inclusion option,C,C.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),C.2.4,Same-sex partner recognition,C,C.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),C.3.1,Public healthcare access,C,C.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),C.3.2,Public education access for children,C,C.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.1.1,PR provision available (yes / no),D,D.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.1.2,Minimum years of residence to PR eligibility,D,D.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.1.3,Physical presence requirement during accrual (days/yr),D,D.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.1.4,PR retention rules (days/yr to keep PR),D,D.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.2.1,Citizenship provision available from this track (yes / no),D,D.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.2.2,Total minimum years from initial visa entry to citizenship eligibility,D,D.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.2.3,Dual citizenship permitted,D,D.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.2.4,Civic / language / integration test burden,D,D.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.3.1,Tax residency trigger (days/yr before worldwide tax applies),D,D.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.3.2,"Special regime available (non-dom, expat bonus, flat-rate)",D,D.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),D.3.3,Territorial vs. worldwide taxation for residents,D,D.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),E.1.1,"Material policy changes in last 5 years (count, weighted by severity)",E,E.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),E.1.2,Forward-announced pipeline changes (positive predictability signal),E,E.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),E.1.3,"Program age (years since introduction, capped at 20)",E,E.1,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),E.2.1,Published approval rate or admission statistics,E,E.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),E.2.2,Published quota / cap information,E,E.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),E.2.3,Public guidance and decision criteria documentation,E,E.2,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),E.3.1,Rule of law (V-Dem / World Bank WGI),E,E.3,,LLM_MISS,,,,,
+SGP,a39ddbf3-39b1-4ac7-a519-d7bad57141f5,Employment Pass (EP),E.3.2,Government effectiveness (World Bank WGI),E,E.3,,LLM_MISS,,,,,
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,A.1.1,Minimum salary threshold (USD-equivalent),A,A.1,approved,POPULATED,"$3,300",https://www.mom.gov.sg/passes-and-permits/s-pass,1,0.950,1.000
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,A.1.2,Salary threshold as % of local median wage,A,A.1,pending_review,POPULATED,49.3,derived-computation:A.1.2,,0.600,0.600
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,A.1.3,"Alternative qualification pathways (points, capital, patent)",A,A.1,approved,POPULATED,salary_only,https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility,1,0.850,0.850
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,A.2.1,Minimum educational requirement,A,A.2,approved,POPULATED,none,https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility,1,0.900,0.920
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,A.2.2,Minimum work experience (years),A,A.2,pending_review,POPULATED,0,https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility,1,0.850,0.950
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,A.2.3,Language proficiency requirement (level + acceptance list),A,A.2,pending_review,POPULATED,none,https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility,1,0.800,0.850
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,A.3.1,Occupation list constraint (open / restricted list / shortage list),A,A.3,pending_review,POPULATED,open,https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility,1,0.750,0.920
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,A.3.2,Annual quota presence and size,A,A.3,pending_review,POPULATED,quota_undisclosed,https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.850,0.900
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,A.3.3,Applicant age cap,A,A.3,pending_review,POPULATED,999,https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility,1,0.700,0.980
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,B.1.1,Published SLA processing time (days),B,B.1,pending_review,POPULATED,14,https://www.mom.gov.sg/passes-and-permits/s-pass/apply-for-a-pass,1,0.700,0.950
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,B.1.2,Fast-track option availability and SLA,B,B.1,pending_review,POPULATED,none,https://www.mom.gov.sg/passes-and-permits/s-pass/apply-for-a-pass,1,0.500,0.750
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,B.1.3,Number of application steps,B,B.1,pending_review,POPULATED,6,https://www.mom.gov.sg/passes-and-permits/s-pass/apply-for-a-pass,1,0.700,1.000
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,B.2.1,Principal applicant fees (USD),B,B.2,pending_review,POPULATED,S$100,https://www.ica.gov.sg/reside/PR/apply,1,0.300,1.000
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,B.2.2,Per-dependant fees (USD),B,B.2,,LLM_MISS,,,,,
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,B.2.3,Employer-borne levies and skill charges (USD),B,B.2,approved,POPULATED,"{""hasLevy"": true, ""notes"": ""Employers are subject to a quota and levy for S Pass",https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.950,1.000
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,B.2.4,"Mandatory non-government costs (agents, translation, medicals)",B,B.2,pending_review,POPULATED,"{""hasMandatoryNonGovCosts"":true,""notes"":""Pre-employment medical examination by a",https://www.mom.gov.sg/passes-and-permits/employment-pass/before-you-apply,,0.700,0.700
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,B.3.1,Online application availability,B,B.3,pending_review,POPULATED,fully_online,https://www.mom.gov.sg/passes-and-permits/s-pass/apply-for-a-pass,1,0.750,0.950
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,B.3.2,In-person / biometric requirement (count of visits),B,B.3,pending_review,POPULATED,2,https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.600,0.950
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,B.3.3,Appeal and refusal process clarity,B,B.3,pending_review,POPULATED,basic,https://www.mom.gov.sg/passes-and-permits/s-pass,1,0.600,0.550
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,C.1.1,Employer-sponsorship requirement,C,C.1,approved,POPULATED,required_throughout,https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.950,0.920
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,C.1.2,Ability to switch employers (no re-application vs. re-application),C,C.1,approved,POPULATED,re_application,https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.950,0.950
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,C.1.3,Self-employment and secondary income rights,C,C.1,pending_review,POPULATED,prohibited,https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.550,0.700
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,C.1.4,Labor market test requirement,C,C.1,approved,POPULATED,true,https://www.mom.gov.sg/passes-and-permits/s-pass,1,0.850,0.950
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,C.2.1,Spouse inclusion and work rights (automatic / by permit / none),C,C.2,pending_review,POPULATED,by_permit_with_work_rights,https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility,1,0.650,1.000
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,C.2.2,Dependent child age cap and inclusion terms,C,C.2,approved,POPULATED,21,https://www.one-visa.com/singapore-visa-resources/singapore-s-pass/,2,0.900,1.000
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,C.2.3,Parent or extended family inclusion option,C,C.2,pending_review,POPULATED,false,https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility,1,0.800,1.000
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,C.2.4,Same-sex partner recognition,C,C.2,pending_review,POPULATED,false,https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.500,0.950
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,C.3.1,Public healthcare access,C,C.3,pending_review,POPULATED,not_stated,https://www.mom.gov.sg/passes-and-permits/s-pass,1,0.900,0.850
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,C.3.2,Public education access for children,C,C.3,approved,POPULATED,,internal:country-substitute-regional/C.3.2/SGP,,1.000,1.000
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.1.1,PR provision available (yes / no),D,D.1,approved,POPULATED,true,https://www.ica.gov.sg/reside/PR/apply,1,0.850,0.850
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.1.2,Minimum years of residence to PR eligibility,D,D.1,pending_review,POPULATED,2,https://www.ica.gov.sg/reside/PR/apply,,0.700,0.700
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.1.3,Physical presence requirement during accrual (days/yr),D,D.1,pending_review,POPULATED,"{""required"":true,""daysPerYear"":180,""notes"":""ICA discretionary; expects substanti",https://www.ica.gov.sg/reside/PR/rep,,0.700,0.700
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.1.4,PR retention rules (days/yr to keep PR),D,D.1,pending_review,POPULATED,"{""required"":true,""daysPerYear"":null,""notes"":""Re-entry Permit (REP) required to r",https://www.ica.gov.sg/reside/PR/rep,,0.700,0.700
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.2.1,Citizenship provision available from this track (yes / no),D,D.2,pending_review,POPULATED,true,https://www.mom.gov.sg/passes-and-permits/s-pass/eligibility,1,0.500,0.720
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.2.2,Total minimum years from initial visa entry to citizenship eligibility,D,D.2,pending_review,POPULATED,4,derived-computation:D.2.2,,0.600,0.600
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.2.3,Dual citizenship permitted,D,D.2,pending_review,POPULATED,not_permitted,https://www.ica.gov.sg/reside/SC/loss-of-citizenship,,0.700,0.700
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.2.4,Civic / language / integration test burden,D,D.2,pending_review,POPULATED,light,https://www.ica.gov.sg/reside/citizenship/apply,1,0.450,0.950
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.3.1,Tax residency trigger (days/yr before worldwide tax applies),D,D.3,approved,POPULATED,183,https://www.iras.gov.sg/taxes/individual-income-tax/basics-of-individual-income-tax/tax-residency-and-tax-rates/individual-income-tax-rates,1,0.900,1.000
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.3.2,"Special regime available (non-dom, expat bonus, flat-rate)",D,D.3,pending_review,POPULATED,none,https://www.iras.gov.sg/taxes/individual-income-tax/basics-of-individual-income-tax/tax-residency-and-tax-rates/individual-income-tax-rates,1,0.400,0.900
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,D.3.3,Territorial vs. worldwide taxation for residents,D,D.3,pending_review,POPULATED,territorial,https://www.iras.gov.sg/taxes/individual-income-tax/basics-of-individual-income-tax/tax-residency-and-tax-rates/individual-income-tax-rates,1,0.400,0.850
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,E.1.1,"Material policy changes in last 5 years (count, weighted by severity)",E,E.1,pending_review,POPULATED,2,https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.800,0.850
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,E.1.2,Forward-announced pipeline changes (positive predictability signal),E,E.1,approved,POPULATED,true,https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.950,0.850
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,E.1.3,"Program age (years since introduction, capped at 20)",E,E.1,,LLM_MISS,,,,,
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,E.2.1,Published approval rate or admission statistics,E,E.2,pending_review,POPULATED,false,https://www.mom.gov.sg/passes-and-permits/s-pass,1,0.900,0.700
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,E.2.2,Published quota / cap information,E,E.2,pending_review,POPULATED,exists_undisclosed,https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.850,0.850
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,E.2.3,Public guidance and decision criteria documentation,E,E.2,pending_review,POPULATED,basic,https://www.mom.gov.sg/passes-and-permits/s-pass/key-facts,1,0.650,0.720
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,E.3.1,Rule of law (V-Dem / World Bank WGI),E,E.3,approved,POPULATED,1.43,https://api.worldbank.org/v2/country/SG/indicator/RL.EST?format=json&mrv=1&source=3,1,1.000,1.000
+SGP,b72e8153-6c3f-4c11-9a90-72cd7cc3c81d,S Pass,E.3.2,Government effectiveness (World Bank WGI),E,E.3,approved,POPULATED,2.28,https://api.worldbank.org/v2/country/SG/indicator/GOV_WGI_GE.EST?format=json&mrv=1&source=3,1,1.000,1.000
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,A.1.1,Minimum salary threshold (USD-equivalent),A,A.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,A.1.2,Salary threshold as % of local median wage,A,A.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,A.1.3,"Alternative qualification pathways (points, capital, patent)",A,A.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,A.2.1,Minimum educational requirement,A,A.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,A.2.2,Minimum work experience (years),A,A.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,A.2.3,Language proficiency requirement (level + acceptance list),A,A.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,A.3.1,Occupation list constraint (open / restricted list / shortage list),A,A.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,A.3.2,Annual quota presence and size,A,A.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,A.3.3,Applicant age cap,A,A.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,B.1.1,Published SLA processing time (days),B,B.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,B.1.2,Fast-track option availability and SLA,B,B.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,B.1.3,Number of application steps,B,B.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,B.2.1,Principal applicant fees (USD),B,B.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,B.2.2,Per-dependant fees (USD),B,B.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,B.2.3,Employer-borne levies and skill charges (USD),B,B.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,B.2.4,"Mandatory non-government costs (agents, translation, medicals)",B,B.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,B.3.1,Online application availability,B,B.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,B.3.2,In-person / biometric requirement (count of visits),B,B.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,B.3.3,Appeal and refusal process clarity,B,B.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,C.1.1,Employer-sponsorship requirement,C,C.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,C.1.2,Ability to switch employers (no re-application vs. re-application),C,C.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,C.1.3,Self-employment and secondary income rights,C,C.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,C.1.4,Labor market test requirement,C,C.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,C.2.1,Spouse inclusion and work rights (automatic / by permit / none),C,C.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,C.2.2,Dependent child age cap and inclusion terms,C,C.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,C.2.3,Parent or extended family inclusion option,C,C.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,C.2.4,Same-sex partner recognition,C,C.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,C.3.1,Public healthcare access,C,C.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,C.3.2,Public education access for children,C,C.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.1.1,PR provision available (yes / no),D,D.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.1.2,Minimum years of residence to PR eligibility,D,D.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.1.3,Physical presence requirement during accrual (days/yr),D,D.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.1.4,PR retention rules (days/yr to keep PR),D,D.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.2.1,Citizenship provision available from this track (yes / no),D,D.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.2.2,Total minimum years from initial visa entry to citizenship eligibility,D,D.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.2.3,Dual citizenship permitted,D,D.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.2.4,Civic / language / integration test burden,D,D.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.3.1,Tax residency trigger (days/yr before worldwide tax applies),D,D.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.3.2,"Special regime available (non-dom, expat bonus, flat-rate)",D,D.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,D.3.3,Territorial vs. worldwide taxation for residents,D,D.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,E.1.1,"Material policy changes in last 5 years (count, weighted by severity)",E,E.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,E.1.2,Forward-announced pipeline changes (positive predictability signal),E,E.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,E.1.3,"Program age (years since introduction, capped at 20)",E,E.1,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,E.2.1,Published approval rate or admission statistics,E,E.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,E.2.2,Published quota / cap information,E,E.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,E.2.3,Public guidance and decision criteria documentation,E,E.2,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,E.3.1,Rule of law (V-Dem / World Bank WGI),E,E.3,,LLM_MISS,,,,,
+SGP,84c0428c-ecd9-4662-a9b1-24d1377d9aeb,ONE Pass,E.3.2,Government effectiveness (World Bank WGI),E,E.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,A.1.1,Minimum salary threshold (USD-equivalent),A,A.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,A.1.2,Salary threshold as % of local median wage,A,A.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,A.1.3,"Alternative qualification pathways (points, capital, patent)",A,A.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,A.2.1,Minimum educational requirement,A,A.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,A.2.2,Minimum work experience (years),A,A.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,A.2.3,Language proficiency requirement (level + acceptance list),A,A.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,A.3.1,Occupation list constraint (open / restricted list / shortage list),A,A.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,A.3.2,Annual quota presence and size,A,A.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,A.3.3,Applicant age cap,A,A.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,B.1.1,Published SLA processing time (days),B,B.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,B.1.2,Fast-track option availability and SLA,B,B.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,B.1.3,Number of application steps,B,B.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,B.2.1,Principal applicant fees (USD),B,B.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,B.2.2,Per-dependant fees (USD),B,B.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,B.2.3,Employer-borne levies and skill charges (USD),B,B.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,B.2.4,"Mandatory non-government costs (agents, translation, medicals)",B,B.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,B.3.1,Online application availability,B,B.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,B.3.2,In-person / biometric requirement (count of visits),B,B.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,B.3.3,Appeal and refusal process clarity,B,B.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,C.1.1,Employer-sponsorship requirement,C,C.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,C.1.2,Ability to switch employers (no re-application vs. re-application),C,C.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,C.1.3,Self-employment and secondary income rights,C,C.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,C.1.4,Labor market test requirement,C,C.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,C.2.1,Spouse inclusion and work rights (automatic / by permit / none),C,C.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,C.2.2,Dependent child age cap and inclusion terms,C,C.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,C.2.3,Parent or extended family inclusion option,C,C.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,C.2.4,Same-sex partner recognition,C,C.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,C.3.1,Public healthcare access,C,C.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,C.3.2,Public education access for children,C,C.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.1.1,PR provision available (yes / no),D,D.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.1.2,Minimum years of residence to PR eligibility,D,D.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.1.3,Physical presence requirement during accrual (days/yr),D,D.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.1.4,PR retention rules (days/yr to keep PR),D,D.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.2.1,Citizenship provision available from this track (yes / no),D,D.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.2.2,Total minimum years from initial visa entry to citizenship eligibility,D,D.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.2.3,Dual citizenship permitted,D,D.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.2.4,Civic / language / integration test burden,D,D.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.3.1,Tax residency trigger (days/yr before worldwide tax applies),D,D.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.3.2,"Special regime available (non-dom, expat bonus, flat-rate)",D,D.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,D.3.3,Territorial vs. worldwide taxation for residents,D,D.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,E.1.1,"Material policy changes in last 5 years (count, weighted by severity)",E,E.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,E.1.2,Forward-announced pipeline changes (positive predictability signal),E,E.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,E.1.3,"Program age (years since introduction, capped at 20)",E,E.1,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,E.2.1,Published approval rate or admission statistics,E,E.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,E.2.2,Published quota / cap information,E,E.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,E.2.3,Public guidance and decision criteria documentation,E,E.2,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,E.3.1,Rule of law (V-Dem / World Bank WGI),E,E.3,,LLM_MISS,,,,,
+SGP,253a8b13-d011-42e2-ace3-5509c478c743,Tech.Pass,E.3.2,Government effectiveness (World Bank WGI),E,E.3,,LLM_MISS,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,A.1.1,Minimum salary threshold (USD-equivalent),A,A.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,A.1.2,Salary threshold as % of local median wage,A,A.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,A.1.3,"Alternative qualification pathways (points, capital, patent)",A,A.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,A.2.1,Minimum educational requirement,A,A.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,A.2.2,Minimum work experience (years),A,A.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,A.2.3,Language proficiency requirement (level + acceptance list),A,A.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,A.3.1,Occupation list constraint (open / restricted list / shortage list),A,A.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,A.3.2,Annual quota presence and size,A,A.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,A.3.3,Applicant age cap,A,A.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,B.1.1,Published SLA processing time (days),B,B.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,B.1.2,Fast-track option availability and SLA,B,B.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,B.1.3,Number of application steps,B,B.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,B.2.1,Principal applicant fees (USD),B,B.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,B.2.2,Per-dependant fees (USD),B,B.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,B.2.3,Employer-borne levies and skill charges (USD),B,B.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,B.2.4,"Mandatory non-government costs (agents, translation, medicals)",B,B.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,B.3.1,Online application availability,B,B.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,B.3.2,In-person / biometric requirement (count of visits),B,B.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,B.3.3,Appeal and refusal process clarity,B,B.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,C.1.1,Employer-sponsorship requirement,C,C.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,C.1.2,Ability to switch employers (no re-application vs. re-application),C,C.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,C.1.3,Self-employment and secondary income rights,C,C.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,C.1.4,Labor market test requirement,C,C.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,C.2.1,Spouse inclusion and work rights (automatic / by permit / none),C,C.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,C.2.2,Dependent child age cap and inclusion terms,C,C.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,C.2.3,Parent or extended family inclusion option,C,C.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,C.2.4,Same-sex partner recognition,C,C.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,C.3.1,Public healthcare access,C,C.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,C.3.2,Public education access for children,C,C.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.1.1,PR provision available (yes / no),D,D.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.1.2,Minimum years of residence to PR eligibility,D,D.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.1.3,Physical presence requirement during accrual (days/yr),D,D.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.1.4,PR retention rules (days/yr to keep PR),D,D.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.2.1,Citizenship provision available from this track (yes / no),D,D.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.2.2,Total minimum years from initial visa entry to citizenship eligibility,D,D.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.2.3,Dual citizenship permitted,D,D.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.2.4,Civic / language / integration test burden,D,D.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.3.1,Tax residency trigger (days/yr before worldwide tax applies),D,D.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.3.2,"Special regime available (non-dom, expat bonus, flat-rate)",D,D.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,D.3.3,Territorial vs. worldwide taxation for residents,D,D.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,E.1.1,"Material policy changes in last 5 years (count, weighted by severity)",E,E.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,E.1.2,Forward-announced pipeline changes (positive predictability signal),E,E.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,E.1.3,"Program age (years since introduction, capped at 20)",E,E.1,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,E.2.1,Published approval rate or admission statistics,E,E.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,E.2.2,Published quota / cap information,E,E.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,E.2.3,Public guidance and decision criteria documentation,E,E.2,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,E.3.1,Rule of law (V-Dem / World Bank WGI),E,E.3,,URL_MISSING,,,,,
+SGP,7d12de90-d46e-498d-b12a-bb09059d103b,EntrePass,E.3.2,Government effectiveness (World Bank WGI),E,E.3,,URL_MISSING,,,,,
