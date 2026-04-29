@@ -52,7 +52,5 @@ echo Next steps:
 echo   1. If NEXT_PUBLIC_APP_URL secret is still a placeholder, update it:
 echo      echo ^| set /p="%SERVICE_URL%" ^| gcloud secrets versions add gtmi-web-public-app-url --data-file=- --project=%PROJECT_ID%
 echo      Then re-run this script to rebuild with the correct URL baked in.
-echo   2. In Supabase dashboard ^(gtmi-staging^) Auth settings, add this redirect URL:
-echo      %SERVICE_URL%/auth/callback
 
 endlocal

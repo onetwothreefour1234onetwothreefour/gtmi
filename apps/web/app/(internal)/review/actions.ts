@@ -5,27 +5,12 @@ import { normalizeRawValue, ScoringError } from '@gtmi/scoring';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
-
-async function requireReviewer(): Promise<string> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    console.error('[review/actions] requireReviewer: no authenticated user');
-    throw new Error('Unauthorized');
-  }
-  return user.id;
-}
 
 export async function approveFieldValue(id: string, editedRaw?: string): Promise<void> {
-  const userId = await requireReviewer();
-
   const update: Record<string, unknown> = {
     status: 'approved',
     reviewedAt: new Date(),
-    reviewedBy: userId,
+    reviewedBy: null,
   };
 
   if (editedRaw !== undefined && editedRaw.trim().length > 0) {
@@ -71,13 +56,12 @@ export async function approveFieldValue(id: string, editedRaw?: string): Promise
 }
 
 export async function rejectFieldValue(id: string): Promise<void> {
-  const userId = await requireReviewer();
-  console.log(`[review/actions] reject called for field_value ${id} by ${userId}`);
+  console.log(`[review/actions] reject called for field_value ${id}`);
   try {
     await db.transaction(async (tx) => {
       const updatedFv = await tx
         .update(fieldValues)
-        .set({ status: 'rejected', reviewedAt: new Date(), reviewedBy: userId })
+        .set({ status: 'rejected', reviewedAt: new Date(), reviewedBy: null })
         .where(eq(fieldValues.id, id))
         .returning({ id: fieldValues.id });
       if (updatedFv.length === 0) {
@@ -111,8 +95,6 @@ export async function rejectFieldValue(id: string): Promise<void> {
  * Wrapped in a single transaction so a failure rolls every row back.
  */
 export async function bulkApproveHighConfidence(): Promise<{ approved: number }> {
-  const userId = await requireReviewer();
-
   const candidates = await db
     .select({ id: fieldValues.id })
     .from(fieldValues)
@@ -136,7 +118,7 @@ export async function bulkApproveHighConfidence(): Promise<{ approved: number }>
     await db.transaction(async (tx) => {
       await tx
         .update(fieldValues)
-        .set({ status: 'approved', reviewedAt, reviewedBy: userId })
+        .set({ status: 'approved', reviewedAt, reviewedBy: null })
         .where(inArray(fieldValues.id, ids));
       await tx
         .update(reviewQueue)

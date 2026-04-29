@@ -34,15 +34,11 @@ steps:
       - |
         docker build \
           -f apps/web/Dockerfile \
-          --build-arg NEXT_PUBLIC_SUPABASE_URL="$$NEXT_PUBLIC_SUPABASE_URL" \
-          --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
           --build-arg NEXT_PUBLIC_APP_URL="$$NEXT_PUBLIC_APP_URL" \
           -t "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID" \
           -t "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest" \
           .
     secretEnv:
-      - NEXT_PUBLIC_SUPABASE_URL
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY
       - NEXT_PUBLIC_APP_URL
 
   - name: gcr.io/cloud-builders/docker
@@ -70,14 +66,10 @@ steps:
       - '--min-instances=0'
       - '--max-instances=5'
       - '--allow-unauthenticated'
-      - '--set-secrets=DATABASE_URL=gtmi-web-database-url:latest,SUPABASE_URL=gtmi-web-supabase-url:latest,SUPABASE_SERVICE_ROLE_KEY=gtmi-web-supabase-service-role-key:latest'
+      - '--set-secrets=DATABASE_URL=gtmi-web-database-url:latest'
 
 availableSecrets:
   secretManager:
-    - versionName: projects/$PROJECT_ID/secrets/gtmi-web-public-supabase-url/versions/latest
-      env: NEXT_PUBLIC_SUPABASE_URL
-    - versionName: projects/$PROJECT_ID/secrets/gtmi-web-public-supabase-anon-key/versions/latest
-      env: NEXT_PUBLIC_SUPABASE_ANON_KEY
     - versionName: projects/$PROJECT_ID/secrets/gtmi-web-public-app-url/versions/latest
       env: NEXT_PUBLIC_APP_URL
 

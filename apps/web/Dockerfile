@@ -38,11 +38,7 @@ COPY --from=deps /repo/packages/shared/node_modules ./packages/shared/node_modul
 COPY --from=deps /repo/packages/extraction/node_modules ./packages/extraction/node_modules
 
 # NEXT_PUBLIC_* are inlined into the client bundle at build time.
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG NEXT_PUBLIC_APP_URL
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
