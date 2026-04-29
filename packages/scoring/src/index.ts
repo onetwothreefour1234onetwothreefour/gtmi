@@ -1,4 +1,5 @@
 export { runScoringEngine, scoreSingleIndicator } from './engine';
+export { PHASE2_PLACEHOLDER_PARAMS } from './placeholder-params';
 export {
   BOOLEAN_WITH_ANNOTATION_KEYS,
   COUNTRY_REGIONS,

@@ -21,47 +21,16 @@
  */
 
 import { db, fieldDefinitions, fieldValues, methodologyVersions, scores } from '@gtmi/db';
-import { runScoringEngine } from '@gtmi/scoring';
-import type { NormalizationParams, ScoringInput } from '@gtmi/scoring';
+import { runScoringEngine, PHASE2_PLACEHOLDER_PARAMS } from '@gtmi/scoring';
+import type { ScoringInput } from '@gtmi/scoring';
 import { eq, and } from 'drizzle-orm';
 import { ACTIVE_FIELD_CODES } from './wave-config';
 
-// ---------------------------------------------------------------------------
-// Phase 2 placeholder normalization params (global benchmark ranges)
-// Replace with cross-program distribution data in Phase 3.
-// ---------------------------------------------------------------------------
-const NORMALIZATION_PARAMS: NormalizationParams = {
-  // A — Access & Eligibility
-  'A.1.1': { mean: 65000, stddev: 35000 }, // salary threshold USD — z_score
-  'A.1.2': { min: 50, max: 300 }, // salary as % median — min_max
-  'A.2.2': { min: 0, max: 10 }, // work experience years — min_max
-  'A.3.3': { min: 0, max: 100 }, // quota size — min_max
-
-  // B — Process & Cost
-  'B.1.1': { min: 1, max: 365 }, // processing days — min_max
-  'B.1.3': { min: 1, max: 10 }, // number of steps — min_max
-  'B.2.1': { mean: 2500, stddev: 2000 }, // principal fees USD — z_score
-  'B.2.2': { mean: 1200, stddev: 900 }, // per-dependant fees USD — z_score
-  'B.2.3': { mean: 5000, stddev: 3000 }, // employer levies USD — z_score
-  'B.2.4': { mean: 1000, stddev: 700 }, // non-gov costs USD — z_score
-  'B.3.2': { min: 0, max: 100 }, // online application — min_max
-
-  // C — Conditions
-  'C.2.2': { min: 0, max: 25 }, // dependent child age cap — min_max
-
-  // D — Pathways
-  'D.1.2': { min: 0, max: 10 }, // years to PR — min_max
-  'D.1.3': { min: 0, max: 365 }, // physical presence days/yr — min_max
-  'D.1.4': { min: 0, max: 365 }, // PR retention days/yr — min_max
-  'D.2.2': { min: 5, max: 30 }, // years to citizenship — min_max
-  'D.3.1': { min: 0, max: 365 }, // tax trigger days — min_max
-
-  // E — Environment & Stability
-  'E.1.1': { mean: 3, stddev: 2.5 }, // policy changes count — z_score
-  'E.1.3': { min: 0, max: 20 }, // program age years — min_max
-  'E.3.1': { min: 0, max: 365 }, // tax residency trigger days — min_max
-  'E.3.2': { min: -2.5, max: 2.5 }, // WGI score — min_max
-};
+// Phase 3.7 / ADR-019 — placeholder normalization params now live in
+// `packages/scoring/src/placeholder-params.ts` so publish-time scoring,
+// /review edits, the audit backfill, and this run-paq-score helper all
+// share one source of truth. Calibration replaces them in Phase 5.
+const NORMALIZATION_PARAMS = PHASE2_PLACEHOLDER_PARAMS;
 
 // ---------------------------------------------------------------------------
 // Main

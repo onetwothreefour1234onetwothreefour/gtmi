@@ -16,39 +16,9 @@
 //   pnpm exec tsx scripts/backfill-value-indicator-scores.ts            # dry run
 //   pnpm exec tsx scripts/backfill-value-indicator-scores.ts --execute  # apply
 import { client, db, fieldDefinitions, fieldValues } from '@gtmi/db';
-import { scoreSingleIndicator } from '@gtmi/scoring';
-import type { FieldDefinitionRecord, NormalizationParams } from '@gtmi/scoring';
+import { scoreSingleIndicator, PHASE2_PLACEHOLDER_PARAMS } from '@gtmi/scoring';
+import type { FieldDefinitionRecord } from '@gtmi/scoring';
 import { eq, and, isNull, inArray, sql } from 'drizzle-orm';
-
-// Phase 2 placeholder normalization params — same set the canary uses
-// for auto-approve scoring. When real calibration data lands, these
-// will be replaced and a re-run of this script will refresh every score.
-// Per-field normalisation params keyed by indicator code. Numeric
-// fields split min_max vs z_score per packages/db/src/seed/methodology-v1.ts.
-// These ranges are placeholders until the calibration pass replaces them
-// with cohort percentiles; rerunning the script with the calibrated
-// values is idempotent (writes a fresh score per row).
-const PHASE2_PLACEHOLDER_PARAMS: NormalizationParams = {
-  // z_score
-  'A.1.1': { mean: 60000, stddev: 20000 },
-  'B.2.1': { mean: 1000, stddev: 800 },
-  'B.2.2': { mean: 500, stddev: 400 },
-  'E.1.1': { mean: 5, stddev: 3 },
-  // min_max
-  'A.1.2': { min: 0, max: 200 },
-  'A.2.2': { min: 0, max: 10 },
-  'A.3.3': { min: 18, max: 65 },
-  'B.1.1': { min: 0, max: 365 },
-  'B.1.3': { min: 1, max: 8 },
-  'B.3.2': { min: 0, max: 5 },
-  'C.2.2': { min: 18, max: 26 },
-  'D.1.2': { min: 0, max: 10 },
-  'D.2.2': { min: 0, max: 15 },
-  'D.3.1': { min: 0, max: 365 },
-  'E.1.3': { min: 0, max: 20 },
-  'E.3.1': { min: -2.5, max: 2.5 },
-  'E.3.2': { min: -2.5, max: 2.5 },
-};
 
 (async () => {
   const execute = process.argv.includes('--execute');

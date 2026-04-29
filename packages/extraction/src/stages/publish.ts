@@ -3,8 +3,11 @@ import {
   BOOLEAN_WITH_ANNOTATION_KEYS,
   getRegionalSubstitute,
   normalizeRawValue,
+  PHASE2_PLACEHOLDER_PARAMS,
   ScoringError,
+  scoreSingleIndicator,
 } from '@gtmi/scoring';
+import type { FieldDefinitionRecord } from '@gtmi/scoring';
 import { createHash } from 'crypto';
 import { eq } from 'drizzle-orm';
 import type { ExtractionOutput, ValidationResult } from '../types/extraction';
@@ -13,6 +16,37 @@ import type { PublishStage } from '../types/pipeline';
 import { detectCurrency } from '../utils/currency';
 
 const COUNTRY_SUBSTITUTE_MODEL = 'country-substitute-regional';
+
+/**
+ * Phase 3.7 / ADR-019 — rubric helpers used by the categorical
+ * pre-flight gate. The on-disk shape is
+ * `{ categories: [{ value: string, score: number, description: string }, ...] }`.
+ *
+ * Exported for unit testing.
+ */
+export function isCategoricalRubric(
+  rubric: unknown
+): rubric is { categories: Array<{ value: string }> } {
+  return (
+    typeof rubric === 'object' &&
+    rubric !== null &&
+    !Array.isArray(rubric) &&
+    Array.isArray((rubric as { categories?: unknown }).categories)
+  );
+}
+
+export function rubricValues(rubric: { categories: Array<{ value: string }> }): string[] {
+  return rubric.categories
+    .map((c) => (typeof c.value === 'string' ? c.value : null))
+    .filter((v): v is string => v !== null);
+}
+
+export function rubricIncludesValue(
+  rubric: { categories: Array<{ value: string }> },
+  rawValue: string
+): boolean {
+  return rubricValues(rubric).includes(rawValue);
+}
 
 /**
  * Phase 3.5 / ADR-014 — synthetic provenance sentinels for country-substitute rows.
@@ -416,7 +450,12 @@ export class PublishStageImpl implements PublishStage {
     const fieldDefRows = await db
       .select({
         id: fieldDefinitions.id,
+        key: fieldDefinitions.key,
+        pillar: fieldDefinitions.pillar,
+        subFactor: fieldDefinitions.subFactor,
+        weightWithinSubFactor: fieldDefinitions.weightWithinSubFactor,
         normalizationFn: fieldDefinitions.normalizationFn,
+        direction: fieldDefinitions.direction,
         scoringRubricJsonb: fieldDefinitions.scoringRubricJsonb,
       })
       .from(fieldDefinitions)
@@ -443,6 +482,71 @@ export class PublishStageImpl implements PublishStage {
     ) {
       console.log(
         `  [${extraction.fieldDefinitionKey}] Skipped publish — value "${rawAsString}" is a coverage-gap sentinel, not data.`
+      );
+      return;
+    }
+
+    // Phase 3.7 / ADR-019 — categorical rubric gate. If the LLM-extracted
+    // raw value is NOT in scoringRubricJsonb.categories[].value, persist
+    // the row with status='pending_review' + valueNormalized=null +
+    // valueIndicatorScore=null so the analyst can map it to a real
+    // rubric value (or reject) at /review. Without this gate, the
+    // existing normalizeRawValue throws and the canary's catch path
+    // also routes to /review — but the row never gets persisted with
+    // its bad raw, so the analyst doesn't see the failure context.
+    // Country-agnostic. Skipped for the `not_stated` and
+    // `not_addressed` / `not_found` sentinels, which already have
+    // dedicated branches above.
+    if (
+      fieldDef.normalizationFn === 'categorical' &&
+      isCategoricalRubric(fieldDef.scoringRubricJsonb) &&
+      !rubricIncludesValue(fieldDef.scoringRubricJsonb, rawAsString)
+    ) {
+      const allowed = rubricValues(fieldDef.scoringRubricJsonb).join(', ');
+      console.log(
+        `  [${extraction.fieldDefinitionKey}] valueRaw="${rawAsString}" not in rubric [${allowed}] — forcing pending_review`
+      );
+      const methodologyRows = await db
+        .select({ id: methodologyVersions.id })
+        .from(methodologyVersions)
+        .where(eq(methodologyVersions.versionTag, provenance.methodologyVersion))
+        .limit(1);
+      if (methodologyRows.length === 0) {
+        throw new Error(
+          `Publish failed: no methodology_version found with version_tag "${provenance.methodologyVersion}"`
+        );
+      }
+      const methodologyVersionId = methodologyRows[0]!.id;
+      const insertedRubric = await db
+        .insert(fieldValues)
+        .values({
+          programId: extraction.programId,
+          fieldDefinitionId,
+          valueRaw: extraction.valueRaw,
+          valueNormalized: null,
+          valueIndicatorScore: null,
+          provenance,
+          status: 'pending_review',
+          extractedAt: extraction.extractedAt,
+          reviewedAt: null,
+          methodologyVersionId,
+        })
+        .onConflictDoUpdate({
+          target: [fieldValues.programId, fieldValues.fieldDefinitionId],
+          set: {
+            valueRaw: extraction.valueRaw,
+            valueNormalized: null,
+            valueIndicatorScore: null,
+            provenance,
+            status: 'pending_review',
+            extractedAt: extraction.extractedAt,
+            reviewedAt: null,
+            methodologyVersionId,
+          },
+        })
+        .returning({ id: fieldValues.id });
+      console.log(
+        `Published [${insertedRubric[0]?.id}] (rubric-mismatch, score=null) — program: ${extraction.programId}, field: ${extraction.fieldDefinitionKey}`
       );
       return;
     }
@@ -563,6 +667,25 @@ export class PublishStageImpl implements PublishStage {
     // Merge detected currency into provenance JSONB — no schema change needed.
     const provenanceToStore = valueCurrency ? { ...provenance, valueCurrency } : provenance;
 
+    // Phase 3.7 / ADR-019 — compute and persist value_indicator_score
+    // alongside the auto-approve write. Failures are non-fatal — log and
+    // store NULL so the row still publishes; the backfill script can
+    // recover later.
+    let valueIndicatorScore: string | null = null;
+    try {
+      const score = scoreSingleIndicator({
+        fieldDefinition: fieldDef as unknown as FieldDefinitionRecord,
+        valueNormalized,
+        normalizationParams: PHASE2_PLACEHOLDER_PARAMS,
+      });
+      if (score !== null) valueIndicatorScore = String(score);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `  [${extraction.fieldDefinitionKey}] scoreSingleIndicator failed: ${msg} — persisting with NULL score`
+      );
+    }
+
     // source_id is intentionally left null: the sources table holds pre-seeded
     // static program-level URLs, while Stage 0 discovers URLs dynamically. Most
     // discovered URLs will not match a sources row. The full source URL, tier,
@@ -574,6 +697,7 @@ export class PublishStageImpl implements PublishStage {
         fieldDefinitionId,
         valueRaw: extraction.valueRaw,
         valueNormalized,
+        valueIndicatorScore,
         provenance: provenanceToStore,
         status: 'approved',
         extractedAt: extraction.extractedAt,
@@ -585,6 +709,7 @@ export class PublishStageImpl implements PublishStage {
         set: {
           valueRaw: extraction.valueRaw,
           valueNormalized,
+          valueIndicatorScore,
           provenance: provenanceToStore,
           status: 'approved',
           extractedAt: extraction.extractedAt,
