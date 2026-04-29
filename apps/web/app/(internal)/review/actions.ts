@@ -95,15 +95,30 @@ export async function rejectFieldValue(id: string): Promise<void> {
  * Wrapped in a single transaction so a failure rolls every row back.
  */
 export async function bulkApproveHighConfidence(): Promise<{ approved: number }> {
+  // Phase 3.7 / ADR-019 — rubric gate at bulk-approve. For categorical
+  // fields, only approve rows whose value_raw is in
+  // scoring_rubric_jsonb.categories[].value. Coverage-gap sentinels like
+  // `not_stated` and `not_addressed` cannot one-click approve into the
+  // public score; the analyst must explicitly approve them per-row (or
+  // map them to a real rubric value via /review).
   const candidates = await db
     .select({ id: fieldValues.id })
     .from(fieldValues)
+    .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
     .where(
       and(
         eq(fieldValues.status, 'pending_review'),
         sql`(${fieldValues.provenance} ->> 'extractionConfidence')::float >= 0.85`,
         sql`(${fieldValues.provenance} ->> 'validationConfidence')::float >= 0.85`,
-        sql`(${fieldValues.provenance} ->> 'isValid') IS DISTINCT FROM 'false'`
+        sql`(${fieldValues.provenance} ->> 'isValid') IS DISTINCT FROM 'false'`,
+        sql`(
+          ${fieldDefinitions.normalizationFn} <> 'categorical'
+          OR EXISTS (
+            SELECT 1
+            FROM jsonb_array_elements(${fieldDefinitions.scoringRubricJsonb} -> 'categories') AS elem
+            WHERE elem ->> 'value' = ${fieldValues.valueRaw}
+          )
+        )`
       )
     );
 
