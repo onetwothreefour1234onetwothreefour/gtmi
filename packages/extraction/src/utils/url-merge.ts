@@ -91,6 +91,14 @@ interface MergeArgs {
   /** Phase 3.6.2 / ITEM 5 — URLs that produced approved values for the
    * currently-missing fields in OTHER programs in the same country. */
   fromProvenance?: DiscoveredUrl[];
+  /**
+   * Phase 3.7 / ADR-018 — URLs that produced approved or pending values
+   * for the currently-missing fields in THIS program on a prior run.
+   * Highest-priority origin in the merge (above `fresh`) so re-runs
+   * preferentially retry the URL that last produced a value rather than
+   * rediscovering from scratch.
+   */
+  fromFieldProven?: DiscoveredUrl[];
   cap?: number;
   /** Phase 3.6.2 / ITEM 4 — explicit per-tier quota override. When unset,
    * dynamicTierQuotas(cap) is used. */
@@ -113,12 +121,14 @@ export function mergeDiscoveredUrls(args: MergeArgs): DiscoveredUrl[] {
   // Tag each entry with its origin so we can implement "registry first within tier".
   type Tagged = {
     url: DiscoveredUrl;
-    origin: 'registry' | 'fresh' | 'proven';
+    origin: 'registry' | 'fresh' | 'proven' | 'fieldProven';
     normalised: string;
   };
   const seen = new Map<string, Tagged>();
 
-  // Seed with registry first; proven overlays on conflict; fresh overrides everything.
+  // Seed with registry first; proven overlays on conflict; fresh overrides
+  // everything. Phase 3.7 / ADR-018: fieldProven (same-program prior URL)
+  // wins outright — it's the highest-confidence signal we have.
   for (const u of args.fromSourcesTable) {
     const n = normaliseUrl(u.url);
     seen.set(n, { url: u, origin: 'registry', normalised: n });
@@ -131,6 +141,10 @@ export function mergeDiscoveredUrls(args: MergeArgs): DiscoveredUrl[] {
     const n = normaliseUrl(u.url);
     seen.set(n, { url: u, origin: 'fresh', normalised: n });
   }
+  for (const u of args.fromFieldProven ?? []) {
+    const n = normaliseUrl(u.url);
+    seen.set(n, { url: u, origin: 'fieldProven', normalised: n });
+  }
 
   // Bucket by tier.
   const byTier: Record<1 | 2 | 3, Tagged[]> = { 1: [], 2: [], 3: [] };
@@ -139,11 +153,14 @@ export function mergeDiscoveredUrls(args: MergeArgs): DiscoveredUrl[] {
     if (t === 1 || t === 2 || t === 3) byTier[t].push(tagged);
   }
 
-  // Within each tier, order: registry → proven → fresh (stable within each origin).
+  // Within each tier, order: fieldProven → registry → proven → fresh
+  // (stable within each origin). fieldProven wins because the URL has
+  // already produced a value for THIS programme on this exact field.
   const ORIGIN_RANK: Record<Tagged['origin'], number> = {
-    registry: 0,
-    proven: 1,
-    fresh: 2,
+    fieldProven: 0,
+    registry: 1,
+    proven: 2,
+    fresh: 3,
   };
   for (const t of [1, 2, 3] as const) {
     byTier[t].sort((a, b) => ORIGIN_RANK[a.origin] - ORIGIN_RANK[b.origin]);
@@ -228,13 +245,29 @@ export async function loadProgramSourcesAsDiscovered(
  * Cap: returns at most `cap` distinct URLs (default 10). The merge layer
  * will further trim against the per-tier quotas.
  */
+export interface LoadProvenUrlsOptions {
+  database?: DbClient;
+  cap?: number;
+  /**
+   * Phase 3.7 / ADR-018 — when true, return URLs that produced approved
+   * OR pending values for the SAME programme on a prior run. When false
+   * (default), return URLs from OTHER programmes in the same country
+   * (the legacy Phase 3.6.2 ITEM 5 behaviour). Same-programme URLs are
+   * the highest-priority signal: the LLM was already on the right page
+   * for this exact field × programme combination.
+   */
+  sameProgram?: boolean;
+}
+
 export async function loadProvenUrlsForMissingFields(
   programId: string,
   countryIso: string,
   missingFieldKeys: string[],
-  database: DbClient = db,
-  cap: number = 10
+  options: LoadProvenUrlsOptions = {}
 ): Promise<DiscoveredUrl[]> {
+  const database = options.database ?? db;
+  const cap = options.cap ?? 10;
+  const sameProgram = options.sameProgram ?? false;
   if (missingFieldKeys.length === 0) return [];
   // drizzle's tagged-template `${array}` expands as a record tuple
   // `($1,$2,$3)`, not a Postgres `text[]`. Use sql.join to inline each
@@ -243,25 +276,39 @@ export async function loadProvenUrlsForMissingFields(
     missingFieldKeys.map((k) => sql`${k}`),
     sql`, `
   );
+  // Phase 3.7 / ADR-018 — same-program mode flips two filters:
+  //   1) program_id = ${programId}  (no cross-programme exclusion)
+  //   2) status IN ('approved','pending_review') — pending rows count
+  //      because the LLM was on the right page, just not confident
+  //      enough; retrying the URL is the cheapest way to upgrade.
+  const programFilter = sameProgram
+    ? sql`fv.program_id = ${programId}`
+    : sql`fv.program_id <> ${programId}`;
+  const statusFilter = sameProgram
+    ? sql`fv.status IN ('approved', 'pending_review')`
+    : sql`fv.status = 'approved'`;
   const rows = await database.execute<{
     url: string;
     field_key: string;
     program_name: string;
+    fv_status: string;
   }>(
     sql`
       SELECT DISTINCT ON (provenance->>'sourceUrl')
         (provenance->>'sourceUrl') AS url,
         fd.key AS field_key,
-        p.name AS program_name
+        p.name AS program_name,
+        fv.status AS fv_status
       FROM field_values fv
       JOIN field_definitions fd ON fd.id = fv.field_definition_id
       JOIN programs p ON p.id = fv.program_id
-      WHERE fv.status = 'approved'
-        AND fv.program_id <> ${programId}
+      WHERE ${statusFilter}
+        AND ${programFilter}
         AND p.country_iso = ${countryIso}
         AND fd.key IN (${keysList})
         AND fv.provenance->>'sourceUrl' IS NOT NULL
         AND fv.provenance->>'sourceUrl' NOT LIKE 'derived-%'
+        AND fv.provenance->>'sourceUrl' NOT LIKE 'derived:%'
         AND fv.provenance->>'sourceUrl' NOT LIKE 'internal:%'
         AND fv.provenance->>'sourceUrl' NOT LIKE 'https://api.worldbank.org/%'
       LIMIT ${cap}
@@ -271,12 +318,19 @@ export async function loadProvenUrlsForMissingFields(
   // postgres-driven Drizzle: rows is iterable.
   const list: DiscoveredUrl[] = [];
   const iter = Array.isArray(rows) ? rows : ((rows as unknown as { rows?: unknown[] }).rows ?? []);
-  for (const r of iter as Array<{ url: string; field_key: string; program_name: string }>) {
+  for (const r of iter as Array<{
+    url: string;
+    field_key: string;
+    program_name: string;
+    fv_status: string;
+  }>) {
     list.push({
       url: r.url,
       tier: 1,
       geographicLevel: 'national',
-      reason: `Proven — produced approved value for ${r.field_key} in "${r.program_name}"`,
+      reason: sameProgram
+        ? `Field-proven — produced ${r.fv_status} value for ${r.field_key} in this programme`
+        : `Proven — produced approved value for ${r.field_key} in "${r.program_name}"`,
       isOfficial: true,
     });
   }

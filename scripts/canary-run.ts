@@ -321,6 +321,16 @@ async function main() {
     const presentKeys = new Set((presentKeysIter as { key: string }[]).map((r) => r.key));
     const missingFieldKeys = allFieldDefs.map((d) => d.key).filter((k) => !presentKeys.has(k));
 
+    // Phase 3.7 / ADR-018 — same-programme field-level proven URLs are
+    // the highest-priority pre-load. The URL has already produced a
+    // value (approved OR pending) for this exact field × programme, so
+    // re-running the same URL is the cheapest way to recover.
+    const fieldProvenUrls = await loadProvenUrlsForMissingFields(
+      programId,
+      countryIso,
+      missingFieldKeys,
+      { sameProgram: true }
+    );
     const provenUrls = await loadProvenUrlsForMissingFields(
       programId,
       countryIso,
@@ -329,6 +339,7 @@ async function main() {
     const registryUrls = await loadProgramSourcesAsDiscovered(programId);
     const mergedDiscoveredUrls = mergeDiscoveredUrls({
       freshFromStage0: discoveryResult.discoveredUrls,
+      fromFieldProven: fieldProvenUrls,
       fromSourcesTable: registryUrls,
       fromProvenance: provenUrls,
       cap,
@@ -338,7 +349,7 @@ async function main() {
       `[Discovery merge] populated=${populatedFieldCount} → cap=${cap} (quotas T1=${quotas[1]} T2=${quotas[2]} T3=${quotas[3]})`
     );
     console.log(
-      `[Discovery merge] fresh=${discoveryResult.discoveredUrls.length} + registry=${registryUrls.length} + proven=${provenUrls.length} → merged=${mergedDiscoveredUrls.length}`
+      `[Discovery merge] fresh=${discoveryResult.discoveredUrls.length} + fieldProven=${fieldProvenUrls.length} + registry=${registryUrls.length} + proven=${provenUrls.length} → merged=${mergedDiscoveredUrls.length}`
     );
 
     console.log('Discovered URLs (post-merge):');

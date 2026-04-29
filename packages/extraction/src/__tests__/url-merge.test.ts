@@ -148,6 +148,53 @@ describe('mergeDiscoveredUrls', () => {
     expect(result).toHaveLength(5);
   });
 
+  // Phase 3.7 / ADR-018 — fieldProven origin (same-program prior URL)
+  // is the highest-priority origin in the merge.
+  it('fieldProven URL beats registry on conflict (ADR-018 priority)', () => {
+    const fieldProven = [
+      du('https://gov.example/x', 1, 'national', 'Field-proven — A.1.1 in this programme'),
+    ];
+    const registry = [du('https://gov.example/x', 1, 'national', 'registry')];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: [],
+      fromSourcesTable: registry,
+      fromFieldProven: fieldProven,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.reason).toContain('Field-proven');
+  });
+
+  it('fieldProven beats fresh on conflict (ADR-018 priority)', () => {
+    const fresh = [du('https://gov.example/x', 1, 'national', 'fresh')];
+    const fieldProven = [du('https://gov.example/x', 1, 'national', 'Field-proven')];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: [],
+      fromFieldProven: fieldProven,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.reason).toBe('Field-proven');
+  });
+
+  it('within the same tier, fieldProven appears before registry, proven, and fresh', () => {
+    const fresh = [du('https://gov.example/fresh', 1, 'national', 'fresh')];
+    const registry = [du('https://gov.example/registry', 1, 'national', 'registry')];
+    const proven = [du('https://gov.example/proven', 1, 'national', 'proven')];
+    const fieldProven = [du('https://gov.example/fieldProven', 1, 'national', 'fieldProven')];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: registry,
+      fromProvenance: proven,
+      fromFieldProven: fieldProven,
+    });
+    expect(result.map((u) => u.url)).toEqual([
+      'https://gov.example/fieldProven',
+      'https://gov.example/registry',
+      'https://gov.example/proven',
+      'https://gov.example/fresh',
+    ]);
+  });
+
   it('falls through tier quotas when one tier is short (Tier 1 underfill backfilled by Tier 2)', () => {
     // 3 Tier 1, 11 Tier 2, 1 Tier 3 → 15 total. Quotas 9/5/1 give 3/5/1=9;
     // fall-through fills remaining 6 from leftover Tier 2 (cap 15).
