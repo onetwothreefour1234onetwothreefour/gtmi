@@ -384,6 +384,34 @@ After 3.1–3.5, expected per-programme coverage **42–44/48** (43 average). Ga
 
 ---
 
+### Phase 3.7 — Review-tab improvements + rubric integrity (ADR-017 / 018 / 019)
+
+**Goal:** close three live-DB gaps the analyst flagged on 2026-04-29 review of CAN FSW + SGP S Pass: (a) approved rows have no editor / re-reject path; (b) per-field URL provenance is not fed back into Stage-0 re-discovery; (c) categorical raw values can leak past the rubric on auto-approve and bulk-approve.
+
+**Diagnostic (live, 2026-04-29):**
+
+- 137/137 approved+pending rows have `provenance.sourceUrl`; 46 distinct URLs across 4 programmes. **GBR Skilled Worker has 2 proven URLs but only 1 row in the `sources` table** — leak.
+- C.3.1 has 3 of 4 approved rows holding `valueRaw='not_stated'` (not in the rubric). E.2.2 has 2 of 3 pending rows on `not_addressed` (a coverage-gap sentinel).
+- 136 of 139 rows have `value_indicator_score = NULL`; only `country-substitute-regional` populates the column.
+
+**Plan:**
+
+- ⬜ **ADR-017 — bidirectional review actions.** Drop the `isPending` UI gate; expose `Edit`, `Re-pend`, and status-aware buttons on already-decided rows. Add `editApprovedFieldValue` and `unapproveFieldValue` server actions. No schema migration. Defer reviewer attribution and `review_history` until Cloud Run IAM lockdown lands.
+- ⬜ **ADR-018 — field-level proven-URL view.** New Postgres view `v_proven_field_urls` derived from `field_values.provenance`. Discovery merge in `scripts/canary-run.ts` adds `fromFieldProven` (same-program) as the highest-priority pre-loaded URL set, ahead of the `sources` registry. `loadProvenUrlsForMissingFields` extended with a `sameProgram` flag. Targeted re-runs prefer the URL that previously produced an approved or pending value.
+- ⬜ **ADR-019 — rubric-validation gate.** Publish-time check that categorical `valueRaw` is in `scoringRubricJsonb.categories[].value`; out-of-rubric values force `status='pending_review'` regardless of confidence. Same gate added to `bulkApproveHighConfidence`. One-time backfill of `value_indicator_score`. Side cleanup: SQL fix for the 3 leaked C.3.1 `not_stated` approved rows.
+
+**New files (proposed):**
+
+- `apps/web/app/(internal)/review/actions.ts` — extended with `editApprovedFieldValue`, `unapproveFieldValue`; `bulkApproveHighConfidence` SQL gains the rubric `EXISTS` clause.
+- `packages/db/src/migrations/000NN_proven_field_urls_view.sql` — `CREATE VIEW v_proven_field_urls`.
+- `packages/extraction/src/utils/url-merge.ts` — `loadProvenUrlsForMissingFields` extended with `sameProgram` option.
+- `scripts/canary-run.ts` — discovery merge consumes the new same-program proven set.
+- `packages/extraction/src/stages/publish.ts` — categorical rubric gate; per-row `value_indicator_score` write.
+- `packages/scoring/src/index.ts` — re-export `scoreSingleIndicator`.
+- `scripts/backfill-value-indicator-scores.ts` — one-time backfill, idempotent.
+
+---
+
 ## Phase 4 — Public Dashboard
 
 **Goal:** Interactive public-facing web dashboard. Every data point shows provenance on hover.
