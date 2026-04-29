@@ -56,7 +56,7 @@ const ARE_CITIZENSHIP: CitizenshipResidenceEntry = {
 // ────────────────────────────────────────────────────────────────────
 
 describe('deriveA12 — happy path', () => {
-  it('computes salary as % of local median wage with correct arithmetic', () => {
+  it('computes salary as % of local median wage with correct arithmetic (annual source sentence)', () => {
     const r = deriveA12({
       programId: 'test-prog',
       countryIso: 'AUS',
@@ -64,6 +64,8 @@ describe('deriveA12 — happy path', () => {
       a11ValueRaw: 'AUD 73,150',
       a11ValueCurrency: 'AUD',
       a11SourceUrl: 'https://immi.homeaffairs.gov.au/...',
+      a11SourceSentence:
+        'The annual income threshold is currently AUD 73,150 per year for the Core Skills Stream.',
       medianWage: AUS_MEDIAN,
       fxRate: AUD_FX,
     });
@@ -74,7 +76,7 @@ describe('deriveA12 — happy path', () => {
     expect(r!.extraction.valueRaw).toBe(String(r!.numericValue));
   });
 
-  it('handles USD directly without FX conversion', () => {
+  it('handles USD directly without FX conversion (annual source sentence)', () => {
     const r = deriveA12({
       programId: 'test-prog',
       countryIso: 'USA',
@@ -82,6 +84,7 @@ describe('deriveA12 — happy path', () => {
       a11ValueRaw: '60000',
       a11ValueCurrency: 'USD',
       a11SourceUrl: 'https://uscis.gov/...',
+      a11SourceSentence: 'The annual prevailing wage is USD 60,000 per year.',
       medianWage: { ...AUS_MEDIAN, iso3: 'USA', medianWageUsd: 80_000 },
       fxRate: { code: 'USD', year: 2024, lcuPerUsd: 1.0, sourceUrl: 'self' },
     });
@@ -98,6 +101,7 @@ describe('deriveA12 — skip conditions', () => {
     a11ValueRaw: 'AUD 73,150',
     a11ValueCurrency: 'AUD',
     a11SourceUrl: 'https://example.gov',
+    a11SourceSentence: 'AUD 73,150 per year (annual)',
     medianWage: AUS_MEDIAN,
     fxRate: AUD_FX,
   };
@@ -198,6 +202,7 @@ describe('Derived row provenance shape (ADR-016 invariants)', () => {
     a11ValueRaw: 'AUD 73,150',
     a11ValueCurrency: 'AUD',
     a11SourceUrl: 'https://immi.homeaffairs.gov.au/...',
+    a11SourceSentence: 'AUD 73,150 per year (annual)',
     medianWage: AUS_MEDIAN,
     fxRate: AUD_FX,
   })!;
@@ -398,5 +403,152 @@ describe('deriveD13 / deriveD14 — PR presence', () => {
     expect(r).not.toBeNull();
     expect(r!.extraction.fieldDefinitionKey).toBe('D.1.4');
     expect(r!.extraction.extractionModel).toBe(DERIVE_KNOWLEDGE_MODEL);
+  });
+});
+
+// Phase 3.6.5 — A.1.2 monthly/annual unit detection.
+describe('deriveA12 — Phase 3.6.5 monthly/annual unit detection', () => {
+  // SGP-style monthly threshold. S$3,300/month ≈ S$39,600/yr.
+  // 39600 / 1.34 SGD/USD ≈ 29,552 USD; / 60,000 USD median × 100 ≈ 49.3%.
+  const SGP_MEDIAN = {
+    iso3: 'SGP',
+    usdYear: 2023,
+    medianWageUsd: 60_000,
+    source: 'OECD' as const,
+    sourceUrl: 'https://stats.oecd.org/...',
+  };
+  const SGD_FX = {
+    code: 'SGD',
+    year: 2024,
+    lcuPerUsd: 1.34,
+    sourceUrl: 'https://data.worldbank.org/...',
+  };
+
+  it('monthly source sentence → annualises (×12) before compute', () => {
+    const r = deriveA12({
+      programId: 'test',
+      countryIso: 'SGP',
+      methodologyVersion: '1.0.0',
+      a11ValueRaw: '3300',
+      a11ValueCurrency: 'SGD',
+      a11SourceUrl: 'https://www.mom.gov.sg/passes-and-permits/s-pass',
+      a11SourceSentence:
+        'The S Pass minimum qualifying salary is at least S$3,300 per month for new applicants.',
+      medianWage: SGP_MEDIAN,
+      fxRate: SGD_FX,
+    });
+    expect(r).not.toBeNull();
+    // 3300 × 12 = 39,600 SGD/yr ÷ 1.34 SGD/USD ≈ 29,552 USD ÷ 60,000 × 100 ≈ 49.3%
+    expect(r!.numericValue).toBeCloseTo(49.3, 0);
+  });
+
+  it('annual source sentence → uses raw value as-is', () => {
+    const r = deriveA12({
+      programId: 'test',
+      countryIso: 'AUS',
+      methodologyVersion: '1.0.0',
+      a11ValueRaw: 'AUD 73,150',
+      a11ValueCurrency: 'AUD',
+      a11SourceUrl: 'https://immi.homeaffairs.gov.au/...',
+      a11SourceSentence:
+        'The annual income threshold is AUD 73,150 per year (TSMIT for the Core Skills Stream).',
+      medianWage: AUS_MEDIAN,
+      fxRate: AUD_FX,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.numericValue).toBeCloseTo(80.0, 1);
+  });
+
+  it('ambiguous source sentence → annualises (safe default ×12)', () => {
+    const r = deriveA12({
+      programId: 'test',
+      countryIso: 'SGP',
+      methodologyVersion: '1.0.0',
+      a11ValueRaw: '3300',
+      a11ValueCurrency: 'SGD',
+      a11SourceUrl: 'https://www.mom.gov.sg/passes-and-permits/s-pass',
+      a11SourceSentence: 'The minimum qualifying salary is S$3,300.',
+      medianWage: SGP_MEDIAN,
+      fxRate: SGD_FX,
+    });
+    expect(r).not.toBeNull();
+    // Ambiguous → ×12, so SGP comes out at the same ~49% as the monthly test.
+    expect(r!.numericValue).toBeCloseTo(49.3, 0);
+  });
+
+  it('null source sentence → ambiguous → annualises (safe default ×12)', () => {
+    const r = deriveA12({
+      programId: 'test',
+      countryIso: 'SGP',
+      methodologyVersion: '1.0.0',
+      a11ValueRaw: '3300',
+      a11ValueCurrency: 'SGD',
+      a11SourceUrl: 'https://www.mom.gov.sg/passes-and-permits/s-pass',
+      a11SourceSentence: null,
+      medianWage: SGP_MEDIAN,
+      fxRate: SGD_FX,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.numericValue).toBeCloseTo(49.3, 0);
+  });
+
+  it('AUS annual stays unchanged (~80%) — sanity check existing happy path', () => {
+    const r = deriveA12({
+      programId: 'test',
+      countryIso: 'AUS',
+      methodologyVersion: '1.0.0',
+      a11ValueRaw: 'AUD 73,150',
+      a11ValueCurrency: 'AUD',
+      a11SourceUrl: 'https://immi.homeaffairs.gov.au/...',
+      a11SourceSentence: 'AUD 73,150 per annum (TSMIT)',
+      medianWage: AUS_MEDIAN,
+      fxRate: AUD_FX,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.numericValue).toBeCloseTo(80.0, 1);
+  });
+
+  it('SGP monthly produces ~49% (regression guard against the 4.1% pre-fix bug)', () => {
+    const r = deriveA12({
+      programId: 'test',
+      countryIso: 'SGP',
+      methodologyVersion: '1.0.0',
+      a11ValueRaw: '3300',
+      a11ValueCurrency: 'SGD',
+      a11SourceUrl: 'https://www.mom.gov.sg/passes-and-permits/s-pass',
+      a11SourceSentence: 'S$3,300 per month',
+      medianWage: SGP_MEDIAN,
+      fxRate: SGD_FX,
+    });
+    expect(r).not.toBeNull();
+    // The pre-fix value was 4.1% (×1 instead of ×12). Anything below ~10%
+    // would indicate the annualisation regressed.
+    expect(r!.numericValue).toBeGreaterThan(40);
+    expect(r!.numericValue).toBeLessThan(60);
+  });
+});
+
+import { detectSalaryUnit } from '../stages/derive';
+describe('detectSalaryUnit — Phase 3.6.5 unit-cue parser', () => {
+  it('detects monthly cues', () => {
+    expect(detectSalaryUnit('S$3,300 per month')).toBe('monthly');
+    expect(detectSalaryUnit('SGD 3300/month')).toBe('monthly');
+    expect(detectSalaryUnit('Salary p.m. is 3300')).toBe('monthly');
+    expect(detectSalaryUnit('Monthly salary requirement')).toBe('monthly');
+  });
+  it('detects annual cues', () => {
+    expect(detectSalaryUnit('AUD 73,150 per year')).toBe('annual');
+    expect(detectSalaryUnit('Annual income threshold')).toBe('annual');
+    expect(detectSalaryUnit('p.a. 73150')).toBe('annual');
+    expect(detectSalaryUnit('USD 60,000 per annum')).toBe('annual');
+  });
+  it('returns ambiguous when neither cue is present', () => {
+    expect(detectSalaryUnit('S$3,300 minimum')).toBe('ambiguous');
+    expect(detectSalaryUnit('')).toBe('ambiguous');
+    expect(detectSalaryUnit(null)).toBe('ambiguous');
+    expect(detectSalaryUnit(undefined)).toBe('ambiguous');
+  });
+  it('biases to monthly when both cues co-occur (e.g. "S$3,300/month, equivalent to ~S$39,600/year")', () => {
+    expect(detectSalaryUnit('S$3,300/month, equivalent to ~S$39,600 per year')).toBe('monthly');
   });
 });

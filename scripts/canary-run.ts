@@ -639,6 +639,7 @@ async function main() {
         valueRaw: string | null;
         valueCurrency: string | null;
         sourceUrl: string | null;
+        sourceSentence: string | null;
         valueNormalized: unknown;
       } | null> {
         const fd = fieldDefByKey.get(key);
@@ -664,6 +665,8 @@ async function main() {
           valueCurrency:
             typeof prov['valueCurrency'] === 'string' ? (prov['valueCurrency'] as string) : null,
           sourceUrl: typeof prov['sourceUrl'] === 'string' ? (prov['sourceUrl'] as string) : null,
+          sourceSentence:
+            typeof prov['sourceSentence'] === 'string' ? (prov['sourceSentence'] as string) : null,
           valueNormalized: row.valueNormalized,
         };
       }
@@ -683,6 +686,10 @@ async function main() {
         if (m && m[1]) a11ValueCurrency = m[1];
       }
       const a11SourceUrl = a11Live?.sourceUrl ?? a11Db?.sourceUrl ?? null;
+      // Phase 3.6.5 — A.1.1 source sentence drives monthly/annual unit
+      // detection in deriveA12.
+      const a11SourceSentence: string | null =
+        a11Live?.output.sourceSentence ?? a11Db?.sourceSentence ?? null;
 
       // D.1.1 — boolean.
       const d11Live = lookupExtraction('D.1.1');
@@ -712,6 +719,7 @@ async function main() {
         a11ValueRaw,
         a11ValueCurrency,
         a11SourceUrl,
+        a11SourceSentence,
         medianWage: COUNTRY_MEDIAN_WAGE[countryIso] ?? null,
         fxRate: a11ValueCurrency ? (FX_RATES[a11ValueCurrency.toUpperCase()] ?? null) : null,
       });

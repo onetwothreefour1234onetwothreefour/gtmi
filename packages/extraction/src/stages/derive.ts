@@ -70,6 +70,14 @@ export interface DerivedA12Input {
   a11ValueCurrency: string | null;
   /** A.1.1 source URL from provenance (recorded in derivedInputs for /review audit). */
   a11SourceUrl: string | null;
+  /**
+   * Phase 3.6.5 — A.1.1 source sentence from provenance. Used to
+   * disambiguate monthly vs annual salary thresholds (immigration
+   * pages routinely state monthly figures, e.g. SGP S Pass S$3,300/mo,
+   * while COUNTRY_MEDIAN_WAGE is annual). Optional for backwards
+   * compatibility; missing → ambiguous → annualised (safe default).
+   */
+  a11SourceSentence?: string | null;
   /** Median-wage table entry for this country, null if missing. */
   medianWage: MedianWageEntry | null;
   /** FX rate for the A.1.1 currency, null if missing or currency null. */
@@ -176,6 +184,37 @@ function parseNumeric(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Phase 3.6.5 — detect whether an A.1.1 salary value is monthly or annual
+ * by scanning the provenance source sentence for cue words. Country-
+ * agnostic.
+ *
+ * Returns 'monthly' / 'annual' / 'ambiguous'. Ambiguous resolves to
+ * monthly upstream (the safe default — most immigration salary
+ * thresholds are stated monthly; an annualised value 12× too small is
+ * obvious at /review, while a monthly value 12× too large is plausible
+ * for high-end visas and harder to catch).
+ */
+export function detectSalaryUnit(
+  sourceSentence: string | null | undefined
+): 'monthly' | 'annual' | 'ambiguous' {
+  if (!sourceSentence) return 'ambiguous';
+  const lower = sourceSentence.toLowerCase();
+  // Test annual cues first — "year"/"annual" tokens appear in some
+  // monthly-context strings ("…per month, equivalent to 39600 per year"),
+  // but in those cases the EXTRACTED valueRaw is the monthly figure and
+  // the annualised reference is parenthetical. We bias to monthly when
+  // BOTH cues appear to avoid double-counting.
+  const monthlyCue = /\bmonth\b|\bmonthly\b|per\s*month|\/\s*month|\bp\.?\s*m\.?\b/i.test(lower);
+  const annualCue =
+    /\byear\b|\bannual\b|\bannually\b|\bper\s*annum\b|\bp\.?\s*a\.?\b|\/\s*year|\byr\b/i.test(
+      lower
+    );
+  if (monthlyCue) return 'monthly';
+  if (annualCue) return 'annual';
+  return 'ambiguous';
+}
+
 function buildBaseProvenance(args: {
   fieldKey: 'A.1.2' | 'D.2.2';
   contentHashSeed: string;
@@ -239,15 +278,39 @@ export function deriveA12(input: DerivedA12Input): DerivedRow | null {
     return null;
   }
 
+  // Phase 3.6.5 — monthly vs annual detection. COUNTRY_MEDIAN_WAGE is
+  // annual; if A.1.1 was extracted as a monthly figure (typical for
+  // immigration salary thresholds), multiply by 12 before the percent
+  // calculation. Ambiguous → monthly (safe default — see detectSalaryUnit
+  // doc comment).
+  const detectedUnit = detectSalaryUnit(input.a11SourceSentence ?? null);
+  const annualisationFactor = detectedUnit === 'annual' ? 1 : 12;
+  const a11Annualised = a11Numeric * annualisationFactor;
+  if (detectedUnit === 'annual') {
+    console.log(`  [A.1.2 derive] A.1.1 unit: annual → used as-is ${a11Annualised}`);
+  } else if (detectedUnit === 'monthly') {
+    console.log(`  [A.1.2 derive] A.1.1 unit: monthly → annualised to ${a11Annualised} (×12)`);
+  } else {
+    console.log(
+      `  [A.1.2 derive] A.1.1 unit: ambiguous → annualised to ${a11Annualised} (×12, safe default)`
+    );
+  }
+
   const amountUsd =
     input.a11ValueCurrency.toUpperCase() === 'USD'
-      ? a11Numeric
-      : a11Numeric / input.fxRate.lcuPerUsd;
+      ? a11Annualised
+      : a11Annualised / input.fxRate.lcuPerUsd;
 
   const percent = Math.round((amountUsd / input.medianWage.medianWageUsd) * 1000) / 10;
 
+  const unitLabel =
+    detectedUnit === 'annual'
+      ? 'annual'
+      : detectedUnit === 'monthly'
+        ? 'monthly × 12'
+        : 'ambiguous → assumed monthly × 12';
   const sourceSentence =
-    `Derived from A.1.1 (${input.a11ValueCurrency} ${a11Numeric.toLocaleString('en-US')}) ` +
+    `Derived from A.1.1 (${input.a11ValueCurrency} ${a11Numeric.toLocaleString('en-US')} [${unitLabel}] = ${a11Annualised.toLocaleString('en-US')} annual) ` +
     `÷ ${input.countryIso} median wage USD ${input.medianWage.medianWageUsd.toLocaleString('en-US')} ` +
     `(${input.medianWage.source} ${input.medianWage.usdYear}) × 100 = ${percent}%`;
 
@@ -256,6 +319,8 @@ export function deriveA12(input: DerivedA12Input): DerivedRow | null {
       valueRaw: input.a11ValueRaw,
       valueCurrency: input.a11ValueCurrency,
       sourceUrl: input.a11SourceUrl,
+      detectedUnit,
+      annualisationFactor,
     },
     medianWage: {
       value: input.medianWage.medianWageUsd,

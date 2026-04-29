@@ -425,6 +425,7 @@ export const extractSingleProgram = task({
         valueRaw: string | null;
         valueCurrency: string | null;
         sourceUrl: string | null;
+        sourceSentence: string | null;
       } | null> {
         const fd = fieldDefByKey.get(key);
         if (!fd) return null;
@@ -448,6 +449,8 @@ export const extractSingleProgram = task({
           valueCurrency:
             typeof prov['valueCurrency'] === 'string' ? (prov['valueCurrency'] as string) : null,
           sourceUrl: typeof prov['sourceUrl'] === 'string' ? (prov['sourceUrl'] as string) : null,
+          sourceSentence:
+            typeof prov['sourceSentence'] === 'string' ? (prov['sourceSentence'] as string) : null,
         };
       }
       const lookupExtraction = (key: string) => {
@@ -464,6 +467,8 @@ export const extractSingleProgram = task({
         if (m && m[1]) a11ValueCurrency = m[1];
       }
       const a11SourceUrl = a11Live?.sourceUrl ?? a11Db?.sourceUrl ?? null;
+      const a11SourceSentence: string | null =
+        a11Live?.output.sourceSentence ?? a11Db?.sourceSentence ?? null;
 
       const d11Live = lookupExtraction('D.1.1');
       const d11Db = d11Live ? null : await readApprovedFieldValue('D.1.1');
@@ -489,6 +494,7 @@ export const extractSingleProgram = task({
         a11ValueRaw,
         a11ValueCurrency,
         a11SourceUrl,
+        a11SourceSentence,
         medianWage: COUNTRY_MEDIAN_WAGE[country] ?? null,
         fxRate: a11ValueCurrency ? (FX_RATES[a11ValueCurrency.toUpperCase()] ?? null) : null,
       });
