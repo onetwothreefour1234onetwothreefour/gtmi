@@ -3,7 +3,12 @@ import { notFound } from 'next/navigation';
 import { ProvenanceHighlight, CountryFlag, DataTableNote } from '@/components/gtmi';
 import { getReviewDetail, listPendingReview } from '@/lib/review-queries';
 import { reviewIdTag, relativeAge } from '@/lib/review-queue-helpers';
-import { approveFieldValue, rejectFieldValue } from '@/app/(internal)/review/actions';
+import {
+  approveFieldValue,
+  editApprovedFieldValue,
+  rejectFieldValue,
+  unapproveFieldValue,
+} from '@/app/(internal)/review/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,10 +63,30 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     'use server';
     const fvId = (fd.get('id') as string | null) ?? '';
     if (!fvId) throw new Error('reject: missing field_value id');
-    await rejectFieldValue(fvId);
+    const reason = (fd.get('reason') as string | null)?.trim() || undefined;
+    await rejectFieldValue(fvId, reason);
+  }
+
+  // Phase 3.7 / ADR-017 — bidirectional review actions.
+  async function editApproved(fd: FormData): Promise<void> {
+    'use server';
+    const fvId = (fd.get('id') as string | null) ?? '';
+    const edited = (fd.get('editedRaw') as string | null) ?? '';
+    if (!fvId) throw new Error('editApproved: missing field_value id');
+    if (!edited.trim()) throw new Error('editApproved: editedRaw is required');
+    await editApprovedFieldValue(fvId, edited);
+  }
+
+  async function unapprove(fd: FormData): Promise<void> {
+    'use server';
+    const fvId = (fd.get('id') as string | null) ?? '';
+    if (!fvId) throw new Error('unapprove: missing field_value id');
+    await unapproveFieldValue(fvId);
   }
 
   const isPending = row.status === 'pending_review';
+  const isApproved = row.status === 'approved';
+  const isRejected = row.status === 'rejected';
   const charOffsets = readCharOffsets(row.provenance);
   const sourceTier = row.sourceTier ?? readSourceTier(row.provenance);
   const scrapedAt = readScrapedAt(row.provenance);
@@ -215,57 +240,125 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           )}
         </section>
 
-        {isPending && (
-          <section
-            className="mb-6 grid items-start gap-4 border bg-paper p-5 md:grid-cols-[1.6fr_1fr]"
-            style={{ borderColor: 'var(--rule)' }}
-            data-testid="review-decision-section"
-          >
-            <form action={approve} className="flex flex-col gap-2">
-              <input type="hidden" name="id" value={id} />
-              <label className="eyebrow" htmlFor="editedRaw">
-                Raw value <span className="text-ink-5">(edit before approving if needed)</span>
-              </label>
-              <textarea
-                id="editedRaw"
-                name="editedRaw"
-                defaultValue={row.valueRaw ?? ''}
-                rows={3}
-                className="num border bg-paper p-2 text-data-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                style={{ borderColor: 'var(--rule)', fontSize: 13 }}
-              />
-              <p className="text-data-sm text-ink-4">
-                Leave unchanged to approve the LLM-extracted value as-is.
-              </p>
-              <button
-                type="submit"
-                className="btn mt-2 w-fit"
-                style={{ background: 'var(--positive)', borderColor: 'var(--positive)' }}
-                data-testid="approve-button"
-              >
-                Approve
-              </button>
-            </form>
+        <section
+          className="mb-6 grid items-start gap-4 border bg-paper p-5 md:grid-cols-[1.6fr_1fr]"
+          style={{ borderColor: 'var(--rule)' }}
+          data-testid="review-decision-section"
+          data-status={row.status}
+        >
+          <div className="flex flex-col gap-2">
+            <label className="eyebrow" htmlFor="editedRaw">
+              Raw value{' '}
+              <span className="text-ink-5">
+                {isApproved
+                  ? '(edit to update the approved value; re-runs scoring)'
+                  : isRejected
+                    ? '(edit before re-pending or approving if you change your mind)'
+                    : '(edit before approving if needed)'}
+              </span>
+            </label>
+            <textarea
+              id="editedRaw"
+              name="editedRaw"
+              form="primary-action-form"
+              defaultValue={row.valueRaw ?? ''}
+              rows={3}
+              className="num border bg-paper p-2 text-data-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              style={{ borderColor: 'var(--rule)', fontSize: 13 }}
+            />
 
-            <form action={reject} className="flex flex-col gap-2">
-              <input type="hidden" name="id" value={id} />
-              <p className="eyebrow">Reject</p>
-              <p className="text-data-sm text-ink-3">
-                Mark the row rejected. It will not contribute to scoring; the row stays on{' '}
-                <span className="num">field_values</span> with{' '}
-                <span className="num">status=&apos;rejected&apos;</span> for audit.
-              </p>
-              <button
-                type="submit"
-                className="btn w-fit"
-                style={{ background: 'var(--negative)', borderColor: 'var(--negative)' }}
-                data-testid="reject-button"
-              >
-                Reject
-              </button>
-            </form>
-          </section>
-        )}
+            {isPending && (
+              <form id="primary-action-form" action={approve} className="flex flex-col gap-2">
+                <input type="hidden" name="id" value={id} />
+                <p className="text-data-sm text-ink-4">
+                  Leave unchanged to approve the LLM-extracted value as-is.
+                </p>
+                <button
+                  type="submit"
+                  className="btn mt-2 w-fit"
+                  style={{ background: 'var(--positive)', borderColor: 'var(--positive)' }}
+                  data-testid="approve-button"
+                >
+                  Approve
+                </button>
+              </form>
+            )}
+
+            {isApproved && (
+              <div className="flex flex-wrap gap-2">
+                <form id="primary-action-form" action={editApproved}>
+                  <input type="hidden" name="id" value={id} />
+                  <button
+                    type="submit"
+                    className="btn"
+                    style={{ background: 'var(--accent)', borderColor: 'var(--accent)' }}
+                    data-testid="edit-approved-button"
+                  >
+                    Save edit
+                  </button>
+                </form>
+                <form action={unapprove}>
+                  <input type="hidden" name="id" value={id} />
+                  <button type="submit" className="btn" data-testid="repend-button">
+                    Re-pend
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {isRejected && (
+              <div className="flex flex-wrap gap-2">
+                <form id="primary-action-form" action={approve}>
+                  <input type="hidden" name="id" value={id} />
+                  <button
+                    type="submit"
+                    className="btn"
+                    style={{ background: 'var(--positive)', borderColor: 'var(--positive)' }}
+                    data-testid="approve-button"
+                  >
+                    Approve
+                  </button>
+                </form>
+                <form action={unapprove}>
+                  <input type="hidden" name="id" value={id} />
+                  <button type="submit" className="btn" data-testid="repend-button">
+                    Re-pend
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+
+          <form action={reject} className="flex flex-col gap-2">
+            <input type="hidden" name="id" value={id} />
+            <p className="eyebrow">Reject{isRejected ? ' (already rejected)' : ''}</p>
+            <p className="text-data-sm text-ink-3">
+              Mark the row rejected. It will not contribute to scoring; the row stays on{' '}
+              <span className="num">field_values</span> with{' '}
+              <span className="num">status=&apos;rejected&apos;</span> for audit.
+            </p>
+            <label className="eyebrow text-ink-5" htmlFor="reject-reason">
+              Reason (optional)
+            </label>
+            <input
+              id="reject-reason"
+              name="reason"
+              type="text"
+              maxLength={200}
+              placeholder="e.g. wrong page; out of rubric"
+              className="num border bg-paper p-2 text-data-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              style={{ borderColor: 'var(--rule)', fontSize: 12 }}
+            />
+            <button
+              type="submit"
+              className="btn w-fit"
+              style={{ background: 'var(--negative)', borderColor: 'var(--negative)' }}
+              data-testid="reject-button"
+            >
+              Reject
+            </button>
+          </form>
+        </section>
 
         <section
           className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2"
