@@ -799,18 +799,28 @@ async function main() {
     //    `country_substitute_regional` fields when a regional default exists.
     //    Phase 3.5 / ADR-014. Auto-approved (no review queue).
     //
-    // Phase 3.6.6 / FIX 2 — coverage-gap sentinels (`not_addressed`,
-    // `not_found`, `not_stated`) returned by the LLM count as empty for
-    // the substitute gate. Without this, a cached "not_addressed" hit
-    // for C.3.2 would skip both the substitute path AND the per-field
-    // publish loop (which excludes country_substitute_regional fields),
-    // leaving the row unwritten. Country-agnostic.
+    // Phase 3.6.6 / FIX 2 — substitute gate. Two reasons to skip:
+    //   1. Empty / coverage-gap sentinel extraction (`''`,
+    //      `not_addressed`, `not_found`, `not_stated`) — substitute always
+    //      fires.
+    //   2. Low-confidence LLM extraction (< auto-approve threshold) is
+    //      noise (the answer isn't on visa pages, so the LLM tends to
+    //      hallucinate at ~0.3) — substitute also fires. Only a
+    //      high-confidence (≥ 0.85) extraction wins over the regional
+    //      default. Without this, a stale cache hit like C.3.2 ↦
+    //      "full_access" (conf 0.3) suppresses substitute, and the
+    //      per-field publish loop excludes country_substitute_regional
+    //      fields, so the row is silently dropped. Country-agnostic.
     const COVERAGE_GAP_SENTINELS = new Set(['not_addressed', 'not_found', 'not_stated', '']);
+    const SUBSTITUTE_GATE_CONFIDENCE = 0.85;
     for (const def of allFieldDefs) {
       if (def.normalizationFn !== 'country_substitute_regional') continue;
       const r = allExtractionResults.get(def.key);
       const extractedRaw = r?.output.valueRaw.trim().toLowerCase() ?? '';
-      if (r && !COVERAGE_GAP_SENTINELS.has(extractedRaw)) continue; // genuine extraction; no substitution needed
+      const extractedConf = r?.output.extractionConfidence ?? 0;
+      const isCoverageGap = COVERAGE_GAP_SENTINELS.has(extractedRaw);
+      const isHighConfidence = extractedConf >= SUBSTITUTE_GATE_CONFIDENCE;
+      if (r && !isCoverageGap && isHighConfidence) continue; // genuine, high-confidence extraction wins
       try {
         const written = await publish.executeCountrySubstitute(
           programId,
