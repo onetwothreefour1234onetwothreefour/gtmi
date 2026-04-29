@@ -1,18 +1,52 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { RankingsExplorer, MethodologyBar, DataTableNote } from '@/components/gtmi';
+import {
+  RankingsExplorer,
+  PreviewBanner,
+  HeroLanding,
+  ThisEdition,
+  WorldMap,
+  SpecimenPlate,
+  PillarsSpecimen,
+  EditorsQuote,
+  ProvenanceProof,
+  DataTableNote,
+  type WorldMapCountryScore,
+} from '@/components/gtmi';
 import { getRankedPrograms } from '@/lib/queries/ranked-programs';
 import { parseRankingsParams } from '@/lib/queries/filters-from-url';
+import { getCohortStats } from '@/lib/queries/cohort-stats';
+import { getMethodologyCurrent } from '@/lib/queries/methodology-current';
+import { getPolicyChanges } from '@/lib/queries/policy-changes';
 import { loadContent } from '@/lib/content';
-import { DEFAULT_PILLAR_WEIGHTS } from '@/lib/advisor-mode';
+import type { RankedProgramRow } from '@/lib/queries/types';
+import type { PillarKey } from '@/lib/theme';
 
-// Render on request, not at build. The query layer (lib/queries/*) wraps
-// every DB call in `unstable_cache` with a 1h TTL + revalidation tags, so
-// across-request caching still works — we just skip Next's build-time
-// prerender step that would otherwise need DATABASE_URL in the build env.
-// See cloudbuild.yaml: NEXT_PUBLIC_* are build-args, DATABASE_URL is a
-// runtime --set-secrets only.
+// See / page header comment from Phase 4 — runtime render, not build prerender.
+// The query layer wraps every DB call in `unstable_cache` so this still
+// amortises across requests.
 export const dynamic = 'force-dynamic';
+
+/** Pillar weights from the live methodology version (PillarsSpecimen). */
+function pillarWeightsFromMethodology(
+  pillars: { key: PillarKey; weightWithinPaq: number }[]
+): Record<PillarKey, number> {
+  return Object.fromEntries(pillars.map((p) => [p.key, p.weightWithinPaq])) as Record<
+    PillarKey,
+    number
+  >;
+}
+
+/** Top-scoring composite per country, for the WorldMap. */
+function leaderCompositesByCountry(rows: RankedProgramRow[]): WorldMapCountryScore[] {
+  const best = new Map<string, number>();
+  for (const r of rows) {
+    if (r.composite === null) continue;
+    const prev = best.get(r.countryIso);
+    if (prev === undefined || r.composite > prev) best.set(r.countryIso, r.composite);
+  }
+  return Array.from(best.entries()).map(([iso, composite]) => ({ iso, composite }));
+}
 
 export default async function LandingPage({
   searchParams,
@@ -21,83 +55,115 @@ export default async function LandingPage({
 }) {
   const sp = await searchParams;
   const { filters, sort } = parseRankingsParams(sp);
-  const [result, previewBannerHtml] = await Promise.all([
+  const [result, stats, methodology, policyChanges, previewBannerHtml] = await Promise.all([
     getRankedPrograms({ filters, sort, limit: 100 }),
+    getCohortStats(),
+    getMethodologyCurrent(),
+    getPolicyChanges({}),
     loadContent('preview-banner.md'),
   ]);
 
+  const cmePaqSplit = methodology?.cmePaqSplit ?? { cme: 0.3, paq: 0.7 };
+  const pillarWeights = methodology ? pillarWeightsFromMethodology(methodology.pillars) : null;
+
+  const worldMapScores = leaderCompositesByCountry(result.rows);
+  const recentChanges = policyChanges.slice(0, 3);
+
   return (
     <>
-      <section className="mx-auto max-w-page px-6 pt-12">
-        <p className="text-data-sm uppercase tracking-widest text-muted-foreground">
-          Preview release
-        </p>
-        <h1 className="mt-2 font-serif text-display-xl text-ink">
-          Global Talent Mobility Index 2026
-        </h1>
-        <p className="mt-6 max-w-editorial text-dek text-muted-foreground">
-          GTMI ranks {result.totalCount} talent-based mobility programmes across the world&rsquo;s
-          30 most appealing economies, using a methodology where every weight is published and every
-          data point traces to its government source.
-        </p>
-        <p className="mt-4 text-data-sm text-muted-foreground">
-          <span className="font-mono tnum text-foreground">{result.scoredCount}</span> of{' '}
-          <span className="font-mono tnum">{result.totalCount}</span> programmes scored (Phase 2
-          preview).{' '}
-          <Link href="/methodology" className="text-accent underline-offset-4 hover:underline">
-            Methodology
-          </Link>
-          .
-        </p>
-      </section>
+      <PreviewBanner bodyHtml={previewBannerHtml || null} />
 
-      {previewBannerHtml && (
-        <section className="mx-auto mt-8 max-w-page px-6">
-          <div
-            role="note"
-            className="rounded-card border-l-2 border-precalib-fg bg-precalib-bg/50 px-4 py-3 text-data-md text-foreground"
-            dangerouslySetInnerHTML={{ __html: previewBannerHtml }}
-          />
-        </section>
-      )}
+      <HeroLanding stats={stats} cmePaqSplit={cmePaqSplit} />
 
-      <section className="mx-auto mt-10 max-w-page px-6">
-        <Suspense fallback={null}>
-          <RankingsExplorer
-            rows={result.rows}
-            totalCount={result.totalCount}
-            scoredCount={result.scoredCount}
-            facets={result.facets}
-            initialFilters={filters}
-            initialSort={sort}
-            basePath="/"
-          />
-        </Suspense>
-      </section>
+      <ThisEdition events={recentChanges} />
 
-      <section className="mx-auto mt-12 max-w-page px-6">
-        <DataTableNote>
-          Composite = 30% CME + 70% PAQ. CME re-normalises IMD&rsquo;s Appeal factor across our
-          30-country cohort. PAQ is GTMI&rsquo;s 48-indicator program-architecture score across five
-          pillars: Access, Process, Rights, Pathway, Stability.
-        </DataTableNote>
-
-        <div className="mt-6">
-          <MethodologyBar
-            cmePaqSplit={{ cme: 0.3, paq: 0.7 }}
-            pillarWeights={DEFAULT_PILLAR_WEIGHTS}
-          />
+      <section
+        className="border-b px-12 pt-16"
+        style={{ borderColor: 'var(--rule)', background: 'var(--paper)' }}
+      >
+        <div className="mx-auto max-w-page">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2
+              className="serif"
+              style={{ fontSize: 36, fontWeight: 400, margin: 0, letterSpacing: '-0.02em' }}
+            >
+              The world by composite
+            </h2>
+            <p className="num text-data-sm text-ink-4">
+              {stats.programmesActive} active programmes scored across the cohort
+            </p>
+          </div>
+          <p className="mb-8 max-w-[640px] text-ink-3">
+            Each dot is a jurisdiction&rsquo;s top-scoring talent visa programme, coloured by
+            quintile. Greyed dots mark countries currently out of scope.
+          </p>
+          <WorldMap scores={worldMapScores} />
+          <div className="h-16" />
         </div>
       </section>
 
-      <section className="mx-auto mt-16 max-w-page px-6 pb-24">
-        <p className="text-data-md text-muted-foreground">
-          For the full indicator list and weights, see{' '}
-          <Link href="/methodology" className="text-accent underline-offset-4 hover:underline">
-            the methodology page
-          </Link>
-          .
-        </p>
+      {pillarWeights && (
+        <SpecimenPlate
+          plateNo="I"
+          title="Five pillars. Forty-eight indicators."
+          caption="Pillar weights are fixed in the methodology version table and drive both this page and the production scoring engine. There is no separate executive-summary version."
+          tone="paper-3"
+        >
+          <PillarsSpecimen pillarWeights={pillarWeights} />
+        </SpecimenPlate>
+      )}
+
+      <EditorsQuote />
+
+      <ProvenanceProof />
+
+      <section className="px-12 py-20">
+        <div className="mx-auto max-w-page">
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+            <h2
+              className="serif"
+              style={{ fontSize: 36, fontWeight: 400, margin: 0, letterSpacing: '-0.02em' }}
+            >
+              Programme rankings
+            </h2>
+            <p className="num text-data-sm text-ink-4">
+              Showing {result.rows.length} of {result.totalCount} · sort: composite ↓
+            </p>
+          </div>
+          <p className="max-w-[640px] text-ink-3">
+            Composite is the {Math.round(cmePaqSplit.paq * 100)} /{' '}
+            {Math.round(cmePaqSplit.cme * 100)} weighted blend of PAQ and CME. Click any row for the
+            full provenance trail.{' '}
+            <Link href="/methodology" className="text-accent underline-offset-4 hover:underline">
+              Methodology
+            </Link>
+            .
+          </p>
+
+          <div className="mt-8">
+            <Suspense fallback={null}>
+              <RankingsExplorer
+                rows={result.rows}
+                totalCount={result.totalCount}
+                scoredCount={result.scoredCount}
+                facets={result.facets}
+                initialFilters={filters}
+                initialSort={sort}
+                basePath="/"
+              />
+            </Suspense>
+          </div>
+
+          <div className="mt-10">
+            <DataTableNote>
+              Composite = {Math.round(cmePaqSplit.cme * 100)}% CME +{' '}
+              {Math.round(cmePaqSplit.paq * 100)}% PAQ across {stats.indicatorsTotal} indicators.
+              Trend sparklines render a deterministic 12-month walk seeded by programme id and
+              current composite — a stable placeholder until Phase 5/6 produces enough scoring
+              history for real plotting. End-of-line dot pins to the displayed score.
+            </DataTableNote>
+          </div>
+        </div>
       </section>
     </>
   );

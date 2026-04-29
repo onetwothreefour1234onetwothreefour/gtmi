@@ -1,18 +1,27 @@
 import { ImageResponse } from 'next/og';
 
 /**
- * Default Open Graph image for the public dashboard root and any route
- * without a more specific og.tsx. Renders at request time on Cloud Run
- * via @vercel/og — the library is portable; no Vercel platform dependency.
+ * Default Open Graph image for the public dashboard root.
  *
- * Cache headers (s-maxage=86400, stale-while-revalidate=604800) come from
- * Next.js's default for opengraph-image.tsx routes; Cloud CDN in front of
- * Cloud Run picks them up automatically.
+ * Phase 4-B redesign — editorial visual language: warm-paper background,
+ * Fraunces-style serif headline (system serif fallback at edge runtime
+ * since @vercel/og can't currently load custom fonts inline without a
+ * fetch round-trip; the editorial weight + spacing land regardless),
+ * oxblood accent underline, italic "actually" emphasis matching the live
+ * landing-page hero.
  */
 export const runtime = 'edge';
 export const alt = 'Global Talent Mobility Index — TTR Group';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
+
+const PAPER = '#F7F4ED';
+const PAPER_3 = '#EAE4D3';
+const INK = '#1A1A1A';
+const INK_3 = '#5C4A2E';
+const INK_4 = '#8A7456';
+const ACCENT = '#B8412A';
+const RULE = '#D9D2BE';
 
 export default async function OG(): Promise<Response> {
   return new ImageResponse(
@@ -22,45 +31,115 @@ export default async function OG(): Promise<Response> {
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
-        padding: '64px 80px',
-        backgroundColor: '#FAFAF7',
-        color: '#0A0A0B',
-        fontFamily: 'serif',
+        padding: '72px 80px',
+        backgroundColor: PAPER,
+        backgroundImage: `radial-gradient(circle at 18% 22%, rgba(92, 74, 46, 0.04) 0%, transparent 42%), radial-gradient(circle at 82% 78%, rgba(92, 74, 46, 0.03) 0%, transparent 42%)`,
+        color: INK,
+        fontFamily: 'Georgia, "Times New Roman", serif',
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Eyebrow */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span
           style={{
-            fontSize: 22,
-            letterSpacing: 6,
+            display: 'block',
+            width: 36,
+            height: 1,
+            backgroundColor: ACCENT,
+          }}
+        />
+        <span
+          style={{
+            fontSize: 18,
+            letterSpacing: '0.16em',
             textTransform: 'uppercase',
-            color: '#6b6b6b',
+            color: INK_3,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontWeight: 600,
           }}
         >
           Global Talent Mobility Index
         </span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        <span style={{ fontSize: 88, lineHeight: 1.05, letterSpacing: '-0.02em' }}>
-          85 talent-mobility programmes,
-        </span>
-        <span style={{ fontSize: 88, lineHeight: 1.05, letterSpacing: '-0.02em' }}>
-          30 economies, 48 indicators.
-        </span>
-      </div>
+
+      {/* Headline */}
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'baseline',
-          fontFamily: 'sans-serif',
-          fontSize: 22,
-          color: '#3a3a3a',
+          flexDirection: 'column',
+          marginTop: 56,
         }}
       >
-        <span>Every weight published. Every value sourced.</span>
-        <span style={{ color: '#0F4C5C' }}>TTR Group</span>
+        <span
+          style={{
+            fontSize: 76,
+            lineHeight: 1.04,
+            letterSpacing: '-0.025em',
+            fontWeight: 500,
+          }}
+        >
+          A primary-source measure of how the world&rsquo;s
+        </span>
+        <span
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'baseline',
+            fontSize: 76,
+            lineHeight: 1.04,
+            letterSpacing: '-0.025em',
+            fontWeight: 500,
+          }}
+        >
+          <span>talent visa programmes</span>
+          <span style={{ width: 18 }} />
+          <span style={{ color: ACCENT, fontStyle: 'italic' }}>actually</span>
+          <span style={{ width: 18 }} />
+          <span>work.</span>
+        </span>
+      </div>
+
+      {/* Spacer */}
+      <div style={{ flex: 1 }} />
+
+      {/* 30/70 strip + footer */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'stretch',
+            height: 14,
+            border: `1px solid ${RULE}`,
+          }}
+        >
+          <div
+            style={{
+              width: '30%',
+              backgroundColor: INK,
+              display: 'flex',
+            }}
+          />
+          <div
+            style={{
+              width: '70%',
+              backgroundColor: PAPER_3,
+              display: 'flex',
+            }}
+          />
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: 22,
+            color: INK_4,
+          }}
+        >
+          <span>30% CME · 70% PAQ · 48 indicators · primary sources only</span>
+          <span style={{ color: INK, fontWeight: 600 }}>TTR Group</span>
+        </div>
       </div>
     </div>,
     { ...size }

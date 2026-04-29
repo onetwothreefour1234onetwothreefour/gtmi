@@ -1,17 +1,17 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { RankingsExplorer } from '@/components/gtmi';
+import { RankingsExplorer, DataTableNote, PreviewBanner } from '@/components/gtmi';
 import { getRankedPrograms } from '@/lib/queries/ranked-programs';
 import { parseRankingsParams } from '@/lib/queries/filters-from-url';
+import { loadContent } from '@/lib/content';
 
 export const metadata: Metadata = {
-  title: 'Programs',
+  title: 'Programmes',
   description:
-    'Browse all 85 talent-based mobility programmes across the IMD World Talent Ranking Top 30 economies.',
+    'Browse every talent-mobility programme scored by GTMI — full editorial layout with provenance on every row.',
 };
 
-// See / page header comment — runtime render, not build prerender.
 export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 50;
@@ -27,72 +27,96 @@ export default async function ProgramsIndexPage({
   const page = Math.max(1, Number(pageRaw) || 1);
   const offset = (page - 1) * PAGE_SIZE;
 
-  const result = await getRankedPrograms({
-    filters,
-    sort,
-    limit: PAGE_SIZE,
-    offset,
-  });
+  const [result, previewBannerHtml] = await Promise.all([
+    getRankedPrograms({ filters, sort, limit: PAGE_SIZE, offset }),
+    loadContent('preview-banner.md'),
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(result.totalCount / PAGE_SIZE));
 
   return (
     <>
-      <section className="mx-auto max-w-page px-6 pt-12">
-        <p className="text-data-sm uppercase tracking-widest text-muted-foreground">Programs</p>
-        <h1 className="mt-2 font-serif text-display-lg text-ink">All programmes</h1>
-        <p className="mt-4 max-w-editorial text-dek text-muted-foreground">
-          {result.totalCount} talent-based mobility programmes across the IMD World Talent Ranking
-          Top 30. Filter by country, region, category, or score range; search by name; reweight
-          pillars in advisor mode.
-        </p>
-      </section>
+      <PreviewBanner bodyHtml={previewBannerHtml || null} />
 
-      <section className="mx-auto mt-10 max-w-page px-6">
-        <Suspense fallback={null}>
-          <RankingsExplorer
-            rows={result.rows}
-            totalCount={result.totalCount}
-            scoredCount={result.scoredCount}
-            facets={result.facets}
-            initialFilters={filters}
-            initialSort={sort}
-            basePath="/programs"
-          />
-        </Suspense>
-      </section>
+      <header
+        className="paper-grain border-b px-12 pb-10 pt-14"
+        style={{ borderColor: 'var(--rule)' }}
+      >
+        <div className="mx-auto max-w-page">
+          <p className="eyebrow mb-3">Programmes</p>
+          <h1
+            className="serif text-ink"
+            style={{
+              fontSize: 56,
+              fontWeight: 400,
+              margin: 0,
+              lineHeight: 1.05,
+              letterSpacing: '-0.025em',
+            }}
+          >
+            All programmes.
+          </h1>
+          <p className="mt-4 max-w-[640px] text-ink-3" style={{ fontSize: 16, lineHeight: 1.55 }}>
+            <span className="num text-ink">{result.totalCount}</span> talent-mobility programmes
+            across the cohort. Filter by category up top; expand &ldquo;More filters&rdquo; for
+            country, region, score range, and free-text search. Reweight pillars in advisor mode.
+          </p>
+        </div>
+      </header>
 
-      {totalPages > 1 && (
-        <nav
-          aria-label="Pagination"
-          className="mx-auto mt-8 flex max-w-page items-center justify-between px-6 text-data-sm"
-        >
-          <span className="text-muted-foreground">
-            Page <span className="font-mono tnum text-foreground">{page}</span> of{' '}
-            <span className="font-mono tnum">{totalPages}</span>
-          </span>
-          <div className="flex items-center gap-3">
-            {page > 1 && (
-              <Link
-                href={pageHref(sp, page - 1)}
-                className="text-accent underline-offset-4 hover:underline"
-              >
-                ← Previous
-              </Link>
-            )}
-            {page < totalPages && (
-              <Link
-                href={pageHref(sp, page + 1)}
-                className="text-accent underline-offset-4 hover:underline"
-              >
-                Next →
-              </Link>
-            )}
+      <section className="px-12 py-12">
+        <div className="mx-auto max-w-page">
+          <Suspense fallback={null}>
+            <RankingsExplorer
+              rows={result.rows}
+              totalCount={result.totalCount}
+              scoredCount={result.scoredCount}
+              facets={result.facets}
+              initialFilters={filters}
+              initialSort={sort}
+              basePath="/programs"
+            />
+          </Suspense>
+
+          {totalPages > 1 && (
+            <nav
+              aria-label="Pagination"
+              className="mt-8 flex items-center justify-between text-data-sm"
+            >
+              <span className="text-ink-4">
+                Page <span className="num text-ink">{page}</span> of{' '}
+                <span className="num">{totalPages}</span>
+              </span>
+              <div className="flex items-center gap-3">
+                {page > 1 && (
+                  <Link
+                    href={pageHref(sp, page - 1)}
+                    className="text-accent underline-offset-4 hover:underline"
+                  >
+                    ← Previous
+                  </Link>
+                )}
+                {page < totalPages && (
+                  <Link
+                    href={pageHref(sp, page + 1)}
+                    className="text-accent underline-offset-4 hover:underline"
+                  >
+                    Next →
+                  </Link>
+                )}
+              </div>
+            </nav>
+          )}
+
+          <div className="mt-10">
+            <DataTableNote>
+              Composite = 30% CME + 70% PAQ across 48 indicators. Trend sparklines render a
+              deterministic 12-month walk seeded by programme id and current composite — a stable
+              placeholder until Phase 5/6 produces enough scoring history for real plotting.
+            </DataTableNote>
           </div>
-        </nav>
-      )}
-
-      <div className="pb-16" />
+        </div>
+      </section>
     </>
   );
 }

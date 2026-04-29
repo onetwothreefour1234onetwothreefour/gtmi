@@ -4,12 +4,13 @@ import * as React from 'react';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { scoreColor, type PillarKey } from '@/lib/theme';
+import { type PillarKey } from '@/lib/theme';
 import { formatScore, formatRank } from '@/lib/format';
 import { PreCalibrationChip } from './pre-calibration-chip';
 import { CoverageChip } from './coverage-chip';
 import { PillarMiniBars } from './pillar-mini-bars';
 import { CountryFlag } from './country-flag';
+import { Sparkline, deterministicTrend } from './sparkline';
 import { recomputePaq, type PillarWeights } from '@/lib/advisor-mode';
 import type { RankedProgramRow, SortField, SortDirection } from '@/lib/queries/types';
 
@@ -25,18 +26,29 @@ export interface RankingsTableProps {
   className?: string;
 }
 
-const HEADERS: { field: SortField; label: string; align?: 'right' }[] = [
-  { field: 'composite', label: 'Rank' },
-  { field: 'name', label: 'Program' },
-  { field: 'country', label: 'Country' },
-  { field: 'composite', label: 'Composite', align: 'right' },
-  { field: 'cme', label: 'CME', align: 'right' },
-  { field: 'paq', label: 'PAQ', align: 'right' },
-  { field: 'name', label: 'Pillars' },
-  { field: 'coverage', label: 'Coverage', align: 'right' },
+interface HeaderSpec {
+  field: SortField | null;
+  label: string;
+  align?: 'left' | 'right';
+  /** Sortable when true; rank/pillars/trend columns have no sort target. */
+  sortable: boolean;
+  width?: string;
+}
+
+const HEADERS: HeaderSpec[] = [
+  { field: null, label: '#', sortable: false, width: '36px' },
+  { field: 'country', label: 'Country', sortable: true, width: '180px' },
+  { field: 'name', label: 'Programme', sortable: true },
+  { field: null, label: 'Category', sortable: false, width: '110px' },
+  { field: 'composite', label: 'Composite', sortable: true, align: 'right', width: '100px' },
+  { field: 'paq', label: 'PAQ', sortable: true, align: 'right', width: '70px' },
+  { field: 'cme', label: 'CME', sortable: true, align: 'right', width: '70px' },
+  { field: null, label: 'Pillars (A→E)', sortable: false, width: '110px' },
+  { field: null, label: 'Trend (12m)', sortable: false, width: '80px' },
+  { field: 'coverage', label: 'Coverage', sortable: true, align: 'right', width: '90px' },
+  { field: null, label: 'Status', sortable: false, width: '90px' },
 ];
 
-/** Compute display values, applying advisor weights when present. */
 function deriveRow(row: RankedProgramRow, weights: PillarWeights | null) {
   if (!weights || !row.pillarScores) {
     return {
@@ -46,7 +58,6 @@ function deriveRow(row: RankedProgramRow, weights: PillarWeights | null) {
     };
   }
   const newPaq = recomputePaq(row.pillarScores, weights);
-  // Composite = 30% CME + 70% PAQ. CME is unaffected by user weights.
   const newComposite = row.cme === null ? null : 0.3 * row.cme + 0.7 * newPaq;
   return {
     composite: newComposite,
@@ -55,10 +66,6 @@ function deriveRow(row: RankedProgramRow, weights: PillarWeights | null) {
   };
 }
 
-/**
- * Re-sort the rows client-side when advisorWeights are active. This keeps
- * advisor-mode interactive without a DB round-trip per slider tick.
- */
 function sortRowsForAdvisor(
   rows: RankedProgramRow[],
   weights: PillarWeights,
@@ -70,7 +77,7 @@ function sortRowsForAdvisor(
   decorated.sort((a, b) => {
     const aUnscored = a.derived.composite === null;
     const bUnscored = b.derived.composite === null;
-    if (aUnscored !== bUnscored) return aUnscored ? 1 : -1; // unscored to bottom
+    if (aUnscored !== bUnscored) return aUnscored ? 1 : -1;
     let cmp = 0;
     if (sortField === 'composite' || sortField === 'name') {
       cmp = (b.derived.composite ?? -Infinity) - (a.derived.composite ?? -Infinity);
@@ -91,6 +98,13 @@ function sortRowsForAdvisor(
   return decorated.map((d) => d.row);
 }
 
+/**
+ * Editorial rankings table — Phase 4-B restyle. Replaces the rounded
+ * shadcn-style card with the design's `table.gtmi` atom: hairline rules,
+ * uppercase header eyebrow, mono numerals, Fraunces programme names,
+ * sparkline column (deterministic placeholder until score history matures),
+ * row-1 oxblood wash on the leader.
+ */
 export function RankingsTable({
   rows,
   scoredCount: _scoredCount,
@@ -105,8 +119,6 @@ export function RankingsTable({
     return sortRowsForAdvisor(rows, advisorWeights, sort.field, sort.direction);
   }, [rows, advisorWeights, sort.field, sort.direction]);
 
-  // For "Rank: #X of N" — only count scored rows in advisor mode if the
-  // composite came back non-null.
   const scoredRanks = React.useMemo(() => {
     const m = new Map<string, number>();
     let n = 1;
@@ -126,98 +138,152 @@ export function RankingsTable({
   };
 
   return (
-    <div
-      className={cn('overflow-x-auto rounded-table border border-border bg-surface', className)}
-      data-testid="rankings-table"
-    >
-      <table className="w-full border-collapse text-data-md">
+    <div className={cn('w-full overflow-x-auto', className)} data-testid="rankings-table">
+      <table className="gtmi tabular w-full">
         <thead>
-          <tr className="border-b border-border bg-muted/50 text-data-sm uppercase tracking-wider text-muted-foreground">
-            {HEADERS.map((h) => (
+          <tr>
+            {HEADERS.map((h, i) => (
               <th
-                key={h.label}
+                key={`${h.label}-${i}`}
                 scope="col"
-                className={cn(
-                  'px-3 py-2 font-medium',
-                  h.align === 'right' ? 'text-right' : 'text-left'
-                )}
+                style={{ width: h.width, textAlign: h.align ?? 'left' }}
               >
-                <button
-                  type="button"
-                  onClick={() => handleSort(h.field)}
-                  className={cn(
-                    'inline-flex items-center gap-1 hover:text-foreground',
-                    sort.field === h.field && 'text-foreground'
-                  )}
-                  aria-label={`Sort by ${h.label}`}
-                >
-                  {h.label}
-                  {sort.field === h.field && <SortGlyph direction={sort.direction} aria-hidden />}
-                </button>
+                {h.sortable && h.field ? (
+                  <button
+                    type="button"
+                    onClick={() => h.field && handleSort(h.field)}
+                    className={cn(
+                      'inline-flex items-center gap-1 hover:text-ink',
+                      sort.field === h.field && 'text-ink'
+                    )}
+                    aria-label={`Sort by ${h.label}`}
+                  >
+                    {h.label}
+                    {sort.field === h.field && <SortGlyph direction={sort.direction} aria-hidden />}
+                  </button>
+                ) : (
+                  <span>{h.label}</span>
+                )}
               </th>
             ))}
+            <th aria-hidden style={{ width: 30 }} />
           </tr>
         </thead>
         <tbody>
-          {orderedRows.map((row) => {
+          {orderedRows.map((row, idx) => {
             const derived = deriveRow(row, advisorWeights);
             const rank = scoredRanks.get(row.programId);
+            const isLeader = rank === 1;
+            const trend =
+              derived.composite !== null
+                ? deterministicTrend(row.programId, derived.composite)
+                : null;
             return (
               <motion.tr
                 key={row.programId}
                 layout={reduceMotion ? false : true}
                 transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
-                className="border-b border-border last:border-b-0 hover:bg-muted/40"
+                style={{
+                  background: isLeader ? 'rgba(184,65,42,0.04)' : undefined,
+                }}
+                data-testid="rankings-row"
+                data-rank={rank ?? 'unscored'}
+                data-program-id={row.programId}
               >
-                <td className="px-3 py-3 font-mono text-data-sm tnum text-muted-foreground">
-                  {formatRank(rank ?? null)}
-                </td>
-                <td className="px-3 py-3">
-                  <Link href={`/programs/${row.programId}`} className="block hover:text-accent">
-                    <span className="font-medium text-foreground">{row.programName}</span>
-                    <span className="ml-2 text-data-sm text-muted-foreground">
-                      {row.programCategory}
-                    </span>
-                  </Link>
-                </td>
-                <td className="px-3 py-3">
-                  <Link
-                    href={`/countries/${row.countryIso}`}
-                    className="inline-flex items-center gap-2 text-foreground hover:text-accent"
-                  >
-                    <CountryFlag iso={row.countryIso} countryName={row.countryName} size="sm" />
-                    {row.countryName}
-                  </Link>
-                  <span className="ml-2 font-mono text-data-sm text-muted-foreground">
-                    {row.countryIso}
+                <td>
+                  <span className="num text-ink-4" style={{ fontSize: 12 }}>
+                    {rank ? String(rank).padStart(2, '0') : formatRank(null)}
                   </span>
                 </td>
-                <td className="px-3 py-3 text-right">
-                  <CompositeCell value={derived.composite} placeholder={row.phase2Placeholder} />
+                <td>
+                  <Link
+                    href={`/countries/${row.countryIso}`}
+                    className="inline-flex items-center gap-2.5 text-ink hover:text-accent"
+                  >
+                    <CountryFlag iso={row.countryIso} countryName={row.countryName} size="sm" />
+                    <span style={{ fontWeight: 500 }}>{row.countryName}</span>
+                  </Link>
                 </td>
-                <td className="px-3 py-3 text-right">
-                  <SubScore value={row.cme} fallback="Phase 3" />
+                <td>
+                  <Link
+                    href={`/programs/${row.programId}`}
+                    className="serif hover:text-accent"
+                    style={{ fontSize: 14, fontWeight: 500 }}
+                  >
+                    {row.programName}
+                  </Link>
                 </td>
-                <td className="px-3 py-3 text-right">
+                <td>
+                  <span
+                    className="text-ink-4"
+                    style={{
+                      fontSize: 11,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {row.programCategory}
+                  </span>
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  <CompositeCell
+                    value={derived.composite}
+                    placeholder={row.phase2Placeholder}
+                    isLeader={isLeader}
+                  />
+                </td>
+                <td style={{ textAlign: 'right' }}>
                   <SubScore value={derived.paq} />
                 </td>
-                <td className="px-3 py-3">
+                <td style={{ textAlign: 'right' }}>
+                  <SubScore value={row.cme} />
+                </td>
+                <td>
                   <PillarMiniBars scores={derived.pillarScores ?? null} />
                 </td>
-                <td className="px-3 py-3 text-right">
+                <td>
+                  {trend ? (
+                    <Sparkline
+                      values={trend}
+                      width={64}
+                      height={18}
+                      color={isLeader ? 'var(--accent)' : 'var(--ink-3)'}
+                      ariaLabel={`12-month trend for ${row.programName} (placeholder; deterministic until score history matures)`}
+                    />
+                  ) : (
+                    <span className="num text-ink-5" style={{ fontSize: 11 }}>
+                      —
+                    </span>
+                  )}
+                </td>
+                <td style={{ textAlign: 'right' }}>
                   {row.composite === null ? (
-                    <span className="font-mono text-data-sm text-muted-foreground">—</span>
+                    <span className="num text-ink-4" style={{ fontSize: 12 }}>
+                      —
+                    </span>
                   ) : (
                     <CoverageChip populated={row.fieldsPopulated} total={row.fieldsTotal} />
                   )}
+                </td>
+                <td>
+                  {row.composite === null ? (
+                    <span className="chip chip-mute">Awaiting</span>
+                  ) : row.phase2Placeholder ? (
+                    <span className="chip chip-amber">Pre-cal</span>
+                  ) : (
+                    <span className="chip chip-mute">Scored</span>
+                  )}
+                </td>
+                <td className="text-ink-4" style={{ fontSize: 12 }} aria-hidden>
+                  {idx >= 0 ? '›' : null}
                 </td>
               </motion.tr>
             );
           })}
           {orderedRows.length === 0 && (
             <tr>
-              <td colSpan={HEADERS.length} className="px-3 py-12 text-center text-muted-foreground">
-                No programs match these filters.
+              <td colSpan={HEADERS.length + 1} style={{ padding: 48, textAlign: 'center' }}>
+                <span className="text-ink-4">No programmes match these filters.</span>
               </td>
             </tr>
           )}
@@ -227,39 +293,60 @@ export function RankingsTable({
   );
 }
 
-function CompositeCell({ value, placeholder }: { value: number | null; placeholder: boolean }) {
+function CompositeCell({
+  value,
+  placeholder,
+  isLeader,
+}: {
+  value: number | null;
+  placeholder: boolean;
+  isLeader: boolean;
+}) {
   if (value === null) {
     return (
-      <span className="font-mono text-data-sm italic text-muted-foreground">Not yet scored</span>
+      <span className="num italic text-ink-4" style={{ fontSize: 12 }}>
+        Not yet scored
+      </span>
     );
   }
+  const pct = Math.max(0, Math.min(100, value));
   return (
     <span className="inline-flex flex-col items-end gap-1">
       <span className="inline-flex items-center gap-2">
-        <span className="font-mono text-data-lg font-semibold tnum text-foreground">
+        <span className="num" style={{ fontWeight: 600 }}>
           {formatScore(value)}
         </span>
         {placeholder && <PreCalibrationChip />}
       </span>
       <span
-        className="block h-1 w-16 rounded-table"
-        style={{ backgroundColor: scoreColor(value) }}
+        className="block w-20"
+        style={{ height: 3, background: 'var(--rule-soft)' }}
         aria-hidden
-      />
+      >
+        <span
+          className="block h-full"
+          style={{
+            width: `${pct}%`,
+            background: isLeader ? 'var(--accent)' : 'var(--ink)',
+          }}
+        />
+      </span>
     </span>
   );
 }
 
-function SubScore({ value, fallback }: { value: number | null; fallback?: string }) {
+function SubScore({ value }: { value: number | null }) {
   if (value === null) {
     return (
-      <span className="font-mono text-data-sm text-muted-foreground" title={fallback}>
-        {fallback ? '—' : '—'}
+      <span className="num text-ink-4" style={{ fontSize: 12 }}>
+        —
       </span>
     );
   }
   return (
-    <span className="font-mono text-data-sm tnum text-muted-foreground">{formatScore(value)}</span>
+    <span className="num text-ink-3" style={{ fontSize: 12 }}>
+      {formatScore(value)}
+    </span>
   );
 }
 
@@ -282,5 +369,4 @@ function SortGlyph({ direction }: { direction: SortDirection }) {
   );
 }
 
-// Re-export PillarKey so tests can reference it without going through theme.ts
 export type { PillarKey };

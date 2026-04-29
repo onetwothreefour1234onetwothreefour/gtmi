@@ -20,6 +20,8 @@ Ask clarifying questions only if a decision materially blocks progress. Most dec
 
 The Global Talent Mobility Index (GTMI) is an interactive web platform that benchmarks talent-based premium mobility programs worldwide. It evaluates how effectively each country's visa architecture supports the attraction, admission, retention, and integration of highly skilled international talent.
 
+**Visual language (Phase 4 Redesign).** The dashboard is editorial in tone — warm cream paper (`--paper`, `--paper-2`, `--paper-3`), Fraunces serif for display + body emphasis, Inter Tight for sans copy, JetBrains Mono for tabular data, oxblood (`#B8412A`) as the single attention accent, deep navy reserved for peer-review marginalia. Section dividers use full-bleed `<SpecimenPlate>` and chapter-style `<SectionPlate>` artefacts; provenance opens in a right-side drawer (Phase C) rather than a popover; the methodology page renders weights as a `<WeightTreeDiagram>` (Phase D). Pillar labels track the methodology vocabulary — Access / Process / Rights / Pathway / Stability — even where the original design copy used editorial alternates. Light-only — `next-themes` and dark-mode tokens were removed during Phase A.
+
 Competitive positioning:
 
 - Henley & Partners ranks investment migration programs (RBI, CBI). They cover money-in pathways.

@@ -5,11 +5,6 @@ export { CompositeScoreDisplay } from './composite-score-display';
 export { PillarMiniBars } from './pillar-mini-bars';
 export { PillarRadar, type PillarScores } from './pillar-radar';
 export { WeightSlider } from './weight-slider';
-// Phase 4-A note: MethodologyBar is staged for deletion in Phase B/D once
-// its public-page consumers (`/` + `/methodology`) get rewritten with
-// SplitSpecimen + PillarsSpecimen. Kept exported here so Phase A leaves
-// public pages untouched.
-export { MethodologyBar } from './methodology-bar';
 export { SplitSpecimen } from './split-specimen';
 export { PillarsSpecimen } from './pillars-specimen';
 export { ProvenanceTrigger } from './provenance-trigger';
@@ -30,8 +25,18 @@ export { PillarComparison } from './pillar-comparison';
 export { CountryFlag } from './country-flag';
 export { JsonLd } from './json-ld';
 
-// New editorial primitives (Phase 4-A redesign).
+// Editorial primitives (Phase 4-A redesign).
 export { Sparkline, deterministicTrend } from './sparkline';
 export { SpecimenPlate } from './specimen-plate';
 export { SectionPlate } from './section-plate';
 export { MarginNote } from './margin-note';
+
+// Phase 4-B layout shell + landing-page sections.
+export { TopNav } from './top-nav';
+export { GtmiFooter } from './gtmi-footer';
+export { PreviewBanner } from './preview-banner';
+export { HeroLanding } from './hero-landing';
+export { ThisEdition } from './this-edition';
+export { WorldMap, type WorldMapCountryScore } from './world-map';
+export { EditorsQuote } from './editors-quote';
+export { ProvenanceProof } from './provenance-proof';

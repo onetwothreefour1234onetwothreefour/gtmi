@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { MethodologyBar, DataTableNote, EmptyState } from '@/components/gtmi';
+import { SplitSpecimen, PillarsSpecimen, DataTableNote, EmptyState } from '@/components/gtmi';
 import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
 import { getMethodologyCurrent } from '@/lib/queries/methodology-current';
 import { loadContent } from '@/lib/content';
@@ -101,7 +101,16 @@ export default async function MethodologyPage() {
           Program Architecture Quality. Hover any pillar segment for its weight.
         </p>
         <div className="mt-4">
-          <MethodologyBar cmePaqSplit={methodology.cmePaqSplit} pillarWeights={pillarWeights} />
+          {/* Phase 4-B / Q10 — `MethodologyBar` deleted in this commit. Phase D
+              rewrites the rest of this page; for now we drop in the design's
+              SplitSpecimen + PillarsSpecimen so the composite-structure section
+              still renders against the live methodology weights. */}
+          <div className="flex flex-col gap-12">
+            <div className="flex justify-start gap-12 pl-12 pt-4">
+              <SplitSpecimen cmePaqSplit={methodology.cmePaqSplit} />
+            </div>
+            <PillarsSpecimen pillarWeights={pillarWeights} />
+          </div>
         </div>
       </Section>
 
