@@ -1,86 +1,92 @@
-IMD Rank,Country,Country ISO,Region,Program Name,Authority / Portal,Official URL,Source type
-1,Switzerland,CHE,Europe,Work Permit (L/B/C permits) – Hub,State Secretariat for Migration (SEM),https://www.sem.admin.ch/sem/en/home/themen/arbeit.html,Official
-1,Switzerland,CHE,Europe,Highly Qualified Non-EU Worker Quota,SEM – Quota System,https://www.sem.admin.ch/sem/en/home/themen/arbeit/nicht-eu_efta-angehoerige.html,Official
-2,Netherlands,NLD,Europe,Highly Skilled Migrant (HSM) Permit,IND (Immigration & Naturalisation Service),https://ind.nl/en/residence-permits/work/highly-skilled-migrant,Official
-2,Netherlands,NLD,Europe,EU Blue Card,IND,https://ind.nl/en/residence-permits/work/eu-blue-card,Official
-2,Netherlands,NLD,Europe,Orientation Year (Zoekjaar),IND,https://ind.nl/en/residence-permits/work/orientation-year-highly-educated-persons,Official
-3,Ireland,IRL,Europe,Critical Skills Employment Permit,DETE (Dept of Enterprise),https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/,Official
-3,Ireland,IRL,Europe,General Employment Permit,DETE,https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/general-employment-permit/,Official
-4,Luxembourg,LUX,Europe,Single Permit (Employed Persons),MIFI / Immigration Directorate,https://guichet.public.lu/en/citoyens/immigration/salaries/salarie-hautement-qualifie.html,Official
-4,Luxembourg,LUX,Europe,EU Blue Card,Immigration Directorate,https://guichet.public.lu/en/citoyens/immigration/salaries/carte-bleue-europeenne.html,Official
-5,Iceland,ISL,Europe,Work Permit for Skilled Workers,Directorate of Immigration (Útlendingastofnun),https://www.utlendingastofnun.is/en/individuals/work-permit/,Official
-5,Iceland,ISL,Europe,EU / EEA Registration,Directorate of Immigration,https://www.utlendingastofnun.is/en/individuals/eu-eea-efta-citizens/,Official
-6,Germany,DEU,Europe,Skilled Immigration Act (Fachkräfteeinwanderungsgesetz),BAMF / Make it in Germany,https://www.make-it-in-germany.com/en/visa-residence/types/skilled-worker,Official
-6,Germany,DEU,Europe,EU Blue Card Germany,BAMF,https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card,Official
-6,Germany,DEU,Europe,Opportunity Card (Chancenkarte),Make it in Germany,https://www.make-it-in-germany.com/en/visa-residence/types/job-seeker-visa/opportunity-card,Official
-7,Canada,CAN,North America,Express Entry – Federal Skilled Worker,IRCC,https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/who-can-apply/federal-skilled-workers.html,Official
-7,Canada,CAN,North America,Global Talent Stream,ESDC,https://canada.ca/en/employment-social-development/services/foreign-workers/global-talent.html,Official
-7,Canada,CAN,North America,Provincial Nominee Program (PNP),IRCC,https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/provincial-nominees.html,Official
-8,Sweden,SWE,Europe,Work Permit (Non-EU),Swedish Migration Agency (Migrationsverket),https://www.migrationsverket.se/English/Private-individuals/Working-in-Sweden/Employed.html,Official
-8,Sweden,SWE,Europe,EU Blue Card,Migrationsverket,https://www.migrationsverket.se/English/Private-individuals/Working-in-Sweden/EU-Blue-Card.html,Official
-9,Singapore,SGP,Asia,Employment Pass (EP),MOM,https://www.mom.gov.sg/passes-and-permits/employment-pass,Official
-9,Singapore,SGP,Asia,S Pass,MOM,https://www.mom.gov.sg/passes-and-permits/s-pass,Official
-9,Singapore,SGP,Asia,ONE Pass,MOM,https://www.mom.gov.sg/passes-and-permits/overseas-networks-expertise-pass,Official
-9,Singapore,SGP,Asia,Tech.Pass,MOM,https://www.edb.gov.sg/en/incentives-and-programmes/incentives-and-facilitation-programmes/tech-pass.html,Official
-10,Belgium,BEL,Europe,Single Permit (Highly Qualified),Foreignaffairs.belgium.be,https://dofi.ibz.be/en/themes/work/single-permit/highly-qualified-worker,Official
-10,Belgium,BEL,Europe,European Blue Card (Belgium),DOFI,https://dofi.ibz.be/en/themes/work/european-blue-card,Official
-11,Austria,AUT,Europe,Red-White-Red Card (Skilled Workers),Austria.gv.at,https://www.migration.gv.at/en/types-of-immigration/permanent-immigration/red-white-red-card/,Official
-11,Austria,AUT,Europe,EU Blue Card Austria,AMS / Migration.gv.at,https://www.migration.gv.at/en/types-of-immigration/permanent-immigration/eu-blue-card/,Official
-12,UAE,ARE,Middle East,Golden Visa (Skilled Workers),ICP / u.ae,https://u.ae/en/information-and-services/visa-and-emirates-id/residence-visas/golden-visa,Official
-12,UAE,ARE,Middle East,Green Visa (Self-sponsored),ICP,https://icp.gov.ae/en/green-visa/,Official
-12,UAE,ARE,Middle East,Standard Work Permit,MOHRE,https://www.mohre.gov.ae/en/services/work-permit-services.aspx,Official
-13,Australia,AUS,Oceania,Skills in Demand 482 – Core Skills Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skills-in-demand-visa-subclass-482/core-skills-stream,Official
-13,Australia,AUS,Oceania,Skills in Demand 482 – Specialist Skills Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skills-in-demand-visa-subclass-482/specialist-skills-stream,Official
-13,Australia,AUS,Oceania,Skills in Demand 482 – Labour Agreement Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skills-in-demand-visa-subclass-482/labour-agreement-stream,Official
-13,Australia,AUS,Oceania,Skilled Independent (subclass 189) - Points Tested Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skilled-independent-189/points-tested,Official
-13,Australia,AUS,Oceania,Skilled Independent (subclass 189) - Hong Kong Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skilled-independent-189/hong-kong,Official
-13,Australia,AUS,Oceania,Skilled Nominated (subclass 190),Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skilled-nominated-190,Official
-13,Australia,AUS,Oceania,Employer Nomination Scheme (subclass 186) - Direct Entry Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/employer-nomination-scheme-186/direct-entry-stream,Official
-13,Australia,AUS,Oceania,Employer Nomination Scheme (subclass 186) - Temporary Residence Transition Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/employer-nomination-scheme-186/temporary-residence-transition-stream,Official
-13,Australia,AUS,Oceania,Employer Nomination Scheme (subclass 186) - Labour Agreement Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/employer-nomination-scheme-186/labour-agreement-stream,Official
-13,Australia,AUS,Oceania,National Innovation Visa,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/national-innovation-visa-858,Official
-14,Japan,JPN,Asia,Highly Skilled Professional Visa (HSP),Immigration Services Agency (ISA),https://www.isa.go.jp/en/hisyoukyoku/hp/index.html,Official
-14,Japan,JPN,Asia,Specified Skilled Worker (SSW) Visa,ISA,https://www.isa.go.jp/en/publications/ssw.html,Official
-14,Japan,JPN,Asia,J-Skip / J-Find (Global Startup Visa),ISA / METI,https://www.isa.go.jp/en/publications/materials/nyukan_r04006.html,Official
-15,Norway,NOR,Europe,Skilled Worker Permit,UDI (Norwegian Directorate of Immigration),https://www.udi.no/en/want-to-apply/work-immigration/skilled-workers-from-countries-outside-the-eu-eea/,Official
-15,Norway,NOR,Europe,EU / EEA Right to Work,UDI,https://www.udi.no/en/want-to-apply/residence-under-the-eea-regulations/work/,Official
-16,Taiwan,TWN,Asia,Employment Gold Card,National Development Council,https://goldcard.nat.gov.tw/en/,Official
-16,Taiwan,TWN,Asia,Work Permit for Professionals,Workforce Development Agency (WDA),https://ezwp.wda.gov.tw/en/,Official
-17,Lithuania,LTU,Europe,Work Permit / Single Permit (Non-EU),Migration Department,https://migracija.lrv.lt/en/migration-topics/immigration/employment-in-lithuania/,Official
-18,USA,USA,North America,H-1B Specialty Occupation,USCIS,https://www.uscis.gov/working-in-the-united-states/h-1b-specialty-occupations,Official
-18,USA,USA,North America,EB-1 Extraordinary Ability / Priority Worker,USCIS,https://www.uscis.gov/working-in-the-united-states/permanent-workers/employment-based-immigration-first-preference-eb-1,Official
-18,USA,USA,North America,EB-2 Advanced Degree / NIW,USCIS,https://www.uscis.gov/working-in-the-united-states/permanent-workers/employment-based-immigration-second-preference-eb-2,Official
-18,USA,USA,North America,O-1 Extraordinary Ability (non-immigrant),USCIS,https://www.uscis.gov/working-in-the-united-states/temporary-workers/o-1-individuals-with-extraordinary-ability-or-achievement,Official
-19,Finland,FIN,Europe,Residence Permit for Employed Person,Finnish Immigration Service (Migri),https://migri.fi/en/permit-for-employed-person,Official
-19,Finland,FIN,Europe,Talent Boost / Specialist Permit,Migri,https://migri.fi/en/specialist,Official
-19,Finland,FIN,Europe,EU Blue Card Finland,Migri,https://migri.fi/en/eu-blue-card,Official
-20,Hong Kong,HKG,Asia,Quality Migrant Admission Scheme (QMAS),ImmD,https://www.immd.gov.hk/eng/services/visas/quality_migrant_admission_scheme.html,Official
-20,Hong Kong,HKG,Asia,Top Talent Pass Scheme (TTPS),ImmD,https://www.immd.gov.hk/eng/services/visas/TTPS.html,Official
-20,Hong Kong,HKG,Asia,General Employment Policy (GEP),ImmD,https://www.immd.gov.hk/eng/services/visas/GEP.html,Official
-20,Hong Kong,HKG,Asia,Technology Talent Admission Scheme (TechTAS),ImmD,https://www.itc.gov.hk/en/techtas/index.htm,Official
-21,Malaysia,MYS,Asia,Employment Pass (EP),Expatriate Services Division (ESD) / MoHA,https://esd.imi.gov.my/portal/employment-pass/,Official
-21,Malaysia,MYS,Asia,Premium Visa Programme (PVIP),Ministry of Home Affairs,https://www.imi.gov.my/index.php/en/main-services/visa/premium-visa-programme-pvip.html,Official
-21,Malaysia,MYS,Asia,Tech Entrepreneur Programme,MDEC (Digital Economy Corp),https://mdec.my/global-programmes/for-entrepreneurs/,Official
-22,Chile,CHL,Americas,Residencia Temporal – Paid Lawful Activities,Servicio Nacional de Migraciones (SERMIG),https://serviciomigraciones.cl/en/residencia-temporal-permit/,Official
-22,Chile,CHL,Americas,Digital Portal Application (Portal de Trámites Digitales),SERMIG – Online Portal,https://tramites.extranjeria.gob.cl/,Official
-23,Saudi Arabia,SAU,Middle East,Premium Residency (Green Card),Ministry of Interior,https://www.iqama.com.sa/,Official
-23,Saudi Arabia,SAU,Middle East,Work Visa / Iqama,Ministry of HR (HRSD),https://hrsd.gov.sa/en/services,Official
-23,Saudi Arabia,SAU,Middle East,Saudi Green Card Hub,Official Portal,https://www.my.gov.sa/wps/portal/snp/content/service?selectedContent=7037,Official
-24,Namibia,NAM,Africa,"Employment Permit (Long-Term, >6 months)","Ministry of Home Affairs, Immigration, Safety & Security (MHAISS)",https://mha.gov.na/all-permits-general-information,Official
-24,Namibia,NAM,Africa,Short-Term Employment Permit / Work Visa (≤6 months),MHAISS – E-Services Portal,https://eservices.mhaiss.gov.na/workvisa-services,Official
-25,France,FRA,Europe,Talent Passport (Passeport Talent),Service-Public.fr,https://www.service-public.fr/particuliers/vosdroits/N16178,Official
-25,France,FRA,Europe,EU Blue Card (Carte Bleue Européenne),Service-Public.fr,https://www.service-public.fr/particuliers/vosdroits/F16922,Official
-26,UK,GBR,Europe,Skilled Worker Visa,UK Home Office,https://www.gov.uk/skilled-worker-visa,Official
-26,UK,GBR,Europe,Global Talent Visa,UK Home Office,https://www.gov.uk/global-talent,Official
-26,UK,GBR,Europe,High Potential Individual (HPI) Visa,UK Home Office,https://www.gov.uk/high-potential-individual-visa,Official
-26,UK,GBR,Europe,Innovator Founder Visa,UK Home Office,https://www.gov.uk/innovator-founder-visa,Official
-27,Estonia,EST,Europe,Work Permit / Short-term Employment,Police and Border Guard Board (PPA),https://www.politsei.ee/en/instructions/information-for-a-foreigner/work-in-estonia/,Official
-27,Estonia,EST,Europe,Digital Nomad Visa (D-visa),Enterprise Estonia,https://www.e-resident.gov.ee/nomadvisa/,Official
-28,New Zealand,NZL,Oceania,Skilled Migrant Category (SMC),Immigration New Zealand,https://www.immigration.govt.nz/new-zealand-visas/visas/visa/skilled-migrant-category-resident-visa,Official
-28,New Zealand,NZL,Oceania,Accredited Employer Work Visa (AEWV),Immigration New Zealand,https://www.immigration.govt.nz/new-zealand-visas/visas/visa/accredited-employer-work-visa,Official
-28,New Zealand,NZL,Oceania,Green List (Straight to Residence),Immigration NZ,https://www.immigration.govt.nz/new-zealand-visas/preparing-a-visa-application/working-in-nz/green-list-occupations,Official
-29,Bahrain,BHR,Middle East,LMRA Work Permit,Labour Market Regulatory Authority (LMRA),https://www.lmra.gov.bh/portal/en/page/show/134,Official
-29,Bahrain,BHR,Middle East,Golden Residency Permit,LMRA / Bahrain.bh,https://www.bahrain.bh/wps/portal/en/BahrainResidence/GoldenResidency/,Official
-30,Oman,OMN,Middle East,Employment (Work) Visa – Standard (2-year),Royal Oman Police (ROP) – Directorate of Passports & Residence,https://www.rop.gov.om/english/Visas.aspx,Official
-30,Oman,OMN,Middle East,Labour Permit / Labour Clearance,Ministry of Manpower – TRACE E-Gov Portal,https://gov.om/en/w/get-a-work-visa,Official
-30,Oman,OMN,Middle East,Temporary Work Visa (4–9 months),Royal Oman Police (ROP),https://www.rop.gov.om/english/Visas.aspx?VisaName=TemporaryWorkVisa,Official
+IMD Rank,Country,Country ISO,Region,Program Name,Authority / Portal,Official URL,Source type,program_type
+1,Switzerland,CHE,Europe,B-Permit (Residence Permit for Employment),State Secretariat for Migration (SEM),https://www.sem.admin.ch/sem/en/home/themen/arbeit.html,Official,Employer-Sponsored
+1,Switzerland,CHE,Europe,Highly Qualified Non-EU Worker Quota,SEM – Quota System,https://www.sem.admin.ch/sem/en/home/themen/arbeit/nicht-eu_efta-angehoerige.html,Official,Employer-Sponsored
+2,Netherlands,NLD,Europe,Highly Skilled Migrant (HSM) Permit,IND (Immigration & Naturalisation Service),https://ind.nl/en/residence-permits/work/highly-skilled-migrant,Official,Employer-Sponsored
+2,Netherlands,NLD,Europe,EU Blue Card,IND,https://ind.nl/en/residence-permits/work/eu-blue-card,Official,Employer-Sponsored
+2,Netherlands,NLD,Europe,Orientation Year (Zoekjaar),IND,https://ind.nl/en/residence-permits/work/orientation-year-highly-educated-persons,Official,Exceptional-Talent
+2,Netherlands,NLD,Europe,Startup Visa (Startupvisum),IND,https://ind.nl/en/residence-permits/work/start-up,Official,Founder-Startup
+3,Ireland,IRL,Europe,Critical Skills Employment Permit,DETE (Dept of Enterprise),https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/critical-skills-employment-permit/,Official,Employer-Sponsored
+3,Ireland,IRL,Europe,General Employment Permit,DETE,https://enterprise.gov.ie/en/what-we-do/workplace-and-skills/employment-permits/permit-types/general-employment-permit/,Official,Employer-Sponsored
+3,Ireland,IRL,Europe,Start-up Entrepreneur Programme (STEP),Dept of Justice (Immigration Service Delivery),https://www.irishimmigration.ie/coming-to-work-in-ireland/what-are-my-options-for-working-in-ireland/coming-to-set-up-a-business-or-invest-in-ireland/start-up-entrepreneur-programme-step/,Official,Founder-Startup
+4,Luxembourg,LUX,Europe,Single Permit (Employed Persons),MIFI / Immigration Directorate,https://guichet.public.lu/en/citoyens/immigration/salaries/salarie-hautement-qualifie.html,Official,Employer-Sponsored
+4,Luxembourg,LUX,Europe,EU Blue Card,Immigration Directorate,https://guichet.public.lu/en/citoyens/immigration/salaries/carte-bleue-europeenne.html,Official,Employer-Sponsored
+5,Iceland,ISL,Europe,Work Permit for Skilled Workers,Directorate of Immigration (Útlendingastofnun),https://www.utlendingastofnun.is/en/individuals/work-permit/,Official,Employer-Sponsored
+6,Germany,DEU,Europe,Skilled Worker Visa (Fachkräfteeinwanderungsgesetz),BAMF / Make it in Germany,https://www.make-it-in-germany.com/en/visa-residence/types/skilled-worker,Official,Employer-Sponsored
+6,Germany,DEU,Europe,EU Blue Card Germany,BAMF,https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card,Official,Employer-Sponsored
+6,Germany,DEU,Europe,Opportunity Card (Chancenkarte),Make it in Germany,https://www.make-it-in-germany.com/en/visa-residence/types/job-seeker-visa/opportunity-card,Official,Points-Based
+6,Germany,DEU,Europe,Freiberufler Visa (Liberal Professions),BAMF / Make it in Germany,https://www.make-it-in-germany.com/en/visa-residence/types/self-employment,Official,Professional-Self-Employed
+7,Canada,CAN,North America,Express Entry – Federal Skilled Worker,IRCC,https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/who-can-apply/federal-skilled-workers.html,Official,Points-Based-PR-Direct
+7,Canada,CAN,North America,Global Talent Stream,ESDC,https://canada.ca/en/employment-social-development/services/foreign-workers/global-talent.html,Official,Employer-Sponsored
+7,Canada,CAN,North America,Provincial Nominee Program (PNP),IRCC,https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/provincial-nominees.html,Official,Points-Based-PR-Direct
+7,Canada,CAN,North America,Start-up Visa Program,IRCC,https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/start-visa.html,Official,Founder-Startup
+8,Sweden,SWE,Europe,Work Permit (Non-EU),Swedish Migration Agency (Migrationsverket),https://www.migrationsverket.se/English/Private-individuals/Working-in-Sweden/Employed.html,Official,Employer-Sponsored
+8,Sweden,SWE,Europe,EU Blue Card,Migrationsverket,https://www.migrationsverket.se/English/Private-individuals/Working-in-Sweden/EU-Blue-Card.html,Official,Employer-Sponsored
+9,Singapore,SGP,Asia,Employment Pass (EP),MOM,https://www.mom.gov.sg/passes-and-permits/employment-pass,Official,Employer-Sponsored
+9,Singapore,SGP,Asia,S Pass,MOM,https://www.mom.gov.sg/passes-and-permits/s-pass,Official,Employer-Sponsored
+9,Singapore,SGP,Asia,ONE Pass,MOM,https://www.mom.gov.sg/passes-and-permits/overseas-networks-expertise-pass,Official,Exceptional-Talent
+9,Singapore,SGP,Asia,Tech.Pass,MOM,https://www.edb.gov.sg/en/incentives-and-programmes/incentives-and-facilitation-programmes/tech-pass.html,Official,Exceptional-Talent
+9,Singapore,SGP,Asia,EntrePass,MOM,https://www.mom.gov.sg/passes-and-permits/entrepass,Official,Founder-Startup
+10,Belgium,BEL,Europe,Single Permit (Highly Qualified),Foreignaffairs.belgium.be,https://dofi.ibz.be/en/themes/work/single-permit/highly-qualified-worker,Official,Employer-Sponsored
+10,Belgium,BEL,Europe,European Blue Card (Belgium),DOFI,https://dofi.ibz.be/en/themes/work/european-blue-card,Official,Employer-Sponsored
+11,Austria,AUT,Europe,Red-White-Red Card (Skilled Workers),Austria.gv.at,https://www.migration.gv.at/en/types-of-immigration/permanent-immigration/red-white-red-card/,Official,Points-Based
+11,Austria,AUT,Europe,EU Blue Card Austria,AMS / Migration.gv.at,https://www.migration.gv.at/en/types-of-immigration/permanent-immigration/eu-blue-card/,Official,Employer-Sponsored
+12,UAE,ARE,Middle East,Golden Visa (Skilled Workers),ICP / u.ae,https://u.ae/en/information-and-services/visa-and-emirates-id/residence-visas/golden-visa,Official,Exceptional-Talent
+12,UAE,ARE,Middle East,Green Visa (Self-sponsored),ICP,https://icp.gov.ae/en/green-visa/,Official,Professional-Self-Employed
+12,UAE,ARE,Middle East,Standard Work Permit,MOHRE,https://www.mohre.gov.ae/en/services/work-permit-services.aspx,Official,Employer-Sponsored
+13,Australia,AUS,Oceania,Skills in Demand 482 – Core Skills Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skills-in-demand-visa-subclass-482/core-skills-stream,Official,Employer-Sponsored
+13,Australia,AUS,Oceania,Skills in Demand 482 – Specialist Skills Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skills-in-demand-visa-subclass-482/specialist-skills-stream,Official,Employer-Sponsored
+13,Australia,AUS,Oceania,Skills in Demand 482 – Labour Agreement Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skills-in-demand-visa-subclass-482/labour-agreement-stream,Official,Employer-Sponsored
+13,Australia,AUS,Oceania,Skilled Independent (subclass 189) - Points Tested Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skilled-independent-189/points-tested,Official,Points-Based-PR-Direct
+13,Australia,AUS,Oceania,Skilled Independent (subclass 189) - Hong Kong Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skilled-independent-189/hong-kong,Official,Points-Based-PR-Direct
+13,Australia,AUS,Oceania,Skilled Nominated (subclass 190),Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skilled-nominated-190,Official,Points-Based-PR-Direct
+13,Australia,AUS,Oceania,Employer Nomination Scheme (subclass 186) - Direct Entry Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/employer-nomination-scheme-186/direct-entry-stream,Official,Employer-Sponsored
+13,Australia,AUS,Oceania,Employer Nomination Scheme (subclass 186) - Temporary Residence Transition Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/employer-nomination-scheme-186/temporary-residence-transition-stream,Official,Employer-Sponsored
+13,Australia,AUS,Oceania,Employer Nomination Scheme (subclass 186) - Labour Agreement Stream,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/employer-nomination-scheme-186/labour-agreement-stream,Official,Employer-Sponsored
+13,Australia,AUS,Oceania,National Innovation Visa,Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/national-innovation-visa-858,Official,Exceptional-Talent
+13,Australia,AUS,Oceania,Global Talent Visa (subclass 858),Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/global-talent-visa-858,Official,Exceptional-Talent
+13,Australia,AUS,Oceania,Business Innovation and Investment (subclass 188A),Dept of Home Affairs,https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/business-innovation-and-investment-188/business-innovation-stream,Official,Founder-Startup
+14,Japan,JPN,Asia,Highly Skilled Professional Visa (HSP),Immigration Services Agency (ISA),https://www.isa.go.jp/en/hisyoukyoku/hp/index.html,Official,Points-Based
+14,Japan,JPN,Asia,Specified Skilled Worker (SSW) Visa,ISA,https://www.isa.go.jp/en/publications/ssw.html,Official,Employer-Sponsored
+14,Japan,JPN,Asia,J-Skip / J-Find (Global Startup Visa),ISA / METI,https://www.isa.go.jp/en/publications/materials/nyukan_r04006.html,Official,Exceptional-Talent
+14,Japan,JPN,Asia,Startup Visa (Municipal),METI / participating municipalities,https://www.meti.go.jp/english/policy/external_economy/investment/startup_visa.html,Official,Founder-Startup
+15,Norway,NOR,Europe,Skilled Worker Permit,UDI (Norwegian Directorate of Immigration),https://www.udi.no/en/want-to-apply/work-immigration/skilled-workers-from-countries-outside-the-eu-eea/,Official,Employer-Sponsored
+16,Taiwan,TWN,Asia,Employment Gold Card,National Development Council,https://goldcard.nat.gov.tw/en/,Official,Exceptional-Talent
+16,Taiwan,TWN,Asia,Work Permit for Professionals,Workforce Development Agency (WDA),https://ezwp.wda.gov.tw/en/,Official,Employer-Sponsored
+17,Lithuania,LTU,Europe,Single Permit for Employment,Migration Department,https://migracija.lrv.lt/en/migration-topics/immigration/employment-in-lithuania/,Official,Employer-Sponsored
+18,USA,USA,North America,H-1B Specialty Occupation,USCIS,https://www.uscis.gov/working-in-the-united-states/h-1b-specialty-occupations,Official,Employer-Sponsored
+18,USA,USA,North America,EB-1 Extraordinary Ability / Priority Worker,USCIS,https://www.uscis.gov/working-in-the-united-states/permanent-workers/employment-based-immigration-first-preference-eb-1,Official,Exceptional-Talent
+18,USA,USA,North America,EB-2 Advanced Degree / NIW,USCIS,https://www.uscis.gov/working-in-the-united-states/permanent-workers/employment-based-immigration-second-preference-eb-2,Official,Exceptional-Talent
+18,USA,USA,North America,O-1 Extraordinary Ability (non-immigrant),USCIS,https://www.uscis.gov/working-in-the-united-states/temporary-workers/o-1-individuals-with-extraordinary-ability-or-achievement,Official,Exceptional-Talent
+19,Finland,FIN,Europe,Residence Permit for Employed Person,Finnish Immigration Service (Migri),https://migri.fi/en/permit-for-employed-person,Official,Employer-Sponsored
+19,Finland,FIN,Europe,EU Blue Card Finland,Migri,https://migri.fi/en/eu-blue-card,Official,Employer-Sponsored
+20,Hong Kong,HKG,Asia,Quality Migrant Admission Scheme (QMAS),ImmD,https://www.immd.gov.hk/eng/services/visas/quality_migrant_admission_scheme.html,Official,Points-Based
+20,Hong Kong,HKG,Asia,Top Talent Pass Scheme (TTPS),ImmD,https://www.immd.gov.hk/eng/services/visas/TTPS.html,Official,Exceptional-Talent
+20,Hong Kong,HKG,Asia,General Employment Policy (GEP),ImmD,https://www.immd.gov.hk/eng/services/visas/GEP.html,Official,Employer-Sponsored
+20,Hong Kong,HKG,Asia,Technology Talent Admission Scheme (TechTAS),ImmD,https://www.itc.gov.hk/en/techtas/index.htm,Official,Employer-Sponsored
+21,Malaysia,MYS,Asia,Employment Pass (EP),Expatriate Services Division (ESD) / MoHA,https://esd.imi.gov.my/portal/employment-pass/,Official,Employer-Sponsored
+21,Malaysia,MYS,Asia,Premium Visa Programme (PVIP),Ministry of Home Affairs,https://www.imi.gov.my/index.php/en/main-services/visa/premium-visa-programme-pvip.html,Official,Exceptional-Talent
+21,Malaysia,MYS,Asia,Tech Entrepreneur Programme,MDEC (Digital Economy Corp),https://mdec.my/global-programmes/for-entrepreneurs/,Official,Founder-Startup
+22,Chile,CHL,Americas,Residencia Temporal – Paid Lawful Activities,Servicio Nacional de Migraciones (SERMIG),https://serviciomigraciones.cl/en/residencia-temporal-permit/,Official,Employer-Sponsored
+23,Saudi Arabia,SAU,Middle East,Premium Residency (Green Card),Ministry of Interior,https://www.iqama.com.sa/,Official,Exceptional-Talent
+23,Saudi Arabia,SAU,Middle East,Work Visa / Iqama,Ministry of HR (HRSD),https://hrsd.gov.sa/en/services,Official,Employer-Sponsored
+23,Saudi Arabia,SAU,Middle East,Special Talent Residency,Premium Residency Center,https://www.iqama.com.sa/,Official,Exceptional-Talent
+24,Namibia,NAM,Africa,"Employment Permit (Long-Term, >6 months)","Ministry of Home Affairs, Immigration, Safety & Security (MHAISS)",https://mha.gov.na/all-permits-general-information,Official,Employer-Sponsored
+24,Namibia,NAM,Africa,Short-Term Employment Permit / Work Visa (≤6 months),MHAISS – E-Services Portal,https://eservices.mhaiss.gov.na/workvisa-services,Official,Employer-Sponsored
+25,France,FRA,Europe,Talent Passport (Passeport Talent),Service-Public.fr,https://www.service-public.fr/particuliers/vosdroits/N16178,Official,Employer-Sponsored
+25,France,FRA,Europe,EU Blue Card (Carte Bleue Européenne),Service-Public.fr,https://www.service-public.fr/particuliers/vosdroits/F16922,Official,Employer-Sponsored
+25,France,FRA,Europe,French Tech Visa,La French Tech / Mission French Tech,https://lafrenchtech.gouv.fr/en/the-french-tech-visa/,Official,Employer-Sponsored
+25,France,FRA,Europe,Talent Passport – Company Creation,Service-Public.fr,https://www.service-public.fr/particuliers/vosdroits/N16178,Official,Founder-Startup
+26,UK,GBR,Europe,Skilled Worker Visa,UK Home Office,https://www.gov.uk/skilled-worker-visa,Official,Employer-Sponsored
+26,UK,GBR,Europe,Global Talent Visa,UK Home Office,https://www.gov.uk/global-talent,Official,Exceptional-Talent
+26,UK,GBR,Europe,High Potential Individual (HPI) Visa,UK Home Office,https://www.gov.uk/high-potential-individual-visa,Official,Exceptional-Talent
+26,UK,GBR,Europe,Innovator Founder Visa,UK Home Office,https://www.gov.uk/innovator-founder-visa,Official,Founder-Startup
+27,Estonia,EST,Europe,Work Permit / Short-term Employment,Police and Border Guard Board (PPA),https://www.politsei.ee/en/instructions/information-for-a-foreigner/work-in-estonia/,Official,Employer-Sponsored
+27,Estonia,EST,Europe,Digital Nomad Visa (D-visa),Enterprise Estonia,https://www.e-resident.gov.ee/nomadvisa/,Official,Professional-Self-Employed
+27,Estonia,EST,Europe,Startup Visa,Startup Estonia / PPA,https://www.startupestonia.ee/visa,Official,Founder-Startup
+28,New Zealand,NZL,Oceania,Skilled Migrant Category (SMC),Immigration New Zealand,https://www.immigration.govt.nz/new-zealand-visas/visas/visa/skilled-migrant-category-resident-visa,Official,Points-Based-PR-Direct
+28,New Zealand,NZL,Oceania,Accredited Employer Work Visa (AEWV),Immigration New Zealand,https://www.immigration.govt.nz/new-zealand-visas/visas/visa/accredited-employer-work-visa,Official,Employer-Sponsored
+28,New Zealand,NZL,Oceania,Green List (Straight to Residence),Immigration NZ,https://www.immigration.govt.nz/new-zealand-visas/preparing-a-visa-application/working-in-nz/green-list-occupations,Official,Employer-Sponsored
+28,New Zealand,NZL,Oceania,Entrepreneur Residence Visa,Immigration New Zealand,https://www.immigration.govt.nz/new-zealand-visas/visas/visa/entrepreneur-resident-visa,Official,Founder-Startup
+29,Bahrain,BHR,Middle East,LMRA Work Permit,Labour Market Regulatory Authority (LMRA),https://www.lmra.gov.bh/portal/en/page/show/134,Official,Employer-Sponsored
+29,Bahrain,BHR,Middle East,Golden Residency Permit,LMRA / Bahrain.bh,https://www.bahrain.bh/wps/portal/en/BahrainResidence/GoldenResidency/,Official,Exceptional-Talent
+30,Oman,OMN,Middle East,Employment (Work) Visa – Standard (2-year),Royal Oman Police (ROP) – Directorate of Passports & Residence,https://www.rop.gov.om/english/Visas.aspx,Official,Employer-Sponsored
