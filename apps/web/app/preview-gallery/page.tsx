@@ -7,7 +7,6 @@ import {
   CompositeScoreDisplay,
   PillarMiniBars,
   PillarRadar,
-  MethodologyBar,
   ProvenanceTrigger,
   ProvenanceHighlight,
   PolicyTimeline,
@@ -15,10 +14,16 @@ import {
   DirectionArrow,
   SectionHeader,
   DataTableNote,
+  Sparkline,
+  deterministicTrend,
+  SpecimenPlate,
+  SectionPlate,
+  MarginNote,
+  SplitSpecimen,
+  PillarsSpecimen,
+  CountryFlag,
   type PolicyTimelineEvent,
 } from '@/components/gtmi';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { DEFAULT_PILLAR_WEIGHTS } from '@/lib/advisor-mode';
 import type { Provenance } from '@/lib/provenance';
 import { PreviewWeightSliderHarness } from './weight-slider-harness';
 
@@ -52,9 +57,6 @@ const PROVENANCE_APPROVED: Provenance = {
   reviewerNotes: 'Verified against ATO supplementary fee table.',
 };
 
-// Phase 3.5 / ADR-014 — country-substitute provenance fixture.
-// extractionModel='country-substitute-regional' triggers the purple
-// "Country-substitute" badge inside the ProvenanceTrigger popover.
 const PROVENANCE_COUNTRY_SUBSTITUTE: Provenance = {
   ...PROVENANCE_OK,
   sourceUrl: 'https://www.education.gov.au/visa-holder-children-public-schools-overview',
@@ -115,37 +117,90 @@ const PILLAR_SCORES_SGP = { A: 24, B: 19, C: 17, D: 13, E: 16 };
 export default function PrimitivesPreviewPage() {
   return (
     <div className="bg-paper text-ink">
-      <header className="sticky top-0 z-30 border-b border-border bg-paper/85 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-rule bg-paper/85 backdrop-blur">
         <div className="mx-auto flex h-[60px] max-w-page-wide items-center justify-between px-6">
-          <p className="font-serif text-data-lg">GTMI primitives — internal preview</p>
-          <ThemeToggle />
+          <p className="serif text-data-lg">GTMI primitives — internal preview</p>
+          <span className="eyebrow">Phase 4-A · redesign</span>
         </div>
       </header>
 
       <main className="mx-auto flex max-w-page-wide flex-col gap-12 px-6 py-10">
         <SectionHeader
-          eyebrow="Phase 4.1"
+          eyebrow="Phase 4-A"
           title="Component gallery"
-          dek="Every primitive in components/gtmi rendered in its supported states. This route is robots-disallowed and not linked from the public site."
+          dek="Every primitive in components/gtmi rendered in its supported states. Editorial token system, light-only (dark mode dropped per Q2). This route is robots-disallowed and not linked from the public site."
         />
 
         <Block title="Typography">
-          <div className="flex flex-col gap-2">
-            <p className="font-serif text-display-xl">Display XL — serif</p>
-            <p className="font-serif text-display-lg">Display LG — serif</p>
-            <p className="font-serif text-display-md">Display MD — serif</p>
-            <p className="text-dek">
-              Dek paragraph — Inter, used for the longer-form copy below display headlines on
-              landing pages and section openers.
+          <div className="flex flex-col gap-3">
+            <p
+              className="serif"
+              style={{ fontSize: 72, fontWeight: 400, lineHeight: 1.02, margin: 0 }}
+            >
+              Display 72px — Fraunces serif
             </p>
-            <p className="text-body">Body — 16px Inter, line-height 1.6.</p>
-            <p className="font-mono text-data-md tnum">
+            <p className="serif" style={{ fontSize: 44, fontWeight: 400, margin: 0 }}>
+              H1 44px — editorial headline
+            </p>
+            <p className="serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>
+              H2 28px — section title
+            </p>
+            <p className="serif" style={{ fontSize: 20, fontWeight: 500, margin: 0 }}>
+              H3 20px — block title
+            </p>
+            <p className="text-dek text-ink-3">
+              Dek paragraph — Inter Tight, longer-form copy below display headlines.
+            </p>
+            <p className="text-body">Body — 16px Inter Tight, line-height 1.6.</p>
+            <p className="num text-data-md">
               Data — 14px JetBrains Mono with tabular numerals: 73,150 / 22.53 / 16.36
             </p>
+            <p className="eyebrow">Eyebrow — uppercase, tracked, 11px ink-3.</p>
           </div>
         </Block>
 
-        <Block title="Sequential color scale">
+        <Block title="Editorial atoms — class rules from globals.css">
+          <div className="flex flex-wrap gap-3">
+            <span className="chip">default chip</span>
+            <span className="chip chip-amber">amber</span>
+            <span className="chip chip-accent">accent</span>
+            <span className="chip chip-mute">mute</span>
+            <span className="chip chip-ink">ink</span>
+            <span className="chip chip-navy">navy</span>
+            <span className="chip chip-navy-soft">navy-soft</span>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button className="btn">Primary button</button>
+            <button className="btn btn-ghost">Ghost</button>
+            <button className="btn-link">Link button</button>
+          </div>
+          <hr className="rule mt-6" />
+          <hr className="rule-thick mt-3" />
+          <hr className="rule-soft mt-3" />
+          <hr className="rule-double mt-3" />
+        </Block>
+
+        <Block title="Pillar palette — design's warm-cool spectrum">
+          <div className="grid grid-cols-5 gap-2">
+            {(['A', 'B', 'C', 'D', 'E'] as const).map((p) => (
+              <div key={p} className="border border-rule bg-paper-2 p-3">
+                <div
+                  className="serif"
+                  style={{
+                    fontSize: 40,
+                    color: `var(--pillar-${p.toLowerCase()})`,
+                    lineHeight: 1,
+                  }}
+                >
+                  {p}
+                </div>
+                <div className="num mt-2 text-data-sm text-ink-4">pillar-{p.toLowerCase()}</div>
+              </div>
+            ))}
+          </div>
+        </Block>
+
+        <Block title="Sequential color scale — ScoreBar">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <ScoreBar value={9.4} />
             <ScoreBar value={28.2} />
@@ -159,15 +214,15 @@ export default function PrimitivesPreviewPage() {
         <Block title="ScoreBar — phase2Placeholder + sizes">
           <div className="grid gap-3 md:grid-cols-3">
             <div>
-              <p className="mb-1 text-data-sm text-muted-foreground">phase2Placeholder = true</p>
+              <p className="mb-1 text-data-sm text-ink-4">phase2Placeholder = true</p>
               <ScoreBar value={16.36} phase2Placeholder />
             </div>
             <div>
-              <p className="mb-1 text-data-sm text-muted-foreground">phase2Placeholder = false</p>
+              <p className="mb-1 text-data-sm text-ink-4">phase2Placeholder = false</p>
               <ScoreBar value={16.36} />
             </div>
             <div>
-              <p className="mb-1 text-data-sm text-muted-foreground">unscored — flag ignored</p>
+              <p className="mb-1 text-data-sm text-ink-4">unscored — flag ignored</p>
               <ScoreBar value={null} phase2Placeholder />
             </div>
             <ScoreBar value={64.2} width="sm" />
@@ -204,25 +259,52 @@ export default function PrimitivesPreviewPage() {
             <CoverageChip populated={34} total={48} />
             <CoverageChip populated={6} total={48} />
             <CoverageChip populated={0} total={48} />
+            <CoverageChip populated={30} total={48} format="fraction" />
+            <CoverageChip populated={6} total={48} format="fraction" />
           </div>
         </Block>
 
         <Block title="PillarMiniBars">
           <div className="flex flex-wrap items-end gap-8">
             <div>
-              <p className="mb-2 text-data-sm text-muted-foreground">
-                AUS Skills in Demand 482 — Core
-              </p>
+              <p className="mb-2 text-data-sm text-ink-4">AUS Skills in Demand 482 — Core</p>
               <PillarMiniBars scores={PILLAR_SCORES_AUS} />
             </div>
             <div>
-              <p className="mb-2 text-data-sm text-muted-foreground">SGP S Pass</p>
+              <p className="mb-2 text-data-sm text-ink-4">SGP S Pass</p>
               <PillarMiniBars scores={PILLAR_SCORES_SGP} />
             </div>
             <div>
-              <p className="mb-2 text-data-sm text-muted-foreground">Unscored</p>
+              <p className="mb-2 text-data-sm text-ink-4">Unscored</p>
               <PillarMiniBars scores={null} />
             </div>
+          </div>
+        </Block>
+
+        <Block title="Sparkline — deterministic trend (Q7 placeholder)">
+          <div className="flex flex-wrap items-center gap-8">
+            <div>
+              <p className="mb-2 text-data-sm text-ink-4">Trend up · composite 78.4</p>
+              <Sparkline values={deterministicTrend('CHE-L', 78.4)} />
+            </div>
+            <div>
+              <p className="mb-2 text-data-sm text-ink-4">Trend down · composite 19.92</p>
+              <Sparkline values={deterministicTrend('SGP-S', 19.92)} highlight="var(--accent)" />
+            </div>
+            <div>
+              <p className="mb-2 text-data-sm text-ink-4">Wider</p>
+              <Sparkline values={deterministicTrend('AUS-CORE', 16.36)} width={120} height={28} />
+            </div>
+          </div>
+        </Block>
+
+        <Block title="CountryFlag — vendored SVG + ISO box fallback">
+          <div className="flex flex-wrap items-center gap-4">
+            <CountryFlag iso="AUS" countryName="Australia" size="sm" />
+            <CountryFlag iso="AUS" countryName="Australia" size="md" />
+            <CountryFlag iso="AUS" countryName="Australia" size="lg" />
+            <CountryFlag iso="ZZZ" countryName="Unknown — falls back to ISO box" />
+            <CountryFlag iso="XXX" />
           </div>
         </Block>
 
@@ -239,11 +321,14 @@ export default function PrimitivesPreviewPage() {
           </div>
         </Block>
 
-        <Block title="MethodologyBar">
-          <MethodologyBar
-            cmePaqSplit={{ cme: 0.3, paq: 0.7 }}
-            pillarWeights={DEFAULT_PILLAR_WEIGHTS}
-          />
+        <Block title="SplitSpecimen — composite 30/70 donut">
+          <div className="flex justify-start gap-16 pl-12 pt-6">
+            <SplitSpecimen />
+          </div>
+        </Block>
+
+        <Block title="PillarsSpecimen — typographic poster (5 pillars)">
+          <PillarsSpecimen />
         </Block>
 
         <Block title="WeightSlider (interactive — proportional rebalance)">
@@ -253,7 +338,7 @@ export default function PrimitivesPreviewPage() {
         <Block title="ProvenanceTrigger states">
           <div className="flex flex-col gap-6">
             <Row label="Pending review (13 core keys)">
-              <span className="font-mono text-data-md">AUD 73,150</span>
+              <span className="num text-data-md">AUD 73,150</span>
               <ProvenanceTrigger
                 provenance={PROVENANCE_OK}
                 status="pending_review"
@@ -261,7 +346,7 @@ export default function PrimitivesPreviewPage() {
               />
             </Row>
             <Row label="Approved (13 + 3 review keys)">
-              <span className="font-mono text-data-md">AUD 73,150</span>
+              <span className="num text-data-md">AUD 73,150</span>
               <ProvenanceTrigger
                 provenance={PROVENANCE_APPROVED}
                 status="approved"
@@ -286,7 +371,7 @@ export default function PrimitivesPreviewPage() {
               <ProvenanceTrigger provenance={null} status="approved" />
             </Row>
             <Row label="Country-substitute (Phase 3.5 / ADR-014; C.3.2 OECD default)">
-              <span className="font-mono text-data-md">automatic</span>
+              <span className="num text-data-md">automatic</span>
               <ProvenanceTrigger
                 provenance={PROVENANCE_COUNTRY_SUBSTITUTE}
                 status="approved"
@@ -310,11 +395,11 @@ export default function PrimitivesPreviewPage() {
         <Block title="PolicyTimeline">
           <div className="grid gap-6 md:grid-cols-2">
             <div>
-              <p className="mb-2 text-data-sm text-muted-foreground">With mocked events</p>
+              <p className="mb-2 text-data-sm text-ink-4">With mocked events</p>
               <PolicyTimeline events={POLICY_EVENTS_MOCK} />
             </div>
             <div>
-              <p className="mb-2 text-data-sm text-muted-foreground">Phase 4 reality (empty)</p>
+              <p className="mb-2 text-data-sm text-ink-4">Phase 4 reality (empty)</p>
               <PolicyTimeline events={[]} />
             </div>
           </div>
@@ -323,7 +408,7 @@ export default function PrimitivesPreviewPage() {
         <Block title="EmptyState">
           <div className="grid gap-4 md:grid-cols-2">
             <EmptyState
-              title="Awaiting Phase 3 scoring"
+              title="Awaiting Phase 5 calibration"
               body="This program is seeded but has no field values or scores yet."
               ctaHref="/methodology"
               ctaLabel="See methodology"
@@ -337,10 +422,10 @@ export default function PrimitivesPreviewPage() {
 
         <Block title="DirectionArrow">
           <div className="flex items-center gap-6">
-            <span className="inline-flex items-center gap-1 font-mono text-data-md">
+            <span className="num inline-flex items-center gap-1 text-data-md">
               Score 78 <DirectionArrow direction="higher_is_better" />
             </span>
-            <span className="inline-flex items-center gap-1 font-mono text-data-md">
+            <span className="num inline-flex items-center gap-1 text-data-md">
               Days 90 <DirectionArrow direction="lower_is_better" />
             </span>
           </div>
@@ -349,19 +434,64 @@ export default function PrimitivesPreviewPage() {
         <Block title="DataTableNote">
           <DataTableNote>
             Composite = 30% CME + 70% PAQ. CME comes from IMD&rsquo;s Appeal factor re-normalized
-            across our 30-country cohort. PAQ is GTMI&rsquo;s 48-indicator program-architecture
-            score.
+            across the 30-country cohort. PAQ is GTMI&rsquo;s 48-indicator program-architecture
+            score across five pillars: Access, Process, Rights, Pathway, Stability.
           </DataTableNote>
         </Block>
+
+        <Block title="MarginNote — italic Fraunces gutter annotation">
+          <div className="grid gap-6 md:grid-cols-2">
+            <MarginNote>
+              Peer-review note: cohort median assumes n≥5; today n=2, so the dashed overlay is a
+              hint not an authority.
+            </MarginNote>
+            <MarginNote color="var(--accent)">
+              Score change: A.03 raw value moved from 4-week to 14-day window on 2026-03-29; impact
+              flagged on the changes timeline.
+            </MarginNote>
+          </div>
+        </Block>
       </main>
+
+      <SpecimenPlate
+        plateNo="I"
+        title="Specimen plate — full-bleed editorial divider"
+        caption="Used between major regions on the landing page. Two-column grid: left holds the plate-number eyebrow + serif title + italic caption; right holds an artefact passed via children."
+        tone="paper-3"
+      >
+        <PillarsSpecimen />
+      </SpecimenPlate>
+
+      <SectionPlate
+        numeral="II"
+        title="Section plate — chapter-style title"
+        standfirst="Drops a large oxblood numeral in the gutter alongside a 56px Fraunces headline. This one is text-only; SpecimenPlate is the artefact-bearing sibling."
+        tone="ink"
+      />
+
+      <SectionPlate
+        numeral="III"
+        title="Tone variant — paper-3"
+        standfirst="The same plate on a warm paper surface, kept in the gallery so all three tones (ink, navy, paper-3) are visible together."
+        tone="paper-3"
+      />
+
+      <SectionPlate
+        numeral="IV"
+        title="Tone variant — navy"
+        standfirst="Used sparingly for peer-review / methodology framing."
+        tone="navy"
+      />
     </div>
   );
 }
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-4 rounded-card border border-border bg-surface p-6">
-      <h3 className="font-serif text-data-lg text-ink">{title}</h3>
+    <section className="flex flex-col gap-4 border border-rule bg-paper-2 p-6">
+      <h3 className="serif text-data-lg text-ink" style={{ fontWeight: 500 }}>
+        {title}
+      </h3>
       <div className="flex flex-col gap-3">{children}</div>
     </section>
   );
@@ -369,8 +499,8 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-card border border-dashed border-border bg-paper px-4 py-3">
-      <p className="text-data-sm text-muted-foreground">{label}</p>
+    <div className="flex flex-wrap items-center gap-3 border border-dashed border-rule bg-paper px-4 py-3">
+      <p className="text-data-sm text-ink-4">{label}</p>
       <div className="ml-auto flex items-center gap-3">{children}</div>
     </div>
   );

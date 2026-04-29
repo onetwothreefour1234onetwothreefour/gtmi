@@ -129,7 +129,7 @@ export function ProvenanceTrigger({
 
           {p.sourceTier === 2 && (
             <div
-              className="mt-3 inline-flex items-start gap-2 rounded-button border border-slate-300/60 bg-slate-100/60 px-2.5 py-1.5 text-data-sm text-slate-700 dark:border-slate-600/60 dark:bg-slate-800/60 dark:text-slate-200"
+              className="mt-3 inline-flex items-start gap-2 border border-rule bg-paper-2 px-2.5 py-1.5 text-data-sm text-ink-3"
               data-testid="tier2-source-badge"
               role="note"
             >
@@ -143,7 +143,7 @@ export function ProvenanceTrigger({
 
           {derivedInputs && (
             <div
-              className="mt-3 rounded-button border border-amber-300/60 bg-amber-50/70 p-2.5 text-data-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100"
+              className="mt-3 border border-precalib-fg/40 bg-precalib-bg p-2.5 text-data-sm text-precalib-fg"
               data-testid="derived-inputs"
               role="note"
             >
@@ -151,9 +151,7 @@ export function ProvenanceTrigger({
               <dl className="mt-1.5 space-y-1.5">
                 {Object.entries(derivedInputs).map(([key, value]) => (
                   <div key={key} className="grid grid-cols-[auto_1fr] gap-x-2">
-                    <dt className="font-mono text-[11px] text-amber-900/80 dark:text-amber-100/80">
-                      {key}
-                    </dt>
+                    <dt className="font-mono text-[11px] text-precalib-fg/80">{key}</dt>
                     <dd className="text-data-sm">
                       <DerivedInputDisplay value={value} />
                     </dd>
@@ -165,7 +163,7 @@ export function ProvenanceTrigger({
 
           {p.extractionModel === 'country-substitute-regional' && (
             <div
-              className="mt-3 inline-flex flex-col gap-0.5 rounded-button border border-purple-300/60 bg-purple-50/70 px-2.5 py-1.5 text-data-sm text-purple-900 dark:border-purple-700/60 dark:bg-purple-950/40 dark:text-purple-100"
+              className="mt-3 inline-flex flex-col gap-0.5 border border-navy-soft bg-navy/[0.06] px-2.5 py-1.5 text-data-sm text-navy"
               data-testid="country-substitute-badge"
               role="note"
             >
@@ -296,7 +294,7 @@ function DerivedInputDisplay({ value }: { value: DerivedInputValue }) {
       {entries.map(([k, v], i) => (
         <span key={k}>
           {i > 0 ? ' · ' : null}
-          <span className="text-amber-900/80 dark:text-amber-100/80">{k}</span>
+          <span className="text-precalib-fg/80">{k}</span>
           {': '}
           <span className="font-mono text-[11px]">{String(v)}</span>
         </span>

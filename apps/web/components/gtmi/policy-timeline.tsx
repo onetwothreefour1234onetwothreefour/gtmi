@@ -19,24 +19,24 @@ export interface PolicyTimelineEvent {
 
 export interface PolicyTimelineProps {
   events: PolicyTimelineEvent[];
-  /** Phase 4 always passes []. Phase 5 will populate this. */
   className?: string;
 }
 
 const SEVERITY_STYLE: Record<PolicyTimelineSeverity, string> = {
-  minor: 'bg-muted text-muted-foreground border-border',
-  material: 'bg-precalib-bg text-precalib-fg border-precalib-fg/40',
-  breaking: 'bg-destructive/10 text-destructive border-destructive/40',
-  url_broken: 'bg-precalib-bg text-precalib-fg border-precalib-fg/40',
+  minor: 'chip chip-mute',
+  material: 'chip chip-amber',
+  breaking: 'chip chip-accent',
+  url_broken: 'chip chip-amber',
 };
 
 /**
- * Horizontal timeline of policy-change events. Phase 4 reality: the table
- * is empty (and RLS gates `summary_human_approved = true`). Renders the
- * Phase 5 placeholder copy via <EmptyState> when events.length === 0.
+ * Vertical timeline of policy-change events on a programme detail page.
+ * Phase 4 reality: empty (RLS gates `summary_human_approved = true`); the
+ * EmptyState placeholder ships in production until Phase 5/6 populates
+ * the table.
  *
- * The component is exercised by tests with mocked events so it activates
- * cleanly when Phase 5 lights up the table — no code change needed.
+ * Editorial restyle (Phase 4-A): rule-soft spine, chip atoms for severity,
+ * Fraunces summary, mono date.
  */
 export function PolicyTimeline({ events, className }: PolicyTimelineProps) {
   if (events.length === 0) {
@@ -51,40 +51,32 @@ export function PolicyTimeline({ events, className }: PolicyTimelineProps) {
 
   return (
     <ol
-      className={cn('relative border-l border-border pl-5', className)}
+      className={cn('relative border-l border-rule pl-5', className)}
       data-testid="policy-timeline"
     >
       {events.map((event) => (
         <li key={event.id} className="mb-6 last:mb-0">
-          <span
-            className="absolute -left-1.5 mt-1 inline-block h-3 w-3 rounded-full bg-accent"
-            aria-hidden
-          />
+          <span className="absolute -left-1.5 mt-1 inline-block h-3 w-3 bg-accent" aria-hidden />
           <div className="flex flex-wrap items-baseline gap-2">
-            <time
-              dateTime={event.detectedAt}
-              className="font-mono text-data-sm text-muted-foreground"
-            >
+            <time dateTime={event.detectedAt} className="num text-data-sm text-ink-4">
               {event.detectedAt.slice(0, 10)}
             </time>
-            <span
-              className={cn(
-                'inline-flex h-5 items-center rounded-button border px-1.5 font-sans text-[10px] font-medium uppercase tracking-wider',
-                SEVERITY_STYLE[event.severity]
-              )}
-            >
-              {event.severity}
-            </span>
-            <span className="font-mono text-data-sm">{event.fieldKey}</span>
-            <span className="text-data-sm">{event.fieldLabel}</span>
+            <span className={SEVERITY_STYLE[event.severity]}>{event.severity}</span>
+            <span className="num text-data-sm">{event.fieldKey}</span>
+            <span className="text-data-sm text-ink-3">{event.fieldLabel}</span>
             {typeof event.paqDelta === 'number' && (
-              <span className="ml-auto font-mono text-data-sm tnum text-muted-foreground">
+              <span className="num ml-auto text-data-sm text-ink-4">
                 Δ PAQ {event.paqDelta > 0 ? '+' : ''}
                 {event.paqDelta.toFixed(2)}
               </span>
             )}
           </div>
-          <p className="mt-1 text-data-md text-foreground">{event.summary}</p>
+          <p
+            className="mt-1 text-data-md text-ink-2"
+            style={{ fontFamily: 'var(--font-serif), Georgia, serif' }}
+          >
+            {event.summary}
+          </p>
         </li>
       ))}
     </ol>

@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
+import { ACCENT_OXBLOOD, type PillarKey } from '@/lib/theme';
 
 export type PillarScores = Record<PillarKey, number>;
 
@@ -35,6 +35,13 @@ const LABEL: Record<PillarKey, string> = {
   E: 'Stability',
 };
 
+/**
+ * Pillar radar with optional cohort-median + compare overlays.
+ *
+ * Editorial restyle (Phase 4-A): program polygon = oxblood (filled at 18%
+ * opacity), cohort median = ink-4 dashed, compare = navy filled at 12%.
+ * Axis labels render in Fraunces. The sr-only data table stays.
+ */
 export function PillarRadar({
   program,
   programLabel = 'This program',
@@ -53,7 +60,6 @@ export function PillarRadar({
 
   return (
     <div className={className} data-testid="pillar-radar">
-      {/* Screen-reader text-alternative table — visually hidden, exposed to AT */}
       <table className="sr-only" aria-label={`Pillar scores for ${programLabel}`}>
         <thead>
           <tr>
@@ -76,18 +82,26 @@ export function PillarRadar({
       </table>
       <ResponsiveContainer width="100%" height={360}>
         <RadarChart data={data} outerRadius={120}>
-          <PolarGrid stroke="hsl(var(--border))" />
+          <PolarGrid stroke="var(--rule)" />
           <PolarAngleAxis
             dataKey="pillar"
-            tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
+            tick={{
+              fill: 'var(--ink-3)',
+              fontSize: 12,
+              fontFamily: 'var(--font-serif), Georgia, serif',
+            }}
           />
-          <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
+          <PolarRadiusAxis
+            angle={90}
+            domain={[0, 100]}
+            tick={{ fontSize: 10, fill: 'var(--ink-4)' }}
+          />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'hsl(var(--popover))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: 4,
-              color: 'hsl(var(--popover-foreground))',
+              backgroundColor: 'var(--popover)',
+              border: '1px solid var(--rule)',
+              borderRadius: 0,
+              color: 'var(--popover-foreground)',
               fontSize: 12,
             }}
           />
@@ -96,17 +110,18 @@ export function PillarRadar({
           <Radar
             name={programLabel}
             dataKey="program"
-            stroke={PILLAR_COLORS.A}
-            fill={PILLAR_COLORS.A}
-            fillOpacity={0.25}
+            stroke={ACCENT_OXBLOOD}
+            fill={ACCENT_OXBLOOD}
+            fillOpacity={0.18}
+            strokeWidth={2}
           />
 
           {cohortMedian && (
             <Radar
               name={`Cohort median${smallCohortNote ? ' (n=2)' : ''}`}
               dataKey="cohort"
-              stroke="hsl(var(--muted-foreground))"
-              strokeDasharray="4 4"
+              stroke="var(--ink-4)"
+              strokeDasharray="3 3"
               fill="none"
             />
           )}
@@ -115,9 +130,9 @@ export function PillarRadar({
             <Radar
               name={compareTo.label}
               dataKey="compare"
-              stroke={PILLAR_COLORS.D}
-              fill={PILLAR_COLORS.D}
-              fillOpacity={0.15}
+              stroke="var(--navy)"
+              fill="var(--navy)"
+              fillOpacity={0.12}
             />
           )}
         </RadarChart>

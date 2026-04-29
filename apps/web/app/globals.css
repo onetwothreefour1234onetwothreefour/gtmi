@@ -3,105 +3,124 @@
 @tailwind utilities;
 
 /*
- * GTMI editorial color tokens.
- * Light = warm off-white paper, dark = near-black with cool surface.
- * HSL values chosen so Tailwind utilities (bg-paper, text-ink, etc.) work
- * via the hsl(var(--token)) indirection in tailwind.config.ts.
+ * GTMI editorial token system.
  *
- * Source colors (resolved):
- *   ink        light #0A0A0B  /  dark #F5F5F5
- *   paper      light #FAFAF7  /  dark #0E0E10
- *   surface    light #FFFFFF  /  dark #171719
- *   border     light #E5E5E0  /  dark #28282C
- *   accent     #0F4C5C deep teal (interactive, GTMI mark, used sparingly)
- *   precalib   #A66A00 on #FFF6E6 (light) / #FFC971 on #33260D (dark)
+ * Source of truth: docs/design/styles.css. Light-only — dark mode dropped
+ * during the Phase 4 redesign (analyst decision Q2). Shadcn/Radix variable
+ * names retained but resolved against the design's flat hex palette so
+ * existing utilities (bg-paper, text-ink, border-border, bg-muted, etc.)
+ * keep working without rewriting every component.
  */
 
 @layer base {
   :root {
-    --ink: 240 6% 5%;
-    --paper: 50 23% 98%;
-    --surface: 0 0% 100%;
-    --border: 50 11% 89%;
-    --input: 50 11% 89%;
-    --ring: 192 71% 21%;
+    /* Surfaces — warm paper */
+    --paper: #f7f4ed;
+    --paper-2: #f2eee3;
+    --paper-3: #eae4d3;
+    --rule: #d9d2be;
+    --rule-soft: #e5dec9;
 
-    --background: 50 23% 98%;
-    --foreground: 240 6% 5%;
+    /* Ink */
+    --ink: #1a1a1a;
+    --ink-2: #2e2a22;
+    --ink-3: #5c4a2e;
+    --ink-4: #8a7456;
+    --ink-5: #b0a289;
 
-    --muted: 50 11% 95%;
-    --muted-foreground: 240 4% 40%;
+    /* Single accent — oxblood */
+    --accent: #b8412a;
+    --accent-2: #8e2f1e;
+    --accent-soft: #e9c4b6;
 
-    --accent: 192 71% 21%;
-    --accent-foreground: 0 0% 100%;
+    /* Secondary accent — deep navy (peer-review / methodology / citation) */
+    --navy: #1b2540;
+    --navy-2: #2a3656;
+    --navy-soft: #c7ccdb;
 
-    --primary: 192 71% 21%;
-    --primary-foreground: 0 0% 100%;
+    /* States */
+    --positive: #4f6b3e;
+    --warning: #b8862a;
+    --negative: #8e2f1e;
 
-    --secondary: 50 11% 95%;
-    --secondary-foreground: 240 6% 5%;
+    /* Pillars — design's warm-cool low-chroma spectrum */
+    --pillar-a: #5c4a2e;
+    --pillar-b: #846a3f;
+    --pillar-c: #4f6b3e;
+    --pillar-d: #2c4159;
+    --pillar-e: #6e3a2e;
 
-    --destructive: 0 65% 38%;
-    --destructive-foreground: 0 0% 100%;
+    /* Pre-calibration chip */
+    --precalib-fg: #b8862a;
+    --precalib-bg: #fbf3dc;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 6% 5%;
+    /* Shadcn/Radix compatibility layer.
+       These point at the design tokens above; Tailwind utility classes
+       (bg-card, text-popover-foreground, etc.) resolve through here so
+       Radix Popover / Dialog primitives keep working unchanged. */
+    --background: var(--paper);
+    --foreground: var(--ink);
+    --surface: var(--paper-2);
+    --border: var(--rule);
+    --input: var(--rule);
+    --ring: var(--accent);
 
-    --card: 0 0% 100%;
-    --card-foreground: 240 6% 5%;
+    --muted: var(--paper-2);
+    --muted-foreground: var(--ink-4);
 
-    --precalib-fg: 36 100% 33%;
-    --precalib-bg: 40 100% 95%;
-  }
+    --accent-foreground: var(--paper);
+    --primary: var(--accent);
+    --primary-foreground: var(--paper);
+    --secondary: var(--paper-2);
+    --secondary-foreground: var(--ink);
 
-  .dark {
-    --ink: 0 0% 96%;
-    --paper: 240 6% 6%;
-    --surface: 240 4% 9%;
-    --border: 240 5% 16%;
-    --input: 240 5% 16%;
-    --ring: 192 50% 60%;
+    --destructive: var(--negative);
+    --destructive-foreground: var(--paper);
 
-    --background: 240 6% 6%;
-    --foreground: 0 0% 96%;
+    --popover: var(--paper);
+    --popover-foreground: var(--ink);
+    --card: var(--paper-2);
+    --card-foreground: var(--ink);
 
-    --muted: 240 4% 12%;
-    --muted-foreground: 240 4% 65%;
+    /* Editorial type scale (px-fixed; for SectionPlate / SpecimenPlate
+       and the design's serif headings). Tailwind's text-display-* keys
+       remain available too for back-compat. */
+    --fs-display: 72px;
+    --fs-h1: 44px;
+    --fs-h2: 28px;
+    --fs-h3: 20px;
+    --fs-body: 15px;
+    --fs-small: 13px;
+    --fs-micro: 11px;
 
-    --accent: 192 50% 60%;
-    --accent-foreground: 240 6% 6%;
-
-    --primary: 192 50% 60%;
-    --primary-foreground: 240 6% 6%;
-
-    --secondary: 240 4% 12%;
-    --secondary-foreground: 0 0% 96%;
-
-    --destructive: 0 65% 55%;
-    --destructive-foreground: 240 6% 6%;
-
-    --popover: 240 4% 9%;
-    --popover-foreground: 0 0% 96%;
-
-    --card: 240 4% 9%;
-    --card-foreground: 0 0% 96%;
-
-    --precalib-fg: 36 100% 72%;
-    --precalib-bg: 36 60% 13%;
+    /* Spacing — 4px base */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+    --space-8: 64px;
+    --space-9: 96px;
   }
 
   html {
     /* Tabular numerals + stylistic alternates for clearer 6/9/0 in tables. */
-    font-feature-settings: 'tnum' 1, 'cv11' 1;
+    font-feature-settings: 'tnum' 1;
   }
 
   body {
     @apply bg-paper text-ink antialiased;
     font-family:
       var(--font-sans),
-      system-ui,
       -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
       sans-serif;
+    font-size: var(--fs-body);
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
   }
 
   :focus-visible {
@@ -126,4 +145,244 @@
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum' 1;
   }
+}
+
+/* ---------------------------------------------------------------- *
+ * Editorial atoms (translated from docs/design/styles.css). These
+ * are CSS classes (not Tailwind utilities) so they can be applied
+ * directly in JSX where the design's typography/rule treatments
+ * are reused verbatim.
+ * ---------------------------------------------------------------- */
+
+.serif {
+  font-family: var(--font-serif), 'Source Serif Pro', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+.serif-tight {
+  font-family: var(--font-serif), 'Source Serif Pro', Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.mono {
+  font-family: var(--font-mono), 'IBM Plex Mono', ui-monospace, monospace;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+}
+.sans {
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.eyebrow {
+  font-family: var(--font-sans), -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.rule {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+.rule-thick {
+  border: 0;
+  border-top: 2px solid var(--ink);
+}
+.rule-soft {
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
+}
+.rule-double {
+  border: 0;
+  height: 5px;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Numerals — typographic atoms reused across screens. */
+.num {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.num-l {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 500;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.02em;
+}
+
+/* Score bar — base atom; consumers can override fill colour inline. */
+.score-bar {
+  position: relative;
+  height: 4px;
+  background: var(--rule-soft);
+  width: 100%;
+  overflow: hidden;
+}
+.score-bar > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: var(--ink);
+}
+
+/* Chip family. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink-3);
+  border-radius: 0;
+}
+.chip-amber {
+  color: var(--warning);
+  border-color: #e0c896;
+  background: #fbf3dc;
+}
+.chip-accent {
+  color: var(--accent);
+  border-color: var(--accent-soft);
+  background: #f8e4da;
+}
+.chip-mute {
+  color: var(--ink-4);
+  border-color: var(--rule);
+}
+.chip-ink {
+  color: var(--paper);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.chip-navy {
+  color: var(--paper);
+  background: var(--navy);
+  border-color: var(--navy);
+  letter-spacing: 0.06em;
+}
+.chip-navy-soft {
+  color: var(--navy);
+  background: rgba(27, 37, 64, 0.06);
+  border-color: var(--navy-soft);
+}
+
+/* Drop cap — editorial. */
+.dropcap::first-letter {
+  font-family: var(--font-serif), Georgia, serif;
+  font-weight: 500;
+  font-size: 5em;
+  line-height: 0.85;
+  float: left;
+  margin: 6px 14px -4px 0;
+  color: var(--accent);
+  letter-spacing: -0.04em;
+}
+
+/* Peer-review marginalia (navy). */
+.peer-note {
+  font-family: var(--font-serif), Georgia, serif;
+  font-style: italic;
+  font-size: 12px;
+  color: var(--navy);
+  line-height: 1.5;
+  border-left: 2px solid var(--navy);
+  padding-left: 12px;
+}
+
+/* Buttons — editorial atoms. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.btn:hover {
+  background: var(--ink-2);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+}
+.btn-ghost:hover {
+  background: var(--paper-3);
+}
+.btn-link {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  height: auto;
+  padding: 0 0 1px 0;
+  color: var(--ink);
+}
+.btn-link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Editorial table primitive. */
+table.gtmi {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.gtmi thead th {
+  text-align: left;
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ink);
+  white-space: nowrap;
+}
+table.gtmi tbody td {
+  padding: 12px;
+  border-bottom: 1px solid var(--rule-soft);
+  vertical-align: middle;
+}
+table.gtmi tbody tr:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Subtle warm paper grain — applied behind editorial sections. */
+.paper-grain {
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(92, 74, 46, 0.025) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(92, 74, 46, 0.02) 0%, transparent 40%);
+}
+
+/* Skeleton hatch — placeholder sources. */
+.hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--paper-3) 0 6px,
+    var(--paper-2) 6px 12px
+  );
 }

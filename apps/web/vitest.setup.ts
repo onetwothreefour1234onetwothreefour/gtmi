@@ -4,7 +4,8 @@ import * as axeMatchers from 'vitest-axe/matchers';
 
 expect.extend(axeMatchers);
 
-// jsdom doesn't ship matchMedia (next-themes uses it). Stub for tests.
+// jsdom doesn't ship matchMedia (Radix primitives use it for collision
+// checks). Stub for tests.
 if (typeof window !== 'undefined' && !window.matchMedia) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).matchMedia = (query: string) => ({

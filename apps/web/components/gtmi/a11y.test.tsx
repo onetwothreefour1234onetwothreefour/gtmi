@@ -11,6 +11,12 @@ import { SectionHeader } from './section-header';
 import { DirectionArrow } from './direction-arrow';
 import { ProvenanceTrigger } from './provenance-trigger';
 import { CountryFlag } from './country-flag';
+import { Sparkline, deterministicTrend } from './sparkline';
+import { SpecimenPlate } from './specimen-plate';
+import { SectionPlate } from './section-plate';
+import { MarginNote } from './margin-note';
+import { SplitSpecimen } from './split-specimen';
+import { PillarsSpecimen } from './pillars-specimen';
 
 /**
  * vitest-axe smoke tests on the leaf primitives. Catches the obvious
@@ -146,6 +152,51 @@ describe('axe a11y smoke', () => {
         valueRaw="AUD 73,150"
       />
     );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('Sparkline (trend up) has role=img + aria-label, no violations', async () => {
+    const { container } = render(<Sparkline values={deterministicTrend('seed-1', 70)} />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('Sparkline (trend down) has no violations', async () => {
+    const { container } = render(<Sparkline values={[80, 60, 40, 30, 20]} />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('SpecimenPlate has no detectable violations', async () => {
+    const { container } = render(
+      <SpecimenPlate plateNo="I" title="Five pillars. Forty-eight indicators." caption="A note.">
+        <PillarsSpecimen />
+      </SpecimenPlate>
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('SectionPlate has no detectable violations', async () => {
+    const { container } = render(
+      <SectionPlate
+        numeral="01"
+        title="The world by composite"
+        standfirst="Italic standfirst paragraph."
+      />
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('MarginNote has no detectable violations', async () => {
+    const { container } = render(<MarginNote>Peer review note.</MarginNote>);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('SplitSpecimen has accessible svg + aria-label, no violations', async () => {
+    const { container } = render(<SplitSpecimen />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('PillarsSpecimen has no detectable violations', async () => {
+    const { container } = render(<PillarsSpecimen />);
     expect(await axe(container)).toHaveNoViolations();
   });
 });

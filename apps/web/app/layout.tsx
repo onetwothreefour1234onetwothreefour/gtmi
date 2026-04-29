@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
-import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google';
-import { ThemeProvider } from '@/components/theme-provider';
+import { Fraunces, Inter_Tight, JetBrains_Mono } from 'next/font/google';
 import { SITE_URL } from '@/lib/site-url';
 import './globals.css';
 
@@ -11,7 +10,7 @@ const fontSerif = Fraunces({
   axes: ['opsz'],
 });
 
-const fontSans = Inter({
+const fontSans = Inter_Tight({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-sans',
@@ -46,16 +45,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={`${fontSerif.variable} ${fontSans.variable} ${fontMono.variable}`}
-    >
-      <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
-        </ThemeProvider>
-      </body>
+    <html lang="en" className={`${fontSerif.variable} ${fontSans.variable} ${fontMono.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }

@@ -18,9 +18,9 @@ export interface ScoreBarProps {
 }
 
 const HEIGHT_BY_WIDTH = {
-  sm: 'h-1',
-  md: 'h-1.5',
-  lg: 'h-2',
+  sm: 'h-[3px]',
+  md: 'h-1',
+  lg: 'h-1.5',
 } as const;
 
 const TEXT_SIZE_BY_WIDTH = {
@@ -32,6 +32,9 @@ const TEXT_SIZE_BY_WIDTH = {
 /**
  * 0-100 score rendered as a numeric label + sequential-color bar.
  * Higher is better. Sequential scale defined in lib/theme.ts.
+ *
+ * Editorial restyle (Phase 4-A): hard-edged track, rule-soft background,
+ * tighter heights to read closer to the design's `score-bar` atom.
  *
  * When `phase2Placeholder` is true, renders <PreCalibrationChip> inline.
  * When `value` is null/undefined, renders the muted "Not yet scored" state
@@ -74,13 +77,13 @@ export function ScoreBar({
         </div>
       )}
       <div
-        className={cn('w-full rounded-table bg-muted', HEIGHT_BY_WIDTH[width])}
+        className={cn('w-full bg-rule-soft', HEIGHT_BY_WIDTH[width])}
         role="img"
         aria-label={computedAriaLabel}
         data-testid="score-bar-track"
       >
         <div
-          className={cn('h-full rounded-table transition-all duration-200')}
+          className="h-full transition-all duration-200"
           style={{
             width: `${clamped}%`,
             backgroundColor: isUnscored ? 'transparent' : fill,

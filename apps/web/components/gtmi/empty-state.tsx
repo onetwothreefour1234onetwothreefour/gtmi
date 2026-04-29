@@ -11,22 +11,22 @@ export interface EmptyStateProps {
 }
 
 /**
- * Standard placeholder for Phase 4 / Phase 5 surfaces with no data yet.
- * Used on /changes, the unscored program panel, missing CME chip,
- * the missing-narrative slot, and a few other places.
+ * Standard placeholder for surfaces with no data yet (Phase 4 → 5/6
+ * empty states, the unscored-program panel, missing-narrative slot).
+ * Editorial restyle (Phase 4-A): paper-2 surface, dashed rule border,
+ * Fraunces title.
  */
 export function EmptyState({ title, body, ctaHref, ctaLabel, className }: EmptyStateProps) {
   return (
     <div
-      className={cn(
-        'rounded-card border border-dashed border-border bg-surface p-6 text-data-md',
-        className
-      )}
+      className={cn('border border-dashed border-rule bg-paper-2 p-6 text-data-md', className)}
       data-testid="empty-state"
       role="status"
     >
-      <p className="font-serif text-data-lg text-ink">{title}</p>
-      <div className="mt-2 max-w-prose text-muted-foreground">{body}</div>
+      <p className="serif text-ink" style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>
+        {title}
+      </p>
+      <div className="mt-2 max-w-prose text-ink-3">{body}</div>
       {ctaHref && ctaLabel && (
         <Link
           href={ctaHref}

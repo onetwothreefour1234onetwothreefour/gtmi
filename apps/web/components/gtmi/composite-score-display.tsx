@@ -15,11 +15,11 @@ export interface CompositeScoreDisplayProps {
 
 /**
  * Headline composite score on the program detail page.
- * 96–120px serif/mono headline + sequential-color bar + CME/PAQ split.
  *
- * Per dispatch §4 the pre-calibration chip must sit *visibly beside* the
- * composite, not tucked away. We keep it on the same baseline as the rank
- * line so it can never be missed.
+ * Phase 4-A rebuild — design's `ProgramHeader` right-column plate:
+ * paper-2 surface, oxblood ScoreBar, large Fraunces serif numeral,
+ * PAQ/CME split below a thin rule. The pre-calibration chip sits beside
+ * the rank line so it's never tucked away (dispatch §4 still applies).
  */
 export function CompositeScoreDisplay({
   composite,
@@ -31,61 +31,66 @@ export function CompositeScoreDisplay({
   className,
 }: CompositeScoreDisplayProps) {
   const isUnscored = composite === null;
-  const fill = scoreColor(composite);
+  const fill = isUnscored ? 'transparent' : scoreColor(composite);
+  const pct = isUnscored ? 0 : Math.max(0, Math.min(100, composite));
 
   return (
-    <div className={cn('flex flex-col gap-3', className)} data-testid="composite-score-display">
-      <div className="flex items-end gap-6">
-        <div className="flex flex-col">
-          <p className="text-data-sm uppercase tracking-widest text-muted-foreground">
-            Composite score
+    <aside
+      className={cn('border border-rule bg-paper-2 px-6 py-6', className)}
+      data-testid="composite-score-display"
+    >
+      <div className="eyebrow" style={{ marginBottom: 16 }}>
+        Composite score
+      </div>
+
+      <div className="flex items-end justify-between gap-4">
+        <span
+          className={cn('num-l', isUnscored ? 'text-muted-foreground' : 'text-ink')}
+          style={{ fontSize: 56, lineHeight: 1 }}
+          data-testid="composite-score-value"
+        >
+          {isUnscored ? '—' : composite.toFixed(2)}
+        </span>
+        <div className="text-right">
+          {rank && scoredCount && !isUnscored ? (
+            <p className="num text-data-sm text-ink-3">
+              Rank #{rank} of {scoredCount}
+            </p>
+          ) : (
+            <p className="text-data-sm italic text-muted-foreground">
+              {isUnscored ? 'Not yet scored' : null}
+            </p>
+          )}
+          {phase2Placeholder && !isUnscored && (
+            <div className="mt-2 inline-flex">
+              <PreCalibrationChip />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 h-1.5 w-full bg-rule-soft" aria-hidden>
+        <div className="h-full" style={{ width: `${pct}%`, backgroundColor: fill }} />
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-4 border-t border-rule pt-5">
+        <div>
+          <p className="eyebrow" style={{ fontSize: 10 }}>
+            PAQ · 70% weight
           </p>
-          <div className="flex items-baseline gap-3">
-            <span
-              className={cn(
-                'font-mono font-semibold tnum',
-                isUnscored ? 'text-muted-foreground' : 'text-ink',
-                'text-[96px] leading-none md:text-[120px]'
-              )}
-              data-testid="composite-score-value"
-            >
-              {isUnscored ? '—' : composite.toFixed(2)}
-            </span>
-            {phase2Placeholder && !isUnscored && <PreCalibrationChip size="md" />}
-          </div>
+          <p className="num-l mt-1" style={{ fontSize: 22 }}>
+            {paq === null ? '—' : paq.toFixed(2)}
+          </p>
         </div>
-
-        <div className="flex flex-col gap-1 pb-3 text-data-md">
-          <div className="flex items-baseline gap-2">
-            <span className="text-muted-foreground">CME</span>
-            <span className="font-mono tnum">{cme === null ? '—' : cme.toFixed(2)}</span>
-            <span className="text-muted-foreground">· 30%</span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-muted-foreground">PAQ</span>
-            <span className="font-mono tnum">{paq === null ? '—' : paq.toFixed(2)}</span>
-            <span className="text-muted-foreground">· 70%</span>
-          </div>
+        <div>
+          <p className="eyebrow" style={{ fontSize: 10 }}>
+            CME · 30% weight
+          </p>
+          <p className="num-l mt-1" style={{ fontSize: 22 }}>
+            {cme === null ? '—' : cme.toFixed(2)}
+          </p>
         </div>
       </div>
-
-      <div className="h-2 w-full max-w-md rounded-table bg-muted" aria-hidden>
-        <div
-          className="h-full rounded-table"
-          style={{
-            width: `${isUnscored ? 0 : Math.max(0, Math.min(100, composite))}%`,
-            backgroundColor: isUnscored ? 'transparent' : fill,
-          }}
-        />
-      </div>
-
-      <p className="text-data-sm text-muted-foreground">
-        {isUnscored
-          ? 'Not yet scored — Phase 3'
-          : rank && scoredCount
-            ? `Rank: #${rank} of ${scoredCount} scored programs`
-            : null}
-      </p>
-    </div>
+    </aside>
   );
 }

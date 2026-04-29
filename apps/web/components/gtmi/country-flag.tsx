@@ -14,17 +14,17 @@ export interface CountryFlagProps {
 }
 
 const SIZE: Record<'sm' | 'md' | 'lg', { w: number; h: number; cls: string }> = {
-  sm: { w: 16, h: 12, cls: 'h-3 w-4' },
-  md: { w: 24, h: 18, cls: 'h-[18px] w-6' },
+  sm: { w: 22, h: 16, cls: 'h-4 w-[22px]' },
+  md: { w: 28, h: 20, cls: 'h-5 w-7' },
   lg: { w: 40, h: 30, cls: 'h-[30px] w-10' },
 };
 
 /**
  * Country flag rendered from a vendored SVG under /flags/{iso2}.svg.
- * Falls back to a globe glyph for ISOs not in the GTMI cohort
- * (resolveIso2 returns null) so the component never throws on input
- * — the unscored-country pages, the country dropdown, and other
- * surfaces all stay graceful.
+ *
+ * Editorial restyle (Phase 4-A): falls back to the design's mono ISO-box
+ * (paper-3 surface, monospace ISO-3 code) for unknown / out-of-cohort
+ * countries — matches docs/design/primitives.jsx:CountryFlag.
  *
  * SVG assets vendored from the MIT-licensed flag-icons package
  * (https://github.com/lipis/flag-icons). License attribution lives in
@@ -42,13 +42,14 @@ export function CountryFlag({ iso, countryName, size = 'sm', className }: Countr
         title={alt}
         aria-label={alt}
         className={cn(
-          'inline-flex items-center justify-center rounded-sm border border-border bg-muted text-muted-foreground',
+          'inline-flex items-center justify-center border border-rule bg-paper-3 font-mono font-semibold text-ink-3',
           dims.cls,
           className
         )}
+        style={{ fontSize: 9, letterSpacing: '0.5px' }}
         data-testid="country-flag-fallback"
       >
-        <GlobeGlyph />
+        {iso.slice(0, 3).toUpperCase()}
       </span>
     );
   }
@@ -60,27 +61,9 @@ export function CountryFlag({ iso, countryName, size = 'sm', className }: Countr
       width={dims.w}
       height={dims.h}
       unoptimized
-      className={cn('inline-block rounded-sm border border-border', dims.cls, className)}
+      className={cn('inline-block border border-rule', dims.cls, className)}
       data-testid="country-flag"
       data-iso={iso2}
     />
-  );
-}
-
-function GlobeGlyph() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="10"
-      height="10"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" />
-    </svg>
   );
 }

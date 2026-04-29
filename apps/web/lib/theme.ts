@@ -2,20 +2,21 @@
  * GTMI design tokens.
  *
  * Color and pillar values are duplicated in `tailwind.config.ts` (so utility
- * classes like `bg-pillar-a` work) and `app/globals.css` (so HSL CSS variables
- * drive light/dark theming). This file is the JS/TS-side reference for any
- * component that needs the raw values — for example, a Recharts `<Radar>`
- * fill prop that can't read a Tailwind class.
+ * classes like `bg-pillar-a` work, via CSS custom properties) and
+ * `app/globals.css` (the design tokens). This file is the JS/TS-side
+ * reference for any component that needs the raw values — for example, a
+ * Recharts `<Radar>` fill prop that can't read a Tailwind class.
  *
- * Keep these in sync with the dispatch §7 design language and `tailwind.config.ts`.
+ * Source of truth: docs/design/styles.css. Light-only after the Phase 4
+ * redesign — dark-mode tokens removed (analyst decision Q2).
  */
 
 export const PILLAR_COLORS = {
-  A: '#3D5A80',
-  B: '#98C1D9',
-  C: '#5C8A9B',
-  D: '#EE6C4D',
-  E: '#293241',
+  A: '#5C4A2E',
+  B: '#846A3F',
+  C: '#4F6B3E',
+  D: '#2C4159',
+  E: '#6E3A2E',
 } as const;
 
 export type PillarKey = keyof typeof PILLAR_COLORS;
@@ -38,9 +39,12 @@ export function scoreColor(score: number | null | undefined): string {
   return SCORE_SCALE[scoreBucket(score)];
 }
 
-export const ACCENT_DEEP_TEAL = '#0F4C5C';
+/** Editorial accent — oxblood. Used for headlines, score-change emphasis,
+ *  focus rings, and the pre-cal chip family. */
+export const ACCENT_OXBLOOD = '#B8412A';
 
+/** Pre-calibration chip palette. Light-only. */
 export const PRE_CALIBRATION = {
-  light: { fg: '#A66A00', bg: '#FFF6E6' },
-  dark: { fg: '#FFC971', bg: '#33260D' },
+  fg: '#B8862A',
+  bg: '#FBF3DC',
 } as const;

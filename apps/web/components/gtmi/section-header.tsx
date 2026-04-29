@@ -9,18 +9,20 @@ export interface SectionHeaderProps {
 }
 
 /**
- * Editorial-style section header. Uppercase eyebrow, serif h2, optional
- * dek paragraph. Used at the top of major page sections — landing,
- * methodology, program detail.
+ * Editorial-style section header. Eyebrow rule (uppercase tracking),
+ * 28–32px Fraunces h2, optional dek paragraph.
+ *
+ * Editorial restyle (Phase 4-A): consumes the `.eyebrow` and `.serif`
+ * class atoms from globals.css.
  */
 export function SectionHeader({ eyebrow, title, dek, className }: SectionHeaderProps) {
   return (
     <header className={cn('flex flex-col gap-2', className)}>
-      {eyebrow && (
-        <p className="text-data-sm uppercase tracking-widest text-muted-foreground">{eyebrow}</p>
-      )}
-      <h2 className="font-serif text-display-md text-ink">{title}</h2>
-      {dek && <p className="max-w-prose text-dek text-muted-foreground">{dek}</p>}
+      {eyebrow && <p className="eyebrow">{eyebrow}</p>}
+      <h2 className="serif text-ink" style={{ fontSize: 32, fontWeight: 400, margin: 0 }}>
+        {title}
+      </h2>
+      {dek && <p className="max-w-prose text-dek text-ink-3">{dek}</p>}
     </header>
   );
 }

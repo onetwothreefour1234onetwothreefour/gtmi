@@ -5,7 +5,13 @@ export { CompositeScoreDisplay } from './composite-score-display';
 export { PillarMiniBars } from './pillar-mini-bars';
 export { PillarRadar, type PillarScores } from './pillar-radar';
 export { WeightSlider } from './weight-slider';
+// Phase 4-A note: MethodologyBar is staged for deletion in Phase B/D once
+// its public-page consumers (`/` + `/methodology`) get rewritten with
+// SplitSpecimen + PillarsSpecimen. Kept exported here so Phase A leaves
+// public pages untouched.
 export { MethodologyBar } from './methodology-bar';
+export { SplitSpecimen } from './split-specimen';
+export { PillarsSpecimen } from './pillars-specimen';
 export { ProvenanceTrigger } from './provenance-trigger';
 export { ProvenanceHighlight } from './provenance-highlight';
 export { PolicyTimeline, type PolicyTimelineEvent } from './policy-timeline';
@@ -23,3 +29,9 @@ export { PillarBreakdownTable } from './pillar-breakdown-table';
 export { PillarComparison } from './pillar-comparison';
 export { CountryFlag } from './country-flag';
 export { JsonLd } from './json-ld';
+
+// New editorial primitives (Phase 4-A redesign).
+export { Sparkline, deterministicTrend } from './sparkline';
+export { SpecimenPlate } from './specimen-plate';
+export { SectionPlate } from './section-plate';
+export { MarginNote } from './margin-note';

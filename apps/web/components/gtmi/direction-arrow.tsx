@@ -18,7 +18,7 @@ export function DirectionArrow({ direction, className }: DirectionArrowProps) {
       role="img"
       title={isUp ? 'Higher is better' : 'Lower is better'}
       aria-label={isUp ? 'Higher is better' : 'Lower is better'}
-      className={cn('inline-block text-muted-foreground', className)}
+      className={cn('inline-block text-ink-4', className)}
       data-testid="direction-arrow"
     >
       <svg

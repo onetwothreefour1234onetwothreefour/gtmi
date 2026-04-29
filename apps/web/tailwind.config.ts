@@ -1,7 +1,6 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
-  darkMode: ['class'],
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
   theme: {
     container: {
@@ -31,48 +30,87 @@ const config: Config = {
         'data-lg': ['1.25rem', { lineHeight: '1.25', letterSpacing: '-0.01em' }],
         'data-md': ['0.875rem', { lineHeight: '1.25', letterSpacing: '0' }],
         'data-sm': ['0.75rem', { lineHeight: '1.3', letterSpacing: '0' }],
+        // Design's px-fixed editorial scale (matches docs/design/styles.css).
+        'fs-display': ['72px', { lineHeight: '1.02', letterSpacing: '-0.025em' }],
+        'fs-h1': ['44px', { lineHeight: '1.05', letterSpacing: '-0.025em' }],
+        'fs-h2': ['28px', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
+        'fs-h3': ['20px', { lineHeight: '1.2', letterSpacing: '-0.01em' }],
+        'fs-body': ['15px', { lineHeight: '1.5' }],
+        'fs-small': ['13px', { lineHeight: '1.4' }],
+        'fs-micro': ['11px', { lineHeight: '1.3', letterSpacing: '0.04em' }],
       },
       colors: {
-        ink: 'hsl(var(--ink))',
-        paper: 'hsl(var(--paper))',
-        surface: 'hsl(var(--surface))',
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        // Semantic tokens resolve to bare custom properties (the design's
+        // flat hex palette in globals.css). No HSL indirection.
+        ink: {
+          DEFAULT: 'var(--ink)',
+          2: 'var(--ink-2)',
+          3: 'var(--ink-3)',
+          4: 'var(--ink-4)',
+          5: 'var(--ink-5)',
+        },
+        paper: {
+          DEFAULT: 'var(--paper)',
+          2: 'var(--paper-2)',
+          3: 'var(--paper-3)',
+        },
+        rule: {
+          DEFAULT: 'var(--rule)',
+          soft: 'var(--rule-soft)',
+        },
+        navy: {
+          DEFAULT: 'var(--navy)',
+          2: 'var(--navy-2)',
+          soft: 'var(--navy-soft)',
+        },
+        positive: 'var(--positive)',
+        warning: 'var(--warning)',
+        negative: 'var(--negative)',
+
+        // Shadcn/Radix compatibility aliases.
+        surface: 'var(--surface)',
+        border: 'var(--border)',
+        input: 'var(--input)',
+        ring: 'var(--ring)',
+        background: 'var(--background)',
+        foreground: 'var(--foreground)',
         muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
+          DEFAULT: 'var(--muted)',
+          foreground: 'var(--muted-foreground)',
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground)',
+          2: 'var(--accent-2)',
+          soft: 'var(--accent-soft)',
         },
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+          DEFAULT: 'var(--primary)',
+          foreground: 'var(--primary-foreground)',
         },
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
+          DEFAULT: 'var(--secondary)',
+          foreground: 'var(--secondary-foreground)',
         },
         destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
+          DEFAULT: 'var(--destructive)',
+          foreground: 'var(--destructive-foreground)',
         },
         popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
+          DEFAULT: 'var(--popover)',
+          foreground: 'var(--popover-foreground)',
         },
         card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
+          DEFAULT: 'var(--card)',
+          foreground: 'var(--card-foreground)',
         },
         precalib: {
-          fg: 'hsl(var(--precalib-fg))',
-          bg: 'hsl(var(--precalib-bg))',
+          fg: 'var(--precalib-fg)',
+          bg: 'var(--precalib-bg)',
         },
+        // Sequential warm-orange ramp for the score bar. Kept from Phase 4 —
+        // the design did not provide a 5-step sequential ramp and this
+        // reads as part of the editorial palette.
         score: {
           1: '#FCEEC9',
           2: '#E8B17A',
@@ -80,20 +118,23 @@ const config: Config = {
           4: '#9C3F2A',
           5: '#7A2A1F',
         },
+        // Pillars — design's warm-cool low-chroma spectrum.
         pillar: {
-          a: '#3D5A80',
-          b: '#98C1D9',
-          c: '#5C8A9B',
-          d: '#EE6C4D',
-          e: '#293241',
+          a: 'var(--pillar-a)',
+          b: 'var(--pillar-b)',
+          c: 'var(--pillar-c)',
+          d: 'var(--pillar-d)',
+          e: 'var(--pillar-e)',
         },
       },
       borderRadius: {
-        card: '4px',
-        button: '2px',
+        // Editorial design sits on hard corners. card/button keep their
+        // radii names for back-compat with shadcn primitives.
+        card: '0px',
+        button: '0px',
         table: '0px',
-        lg: '4px',
-        md: '2px',
+        lg: '0px',
+        md: '0px',
         sm: '2px',
       },
       maxWidth: {

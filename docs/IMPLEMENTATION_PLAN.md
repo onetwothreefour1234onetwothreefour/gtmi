@@ -460,6 +460,54 @@ After 3.1–3.5, expected per-programme coverage **42–44/48** (43 average). Ga
 
 ---
 
+## Phase 4 Redesign — Editorial visual layer
+
+**Goal:** Replace the Phase 4 visual layer entirely with the editorial design captured in [docs/design/](design/). Five independently shippable phases (A → E). The data layer (`apps/web/lib/queries/*`), routing, scoring, and component logic stay intact. Plan: [REDESIGN_PLAN.md](../REDESIGN_PLAN.md).
+
+> Phase 4.1's `MethodologyBar` and `ThemeToggle` are **superseded** by this redesign. `MethodologyBar` is replaced by `<SplitSpecimen>` + `<PillarsSpecimen>` and is removed in Phase B / D when its `(public)` page consumers get rewritten. `ThemeToggle` is shimmed to a no-op in Phase A and deleted in Phase B when `(public)/layout.tsx` is rebuilt.
+
+### Phase 4-A — Token layer + primitives — ✅ COMPLETE
+
+- ✅ Replaced shadcn HSL token system with the design's flat hex palette in `apps/web/app/globals.css` (`--paper`, `--paper-2`, `--paper-3`, `--ink`, `--ink-2..5`, `--accent` oxblood, `--navy`, `--positive`, `--warning`, `--negative`, `--pillar-a..e` warm-cool spectrum). Shadcn variable names (`--background`, `--foreground`, `--card`, `--popover`, `--muted`, `--ring`, `--border`, etc.) retained as compatibility aliases pointing at the design tokens — Radix primitives unchanged.
+- ✅ Added editorial class atoms verbatim from `docs/design/styles.css`: `.serif`, `.serif-tight`, `.mono`, `.eyebrow`, `.rule` family, `.dropcap`, `.peer-note`, `.btn` family, `.chip` family, `.score-bar`, `.num`, `.num-l`, `.paper-grain`, `.hatch`, `table.gtmi`.
+- ✅ `apps/web/tailwind.config.ts` flattened from `hsl(var(--…))` → `var(--…)`. Added `colors.ink.{2,3,4,5}`, `colors.paper.{2,3}`, `colors.rule.{soft}`, `colors.navy.{DEFAULT,2,soft}`, `colors.positive`, `colors.warning`, `colors.negative`, `colors.accent.{2,soft}`, plus `fs-display/h1/h2/h3/body/small/micro` to match the design's px-fixed scale. `darkMode` removed.
+- ✅ `apps/web/lib/theme.ts`: `PILLAR_COLORS` switched to the warm-cool spectrum; `ACCENT_DEEP_TEAL` renamed to `ACCENT_OXBLOOD = '#B8412A'`; `PRE_CALIBRATION` collapsed to a single light-only object.
+- ✅ Fonts switched from Inter → Inter Tight via `next/font/google`. `apps/web/app/layout.tsx` no longer wires `ThemeProvider`; `<html>` lost `suppressHydrationWarning`.
+- ✅ Dark mode dropped (analyst Q2). `next-themes` removed from `apps/web/package.json`; `components/theme-provider.tsx` deleted; `components/theme-toggle.tsx` shimmed to a no-op for back-compat with the Phase 4.1 `(public)/layout.tsx` import (deleted in Phase B). All `dark:` Tailwind variants stripped from `provenance-trigger.tsx`. `vitest.setup.ts` matchMedia stub kept (Radix uses it).
+- ✅ New primitives shipped under `apps/web/components/gtmi/`:
+  - `Sparkline` + `deterministicTrend(seedKey, composite)` (Q7 placeholder until score history matures).
+  - `SpecimenPlate` (full-bleed editorial divider; tones: paper-2 / paper-3 / ink / navy).
+  - `SectionPlate` (chapter-style title plate with oxblood numeral; tones: ink / navy / paper-3).
+  - `MarginNote` (italic Fraunces gutter annotation; default navy, accent override).
+  - `SplitSpecimen` (30/70 SVG donut + side legend; oxblood PAQ arc, navy CME arc).
+  - `PillarsSpecimen` (5-letter typographic poster reading methodology v1 weights; pillar labels mapped to Access/Process/Rights/Pathway/Stability per Q1).
+- ✅ Existing primitives restyled: `ScoreBar` (rule-soft track, hard corners), `PreCalibrationChip` (chip-amber atom), `CoverageChip` (default percent format; fraction available; `data-low-coverage`), `PillarMiniBars` (6px-wide bars per design's PillarMini), `CompositeScoreDisplay` (paper-2 plate; serif numeral; PAQ/CME below thin rule), `PillarRadar` (oxblood program polygon, ink-4 dashed median, navy compare), `CountryFlag` (mono ISO-box fallback per design), `PolicyTimeline` (chip atoms for severity, serif summary), `ProvenanceHighlight` (oxblood underline on highlight), `SectionHeader` (`.eyebrow` + `.serif`), `EmptyState` (paper-2, dashed rule), `DataTableNote` (italic Fraunces, oxblood left rule).
+- ✅ `MethodologyBar` retained for back-compat (consumed by `(public)/page.tsx` + `(public)/methodology/page.tsx` which Phase A is forbidden to touch). Annotation in `components/gtmi/index.ts` flags it for deletion in Phase B / D.
+- ✅ `app/preview-gallery/page.tsx` rewritten — every new + restyled primitive in every state (typography, palette, atoms, sequential color scale, sizes, sparkline trend variants, all four ProvenanceTrigger states, all three SectionPlate tones, both SpecimenPlate tones).
+- ✅ Tests added: `sparkline.test.tsx` (10), `specimen-plate.test.tsx` (10), `specimen-charts.test.tsx` (4), `coverage-chip.test.tsx` (6), plus 7 new a11y smoke cases for Sparkline / SpecimenPlate / SectionPlate / MarginNote / SplitSpecimen / PillarsSpecimen.
+- ✅ `pnpm turbo run typecheck` 7/7 green; `pnpm turbo run test` workspace-wide: 533 tests passing (web 166 / scoring 164 / extraction 203). Web baseline grew 130 → 166 (+36 net new).
+- ✅ Live verification on `/preview-gallery`: HTTP 200, 308 KB rendered, all 42 component markers present, zero `next-themes` references in HTML, zero `dark:` variant occurrences.
+
+### Phase 4-B — Landing + Rankings — ⬜ NOT STARTED
+
+Surfaces: `apps/web/app/(public)/page.tsx`, `apps/web/app/(public)/programs/page.tsx`, redesigned `<RankingsTable>` + `<RankingsFilters>`, new components `ThisEdition` / `WorldMap` / `LeadersByCategory` / `EditorsQuote` / `ProvenanceProof` / `TopNav` / `GtmiFooter` / `PreviewBanner`, new query `cohort-stats.ts`. Removes the `MethodologyBar` import from the landing page; replaces it with `<SplitSpecimen>` + `<SpecimenPlate>` wrapping `<PillarsSpecimen>`. OG cards redesigned per Q11. `ThemeToggle` shim removed when `(public)/layout.tsx` is rebuilt with the new `<TopNav>`.
+
+### Phase 4-C — Programme detail + Provenance drawer — ⬜ NOT STARTED
+
+Surfaces: `apps/web/app/(public)/programs/[id]/page.tsx`, new `<ProvenanceDrawer>` (right-side, Radix Dialog non-modal, ESC + keyboard accessible per Q13/decisions), restyled `<IndicatorRow>`, `<SubFactorAccordion>` extended with the pillar-tab-strip rendering (Q5).
+
+### Phase 4-D — Methodology + Country pages — ⬜ NOT STARTED
+
+Surfaces: `apps/web/app/(public)/methodology/page.tsx` (new `<WeightTreeDiagram>` + `<FalsifiabilityCommitments>`; replaces second `MethodologyBar` consumer), `apps/web/app/(public)/countries/[iso]/page.tsx` (radar overlay vs OECD median; country stability section gated behind `NEXT_PUBLIC_STABILITY_ENABLED=false` per Q8). `MethodologyBar` deleted in this phase's close-out commit (last consumer removed).
+
+### Phase 4-E — Internal tools — ⬜ NOT STARTED
+
+Surfaces: `apps/web/app/(internal)/review/page.tsx` (new `<EditorialQueue>` table; impact delta = `—` for v1 per Q9), `apps/web/app/(public)/changes/page.tsx` (new `<ChangesAudit>`), new `<InternalBadge>`. Behind a temporary `/review2` alias during development, route swap on close-out.
+
+**Tag on close of Phase E:** `phase-4-redesign-complete`.
+
+---
+
 ## Phase 5 — 5-Country Pilot
 
 **Goal:** Full extraction across all 5 pilot countries (~25 programs) using the improved pipeline from Phase 3. First composite scores with calibrated normalization params. All sensitivity analyses run.

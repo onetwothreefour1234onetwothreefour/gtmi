@@ -5,6 +5,8 @@ import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
 export interface PillarMiniBarsProps {
   /** Map of pillar score 0-100. Null/undefined values render as inactive bars. */
   scores: Record<PillarKey, number | null | undefined> | null;
+  /** Bar row height in pixels. Default: 22 (design's PillarMini). */
+  height?: number;
   className?: string;
 }
 
@@ -18,15 +20,17 @@ const PILLAR_LABEL: Record<PillarKey, string> = {
 };
 
 /**
- * 5 vertical 8×24px bars used in dense rankings rows. Fully greyed when
- * `scores` is null (unscored program). Hover reveals the pillar name +
- * numeric score via the native title attribute (lightweight; full
- * tooltip with shadcn lands in 4.2 if needed).
+ * Five 6px-wide vertical pillar bars used in dense rankings rows.
+ *
+ * Editorial restyle (Phase 4-A): trackless, hard-edged, 6px width per the
+ * design's PillarMini atom. Hover reveals the pillar name + numeric score
+ * via the native title attribute.
  */
-export function PillarMiniBars({ scores, className }: PillarMiniBarsProps) {
+export function PillarMiniBars({ scores, height = 22, className }: PillarMiniBarsProps) {
   return (
     <div
-      className={cn('flex items-end gap-1', className)}
+      className={cn('flex items-end gap-[3px]', className)}
+      style={{ height }}
       role="img"
       aria-label={
         scores
@@ -40,21 +44,19 @@ export function PillarMiniBars({ scores, className }: PillarMiniBarsProps) {
       {PILLAR_ORDER.map((k) => {
         const v = scores?.[k];
         const isUnscored = v === null || v === undefined;
-        const heightPct = isUnscored ? 8 : Math.max(4, Math.min(100, v));
+        const barHeight = isUnscored ? 2 : Math.max(2, (v / 100) * height);
         return (
           <span
             key={k}
             title={`${PILLAR_LABEL[k]}: ${isUnscored ? '—' : v.toFixed(0)}`}
-            className="flex h-6 w-2 items-end overflow-hidden rounded-table bg-muted"
-          >
-            <span
-              className="block w-full rounded-table"
-              style={{
-                height: `${heightPct}%`,
-                backgroundColor: isUnscored ? 'transparent' : PILLAR_COLORS[k],
-              }}
-            />
-          </span>
+            style={{
+              width: 6,
+              height: `${barHeight}px`,
+              background: isUnscored ? 'var(--rule)' : PILLAR_COLORS[k],
+              opacity: isUnscored ? 1 : 0.85,
+              display: 'block',
+            }}
+          />
         );
       })}
     </div>
