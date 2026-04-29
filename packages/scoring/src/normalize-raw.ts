@@ -5,6 +5,7 @@ import {
   WrappedCategoricalRubric,
   rubricToScoreMap,
 } from './types';
+import { NO_LIMIT_MARKER, isNumericNoLimitSentinel } from './sentinels';
 
 export type NormalizedValue = number | string | boolean | Record<string, unknown>;
 
@@ -69,6 +70,14 @@ export function normalizeRawValue(
   switch (normalizationFn) {
     case 'min_max':
     case 'z_score': {
+      // Phase 3.6.3 / FIX 4 — numeric "no limit" sentinel handling. Fields
+      // like A.3.3 (applicant age cap) encode "no cap" as 999 / "none" /
+      // "no_cap" / "no_limit". Passing 999 through min_max would distort
+      // the cohort max. Return the structured NO_LIMIT_MARKER instead;
+      // the engine short-circuits to 100/0 based on direction.
+      if (isNumericNoLimitSentinel(valueRaw)) {
+        return { ...NO_LIMIT_MARKER };
+      }
       const cleaned = valueRaw.replace(/[$,\s%]/g, '');
       const n = parseFloat(cleaned);
       if (!isFinite(n)) {

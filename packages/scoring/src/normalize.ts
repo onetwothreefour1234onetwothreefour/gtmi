@@ -6,6 +6,7 @@ import {
   ScoringError,
   rubricToScoreMap,
 } from './types';
+import { isNoLimitMarker, type NoLimitMarker } from './sentinels';
 
 /**
  * Abramowitz & Stegun approximation 26.2.17.
@@ -222,8 +223,13 @@ export function getRegionalSubstitute(countryIso: string, fieldKey: string): Reg
 export function parseIndicatorValue(
   valueNormalized: unknown,
   fn: NormalizationFn
-): number | string | boolean | Record<string, unknown> {
+): number | string | boolean | Record<string, unknown> | NoLimitMarker {
   if (fn === 'min_max' || fn === 'z_score') {
+    // Phase 3.6.3 / FIX 4 — accept the no-limit sentinel marker as a
+    // legitimate parsed value. The engine short-circuits scoring for it.
+    if (isNoLimitMarker(valueNormalized)) {
+      return valueNormalized;
+    }
     if (typeof valueNormalized !== 'number') {
       throw new ScoringError(
         `Expected JSON number for normalizationFn "${fn}", got ${typeof valueNormalized}`

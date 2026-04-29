@@ -11,11 +11,26 @@
 // table is the right vehicle, mirroring the pattern used for D.2.2
 // (citizenship residence) and D.2.3 (dual-citizenship policy).
 //
-// HEADER NOTE (per analyst sign-off, 2026-04-28):
+// HEADER NOTE (per analyst sign-off, 2026-04-28; FIX 2 audit 2026-04-29):
 // Values below were verified from public records (each row's sourceUrl).
 // They MUST be re-checked before Phase 5 SGP/CAN/GBR/HKG canaries to
 // catch any regulatory changes since the last verification year.
 // Re-check cadence: annual; trigger via Phase 6 living-index policy_changes.
+//
+// Phase 3.6.3 / FIX 2 — D.1.3 SEMANTIC AUDIT:
+// D.1.3 measures physical-presence-DURING-PR-ACCRUAL (while on the
+// temporary visa transitioning to PR). It is NOT the citizenship-residence
+// rule (which is captured separately by D.2.2 input via
+// COUNTRY_CITIZENSHIP_RESIDENCE_YEARS). The original cohort entries for
+// AUS, CAN, and USA used citizenship-naturalisation figures (1095/5 days,
+// 30/60 months) as D.1.3 proxies — that is a category error. Those three
+// were corrected to required=false where the talent-visa pathway has NO
+// per-year accrual presence rule. Genuine PR-accrual presence rules
+// (GBR 180/12 absence cap during ILR qualifying; SGP, HKG continuous
+// residence; NZL 184/yr pre-PR; TWN 6-month absence cap during APRC
+// 5-year period; CHE/NLD/IRL/FRA/DEU/etc. continuity-of-residence) were
+// kept as-is. GCC entries (ARE/SAU/BHR/OMN) remain required=null because
+// no PR pathway exists.
 //
 // Each entry has:
 //   - d13: physical presence DURING accrual to PR (boolean_with_annotation
@@ -46,10 +61,17 @@ export const COUNTRY_PR_PRESENCE_POLICY: Record<string, PrPresencePolicy> = {
   AUS: {
     iso3: 'AUS',
     d13: {
-      required: true,
-      daysPerYear: 219,
+      // Phase 3.6.3 / FIX 2 — D.1.3 measures physical-presence-during-PR-ACCRUAL,
+      // i.e. while on the temporary 482 visa transitioning to ENS-186/PR. AUS
+      // 482 → ENS-186-DET requires 2 years of CONTINUOUS SPONSORED EMPLOYMENT,
+      // not a per-year physical-presence count. The 1095/5 figure is for
+      // citizenship (post-PR), captured by D.2.2 input, not D.1.3. Setting
+      // required=false with a clear note is more honest than a misleading
+      // proxy number.
+      required: false,
+      daysPerYear: null,
       notes:
-        '4 years total residence including 12 months as PR; ~219 days/year proxy from "1095 days in 5 years" citizenship requirement.',
+        'No per-year physical-presence requirement during 482 → 186 TRT transition. The pathway rule is 2 years of continuous sponsored employment, not a presence-day count. (1095/5 days/yr applies to citizenship-after-PR — captured separately by D.2.2 input.)',
     },
     d14: {
       required: true,
@@ -58,16 +80,21 @@ export const COUNTRY_PR_PRESENCE_POLICY: Record<string, PrPresencePolicy> = {
         '5-year travel facility on PR; Resident Return Visa (subclass 155) required to re-enter after 5 years out.',
     },
     sourceUrl:
-      'https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/resident-return-155-157',
+      'https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/employer-nomination-scheme-186/temporary-residence-transition-stream',
     sourceYear: 2024,
   },
   CAN: {
     iso3: 'CAN',
     d13: {
-      required: true,
-      daysPerYear: 219,
+      // Phase 3.6.3 / FIX 2 — Express Entry candidates do NOT have a per-year
+      // physical-presence requirement during accrual. The PR accrual rule is
+      // CRS-points + invitation-to-apply, with continuous-residence assessed
+      // at PR-application time, not during accrual. The 1095/5 figure
+      // (citizenship after PR) is a D.2.2 input, not D.1.3.
+      required: false,
+      daysPerYear: null,
       notes:
-        '1095 days physical presence in the 5-year qualifying period before citizenship application (=~219 days/yr proxy).',
+        'Express Entry has no per-year physical-presence requirement during accrual. (1095/5 days applies to citizenship-after-PR — captured by D.2.2 input. 730/5 PR-retention rule lives in D.1.4.)',
     },
     d14: {
       required: true,
@@ -131,10 +158,15 @@ export const COUNTRY_PR_PRESENCE_POLICY: Record<string, PrPresencePolicy> = {
   USA: {
     iso3: 'USA',
     d13: {
-      required: true,
-      daysPerYear: 183,
+      // Phase 3.6.3 / FIX 2 — INA 316 30/60-month physical presence is a
+      // CITIZENSHIP-AFTER-PR requirement (naturalisation), not a PR-accrual
+      // requirement. EB visa accrual to LPR is processed without a per-year
+      // physical-presence count; the rule is 6-month-absence-presumed-
+      // abandonment for LPRs (D.1.4) plus naturalisation residency (D.2.2).
+      required: false,
+      daysPerYear: null,
       notes:
-        'LPRs naturalising under INA 316 must be physically present for 30 of 60 months prior to filing.',
+        'EB-visa pathway to LPR has no per-year physical-presence requirement during accrual. (INA 316 30/60-month figure applies to naturalisation — captured by D.2.2 input. 12-month-presumed-abandonment rule lives in D.1.4.)',
     },
     d14: {
       required: true,

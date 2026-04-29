@@ -91,12 +91,46 @@ export function validateBooleanWithAnnotationShape(
 }
 
 // Phase 3.6 / Fix D / ADR-016 — value-normalization helper for derived rows.
-// Derived A.1.2 / D.2.2 outputs are pre-computed numbers; we just persist
-// them as JSON numbers so scoring can read them back via the standard
-// min_max / numeric path.
-function normalizeDerivedValueRaw(valueRaw: string): number | null {
-  const n = Number.parseFloat(valueRaw);
-  return Number.isFinite(n) ? n : null;
+// Derived A.1.2 / D.2.2 outputs are pre-computed numbers; persist as JSON
+// numbers so scoring reads them via the standard min_max numeric path.
+//
+// Phase 3.6.3 / FIX 5 — derived-knowledge fields (B.2.4, D.1.3, D.1.4,
+// D.2.3) carry structured / categorical data in valueRaw rather than a
+// raw number. The previous helper returned null for these, leaving
+// valueNormalized=null and breaking the scoring path. The helper is now
+// normalisationFn-aware: boolean_with_annotation rows JSON-parse valueRaw
+// into the structured object; boolean rows map the "permitted" /
+// "not_permitted" rubric strings to true / false. min_max / z_score
+// fields keep the numeric path (used by deriveA12 / deriveD22).
+function normalizeDerivedValueRaw(
+  valueRaw: string,
+  normalizationFn: string
+): number | string | boolean | Record<string, unknown> | null {
+  if (normalizationFn === 'min_max' || normalizationFn === 'z_score') {
+    const n = Number.parseFloat(valueRaw);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (normalizationFn === 'boolean_with_annotation') {
+    try {
+      const parsed = JSON.parse(valueRaw);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  if (normalizationFn === 'boolean') {
+    const trimmed = valueRaw.trim().toLowerCase();
+    if (trimmed === 'permitted' || trimmed === 'true' || trimmed === 'yes') return true;
+    if (trimmed === 'not_permitted' || trimmed === 'false' || trimmed === 'no') return false;
+    return null;
+  }
+  if (normalizationFn === 'categorical' || normalizationFn === 'country_substitute_regional') {
+    return valueRaw.trim();
+  }
+  return null;
 }
 
 export class PublishStageImpl implements PublishStage {
@@ -257,7 +291,10 @@ export class PublishStageImpl implements PublishStage {
     }
 
     const fieldDefRows = await db
-      .select({ id: fieldDefinitions.id })
+      .select({
+        id: fieldDefinitions.id,
+        normalizationFn: fieldDefinitions.normalizationFn,
+      })
       .from(fieldDefinitions)
       .where(eq(fieldDefinitions.key, extraction.fieldDefinitionKey))
       .limit(1);
@@ -267,6 +304,7 @@ export class PublishStageImpl implements PublishStage {
       );
     }
     const fieldDefinitionId = fieldDefRows[0]!.id;
+    const normalizationFn = fieldDefRows[0]!.normalizationFn;
 
     const methodologyRows = await db
       .select({ id: methodologyVersions.id })
@@ -280,7 +318,7 @@ export class PublishStageImpl implements PublishStage {
     }
     const methodologyVersionId = methodologyRows[0]!.id;
 
-    const valueNormalized = normalizeDerivedValueRaw(extraction.valueRaw);
+    const valueNormalized = normalizeDerivedValueRaw(extraction.valueRaw, normalizationFn);
 
     // If an approved row already exists, do not overwrite. Mirrors humanReview.enqueue.
     const existingRows = await db

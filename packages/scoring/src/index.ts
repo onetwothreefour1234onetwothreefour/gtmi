@@ -9,6 +9,13 @@ export {
 export type { Region, RegionalSubstitute } from './normalize';
 export { normalizeRawValue } from './normalize-raw';
 export type { NormalizedValue } from './normalize-raw';
+export {
+  NUMERIC_NO_LIMIT_SENTINELS,
+  NO_LIMIT_MARKER,
+  isNumericNoLimitSentinel,
+  isNoLimitMarker,
+} from './sentinels';
+export type { NoLimitMarker } from './sentinels';
 export type {
   ScoringInput,
   ScoringOutput,

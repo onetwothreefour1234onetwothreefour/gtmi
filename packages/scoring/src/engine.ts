@@ -13,6 +13,7 @@ import {
   normalizeZScore,
   parseIndicatorValue,
 } from './normalize';
+import { isNoLimitMarker } from './sentinels';
 import {
   INSUFFICIENT_DISCLOSURE_THRESHOLD,
   CME_WEIGHT,
@@ -52,8 +53,17 @@ function scoreIndicator(
 
   switch (def.normalizationFn) {
     case 'min_max':
+      // Phase 3.6.3 / FIX 4 — sentinel short-circuit. "no limit" rows
+      // bypass min_max entirely so 999/none/no_cap can never distort the
+      // cohort range. higher_is_better → 100; lower_is_better → 0.
+      if (isNoLimitMarker(parsed)) {
+        return def.direction === 'higher_is_better' ? 100 : 0;
+      }
       return normalizeMinMax(parsed as number, params, def.direction);
     case 'z_score':
+      if (isNoLimitMarker(parsed)) {
+        return def.direction === 'higher_is_better' ? 100 : 0;
+      }
       return normalizeZScore(parsed as number, params, def.direction);
     case 'categorical':
     case 'country_substitute_regional': {

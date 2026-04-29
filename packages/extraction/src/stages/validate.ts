@@ -6,11 +6,32 @@ import type { ExtractionOutput, ScrapeResult } from '../types/extraction';
 import type { ValidationResult } from '../types/extraction';
 import type { ValidateStage } from '../types/pipeline';
 
+// Phase 3.6.3 / FIX 1 — validator prompt revised. The previous prompt was
+// strict-literal-match: it required the source sentence to *directly* state
+// the extracted value. This produced a class of false negatives where the
+// extracted value is a *rubric label* that paraphrases or summarises the
+// source sentence (e.g. "required_throughout" for sponsorship-required
+// language; "not_stated" for absence of a topic; "worldwide" as a
+// jurisdictional categorisation). The prompt is now consistency-based:
+// isValid=true when the source sentence is consistent with the extracted
+// value (supports it, paraphrases it, or — for absence sentinels —
+// genuinely does not contradict the value). isValid=false is reserved for
+// the genuine veto case: the source sentence directly contradicts the
+// extracted value, OR the extracted value is unsupportable from the
+// source. This is country-agnostic and applies to all categorical /
+// boolean / boolean_with_annotation fields where the LLM normalises a
+// natural-language source into a rubric label.
 const SYSTEM_PROMPT =
   'You are an independent verification agent for immigration data extraction. Your sole job ' +
-  'is to check whether a claimed extraction is supported by evidence in a source document. ' +
-  'You do not re-extract data. You only verify. Be strict: if the source sentence does not ' +
-  'clearly and directly support the extracted value, mark isValid as false.';
+  'is to check whether a claimed extraction is consistent with evidence in a source document. ' +
+  'You do not re-extract data. You only verify. The extracted value is often a rubric label ' +
+  '(e.g. "required_throughout", "not_stated", "worldwide") that paraphrases or categorises the ' +
+  'source. Mark isValid=true when the source sentence supports, paraphrases, or is consistent ' +
+  'with the extracted value. Mark isValid=false ONLY when the source sentence directly ' +
+  'contradicts the extracted value, or when the value is clearly unsupportable from the source. ' +
+  'Absence-of-topic values (e.g. "not_stated", "absent", "false" for boolean availability ' +
+  'questions) are valid when the source does not address the topic — do not require the ' +
+  'source to literally state the absence.';
 
 const CONTEXT_WINDOW = 200;
 
@@ -69,8 +90,9 @@ function buildUserMessage(
     `  "notes": string | null\n` +
     `}\n\n` +
     `Rules:\n` +
-    `- isValid: true only if the source sentence clearly and directly supports the value.\n` +
-    `- validationConfidence: 0.0 to 1.0.\n` +
+    `- isValid: true when the source sentence supports, paraphrases, or is CONSISTENT WITH the extracted value (rubric labels are paraphrases — they don't need to appear literally). isValid: false ONLY when the source sentence directly contradicts the value, or the value is unsupportable from the source.\n` +
+    `- For absence-style values ("not_stated", "absent", boolean false for an availability question), isValid: true when the source does not contradict the absence — silence on the topic counts as consistent.\n` +
+    `- validationConfidence: 0.0 to 1.0 — your certainty in the isValid verdict.\n` +
     `- notes: A single sentence explaining your reasoning, or null if isValid is true and confidence is 1.0.`
   );
 }

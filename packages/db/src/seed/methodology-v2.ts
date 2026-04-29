@@ -752,7 +752,9 @@ export const PHASE_3_5_INDICATOR_RESTRUCTURES: Record<string, IndicatorRestructu
       `Extraction Task: B.2.3 — Employer-borne levies and skill charges (boolean+annotation)
 Question: Does this programme require the sponsoring employer to pay any government levy or skill charge?
 
-Return value: a JSON object with this exact shape:
+OUTPUT SHAPE — STRICT. The valueRaw field MUST be a JSON OBJECT, NOT a currency string. Wrong: "AUD 1,800". Right: { "hasLevy": true, "notes": "Skilling Australians Fund (SAF) levy AUD 1,800 / year for 4-year stream." }. If you find a currency amount in the page, embed it inside the notes field; never return the bare amount as valueRaw.
+
+Return value: a JSON object with this exact shape (and no other top-level keys):
   { "hasLevy": boolean, "notes": string | null }
 
 Recall hints (extends Phase 3.3 v2 prompt):
