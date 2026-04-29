@@ -1,4 +1,4 @@
-export { runScoringEngine } from './engine';
+export { runScoringEngine, scoreSingleIndicator } from './engine';
 export {
   BOOLEAN_WITH_ANNOTATION_KEYS,
   COUNTRY_REGIONS,

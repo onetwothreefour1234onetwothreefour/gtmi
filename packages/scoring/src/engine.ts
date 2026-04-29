@@ -1,6 +1,7 @@
 import {
   FieldDefinitionRecord,
   NormalizationFn,
+  NormalizationParams,
   ScoringError,
   ScoringInput,
   ScoringOutput,
@@ -43,13 +44,30 @@ interface IndicatorResult {
   weight: number;
 }
 
-function scoreIndicator(
-  def: FieldDefinitionRecord,
-  valueNormalized: unknown,
-  input: ScoringInput
-): number {
+/**
+ * Phase 3.7 / ADR-019 — score one indicator in isolation.
+ *
+ * Pure: takes a field definition, a normalised value, and the per-field
+ * normalisation parameters; returns a 0–100 score. No DB, no I/O.
+ *
+ * Returns `null` when the input is missing or the `notApplicable: true`
+ * marker is present — those rows are excluded from scoring.
+ *
+ * `runScoringEngine` and `PublishStageImpl.execute` (and the /review
+ * approve / edit actions) call this so a single row can be scored
+ * without re-running the whole programme.
+ */
+export function scoreSingleIndicator(args: {
+  fieldDefinition: FieldDefinitionRecord;
+  valueNormalized: unknown;
+  normalizationParams: NormalizationParams;
+}): number | null {
+  const { fieldDefinition: def, valueNormalized, normalizationParams } = args;
+  if (valueNormalized === null || valueNormalized === undefined) return null;
+  if (isNotApplicableMarker(valueNormalized)) return null;
+
   const parsed = parseIndicatorValue(valueNormalized, def.normalizationFn);
-  const params = input.normalizationParams[def.key] ?? {};
+  const params = normalizationParams[def.key] ?? {};
 
   switch (def.normalizationFn) {
     case 'min_max':
@@ -88,6 +106,27 @@ function scoreIndicator(
         def.direction
       );
   }
+}
+
+function scoreIndicator(
+  def: FieldDefinitionRecord,
+  valueNormalized: unknown,
+  input: ScoringInput
+): number {
+  // Inside the cohort engine we know the value is present (the caller
+  // already filtered nulls + notApplicable markers in the gather loop),
+  // so a null result here is a pipeline bug — surface it loudly.
+  const score = scoreSingleIndicator({
+    fieldDefinition: def,
+    valueNormalized,
+    normalizationParams: input.normalizationParams,
+  });
+  if (score === null) {
+    throw new ScoringError(
+      `scoreSingleIndicator returned null for "${def.key}" — value should have been filtered upstream`
+    );
+  }
+  return score;
 }
 
 export function runScoringEngine(input: ScoringInput): ScoringOutput {
