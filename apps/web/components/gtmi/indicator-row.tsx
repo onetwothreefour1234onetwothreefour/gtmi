@@ -4,29 +4,30 @@ import { formatScore } from '@/lib/format';
 import { DirectionArrow } from './direction-arrow';
 import { ProvenanceTrigger } from './provenance-trigger';
 import { PreCalibrationChip } from './pre-calibration-chip';
+import { ScoreBar } from './score-bar';
 import type { ProgramDetailFieldValue } from '@/lib/queries/program-detail-types';
 
 export interface IndicatorRowProps {
   fieldValue: ProgramDetailFieldValue;
   /** Pre-calibration flag from the program's score row. */
   phase2Placeholder?: boolean;
+  /** Highlight row treatment (oxblood wash) — used when this row owns the
+   *  active provenance drawer or is the page's "anchor" row. */
+  highlighted?: boolean;
   className?: string;
 }
 
 /**
- * One indicator inside the sub-factor accordion. Shows the indicator key,
- * label, raw extracted value (with currency code if provenance carries
- * `valueCurrency`), normalised 0-100 score, weight within its sub-factor,
- * direction-arrow, and the ProvenanceTrigger affordance.
+ * Editorial table row for an indicator. Replaces the Phase 4.3 grid layout
+ * with a `<tr>` that drops cleanly into the design's `table.gtmi` atom.
  *
- * Three rendering branches:
- *   1. fieldValue with valueRaw + status='approved'   → full row
- *   2. fieldValue with valueRaw + status='pending_…'  → muted row, queue chip
- *   3. fieldValue without valueRaw (no field_value yet) → "Not on government source"
+ * Columns (matching docs/design/screen-program.jsx:IndicatorRow):
+ *   ID · Indicator · Weight · Raw value · Score (+ bar) · Provenance · Status
  */
 export function IndicatorRow({
   fieldValue,
   phase2Placeholder = false,
+  highlighted = false,
   className,
 }: IndicatorRowProps) {
   const fv = fieldValue;
@@ -35,60 +36,98 @@ export function IndicatorRow({
     fv.direction === 'higher_is_better' || fv.direction === 'lower_is_better'
       ? fv.direction
       : 'higher_is_better';
-
-  // ProvenanceTrigger needs the row's status. When no field_value row
-  // exists at all, status defaults to 'draft' from the query layer; we
-  // show the affordance regardless so users can still see "Not on
-  // government source" with a Provenance Incomplete chip if needed.
   const valueCurrency = readValueCurrency(fv.provenance);
+  const status = fv.status;
 
   return (
-    <div
-      className={cn(
-        'grid grid-cols-[auto_1fr_auto_auto_auto_auto] items-center gap-3 border-b border-border px-3 py-2 last:border-b-0 text-data-md',
-        className
-      )}
+    <tr
+      className={cn(className)}
+      style={{ background: highlighted ? 'rgba(184,65,42,0.06)' : undefined }}
       data-testid="indicator-row"
       data-field-key={fv.fieldKey}
     >
-      <span className="font-mono text-data-sm text-muted-foreground">{fv.fieldKey}</span>
-      <span className="text-foreground">{fv.fieldLabel}</span>
-
-      <span className="font-mono text-data-sm tnum text-foreground">
-        {hasValue ? (
-          <span className="inline-flex items-baseline gap-1">
-            <span className="max-w-[180px] truncate">{fv.valueRaw}</span>
-            {valueCurrency && <span className="text-muted-foreground">{valueCurrency}</span>}
-          </span>
-        ) : (
-          <span className="italic text-muted-foreground">Not on government source</span>
-        )}
-      </span>
-
-      <span className="inline-flex items-center gap-2">
-        {fv.valueIndicatorScore !== null ? (
-          <span className="font-mono text-data-sm tnum text-foreground">
-            {formatScore(fv.valueIndicatorScore)}
-          </span>
-        ) : (
-          <span className="font-mono text-data-sm text-muted-foreground">—</span>
-        )}
-        {phase2Placeholder && fv.valueIndicatorScore !== null && hasValue && <PreCalibrationChip />}
-      </span>
-
-      <span className="inline-flex items-center gap-1">
-        <span className="font-mono text-data-sm tnum text-muted-foreground">
-          {Math.round(fv.weightWithinSubFactor * 100)}%
+      <td style={{ width: 80 }}>
+        <span className="num text-ink-4" style={{ fontSize: 11 }}>
+          {fv.fieldKey}
         </span>
-        <DirectionArrow direction={direction} />
-      </span>
-
-      <ProvenanceTrigger provenance={fv.provenance} status={fv.status} valueRaw={fv.valueRaw} />
-    </div>
+      </td>
+      <td>
+        <span
+          className="serif"
+          style={{ fontSize: 14, fontWeight: 500 }}
+          data-testid="indicator-label"
+        >
+          {fv.fieldLabel}
+        </span>
+      </td>
+      <td style={{ width: 90, textAlign: 'right' }}>
+        <span className="num inline-flex items-center gap-1 text-ink-3" style={{ fontSize: 12 }}>
+          {(fv.weightWithinSubFactor * 100).toFixed(1)}%
+          <DirectionArrow direction={direction} />
+        </span>
+      </td>
+      <td style={{ width: 160 }}>
+        {hasValue ? (
+          <span className="num inline-flex items-baseline gap-1 text-ink" style={{ fontSize: 13 }}>
+            <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {fv.valueRaw}
+            </span>
+            {valueCurrency && <span className="text-ink-4">{valueCurrency}</span>}
+          </span>
+        ) : (
+          <span className="num italic text-ink-4" style={{ fontSize: 12 }}>
+            Not on government source
+          </span>
+        )}
+      </td>
+      <td style={{ width: 130, textAlign: 'right' }}>
+        {fv.valueIndicatorScore !== null ? (
+          <div className="flex items-center justify-end gap-2">
+            <span className="num" style={{ fontWeight: 600 }}>
+              {formatScore(fv.valueIndicatorScore)}
+            </span>
+            <span className="block w-12">
+              <ScoreBar
+                value={fv.valueIndicatorScore}
+                showLabel={false}
+                width="sm"
+                ariaLabel={`Score ${fv.valueIndicatorScore.toFixed(1)} for ${fv.fieldLabel}`}
+              />
+            </span>
+            {phase2Placeholder && hasValue && <PreCalibrationChip />}
+          </div>
+        ) : (
+          <span className="num text-ink-4" style={{ fontSize: 12 }}>
+            —
+          </span>
+        )}
+      </td>
+      <td style={{ width: 100 }}>
+        <ProvenanceTrigger
+          provenance={fv.provenance}
+          status={status}
+          fieldKey={fv.fieldKey}
+          fieldLabel={fv.fieldLabel}
+          weightWithinSubFactor={fv.weightWithinSubFactor}
+          valueRaw={fv.valueRaw}
+          valueIndicatorScore={fv.valueIndicatorScore}
+        />
+      </td>
+      <td style={{ width: 90 }}>
+        {!hasValue ? (
+          <span className="chip chip-mute">Missing</span>
+        ) : status === 'approved' ? (
+          <span className="chip chip-mute">Verified</span>
+        ) : phase2Placeholder ? (
+          <span className="chip chip-amber">Pre-cal</span>
+        ) : (
+          <span className="chip chip-mute">Scored</span>
+        )}
+      </td>
+    </tr>
   );
 }
 
-/** Read provenance.valueCurrency defensively without importing the full schema. */
 function readValueCurrency(raw: unknown): string | null {
   if (raw === null || raw === undefined || typeof raw !== 'object') return null;
   const v = (raw as Record<string, unknown>).valueCurrency;

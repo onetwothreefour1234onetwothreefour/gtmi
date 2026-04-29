@@ -516,9 +516,34 @@ After 3.1–3.5, expected per-programme coverage **42–44/48** (43 average). Ga
 - ✅ `/programs` HTTP 200, 224 KB; 50 ranking rows (paginated), `<RankingsFilters>` chip strip + disclosure visible, `<AdvisorModeToggle>` retained.
 - ✅ OG image HTTP 200, 1200×630 PNG, 87 KB. Editorial visual language confirmed visually.
 
-### Phase 4-C — Programme detail + Provenance drawer — ⬜ NOT STARTED
+### Phase 4-C — Programme detail + Provenance drawer — ✅ COMPLETE
 
-Surfaces: `apps/web/app/(public)/programs/[id]/page.tsx`, new `<ProvenanceDrawer>` (right-side, Radix Dialog non-modal, ESC + keyboard accessible per Q13/decisions), restyled `<IndicatorRow>`, `<SubFactorAccordion>` extended with the pillar-tab-strip rendering (Q5).
+- ✅ Programme detail page (`apps/web/app/(public)/programs/[id]/page.tsx`) rewritten end-to-end:
+  - `<ProgramHeader>` — breadcrumb (Programmes › Country › Programme), country flag inline with eyebrow caption, status chip + coverage chip, 56px Fraunces serif programme name, italic-serif description body, paper-2 composite-score plate (Phase A `<CompositeScoreDisplay>`).
+  - Pre-calibration banner pinned directly under the header for placeholder rows.
+  - `<PillarStrip>` — 5-cell pillar grid driven by `getProgramDetail()` pillar scores + indicator counts, scoring bar in each pillar's colour, weight badge from `methodology v1`.
+  - `<PillarBreakdown>` (Q5 — keep both modes):
+    - **Tabs mode** (default) — 5-tab strip A→E; switching tabs renders the per-pillar radar (program polygon vs cohort median, small-cohort caveat) on the left and a per-pillar `<IndicatorRow>` table on the right.
+    - **Expand all sub-factors mode** — collapses the tab strip and renders all 48 indicators grouped by sub-factor, faithful port of the Phase 4.3 SubFactorAccordion behaviour.
+  - `<IndicatorRow>` rebuilt to the design's `table.gtmi` row layout: ID · Indicator (Fraunces) · Weight (mono + direction arrow) · Raw value · Score (mono + ScoreBar + Pre-cal chip) · `<ProvenanceTrigger>` · status chip (Verified / Pre-cal / Scored / Missing).
+  - `<PolicyTimeline>` reads from `detail.policyChanges`; renders the Phase 5 empty state (no mock).
+  - "What this means" panel reads `programs.long_summary_md` first, falls back to `apps/web/content/programs/<countryIso-lower>-<slug>.md`. Italic Fraunces "Summary forthcoming" placeholder for missing content.
+  - Government sources list + closing `<DataTableNote>` + bottom-of-page coverage chip in fraction format.
+- ✅ `<ProvenanceDrawer>` (`apps/web/components/gtmi/provenance-drawer.tsx`) — right-side Radix Dialog (modal) replacing the Phase 4.1 popover. 540px wide, slides from right edge, oxblood-ink left rule, paper background. Built-in focus trap, Escape-to-close, overlay-click-to-close, scroll-lock all handled by Radix Dialog. Renders the full ADR-007 schema in a single source card per analyst Q13:
+  - Header: indicator key (mono) + label (Fraunces) + Raw / Score / Weight / Sources strip.
+  - Source card: geographic level + tier · scrape time · char-offset-highlighted source sentence · char/page/sha/scrape grid · "View at source" link · disabled "View archived version" with the Phase 5 ADR-008 tooltip.
+  - Tier 2 advisory note when `sourceTier === 2`.
+  - Country-substitute note when `extractionModel === 'country-substitute-regional'`.
+  - **Derived note** when `extractionModel === 'derived-knowledge'` or `'derived-computation'` (new in Phase C).
+  - Derived inputs detail with per-input source links when `provenance.derivedInputs` is present.
+  - Provenance metadata grid: extractionModel + confidence bar, validationModel + confidence bar, crossCheckResult, methodologyVersion, reviewer (only when status === 'approved'), stabilityEdgeCase note (E.1.1 mean-substitution).
+- ✅ `<ProvenanceTrigger>` migrated from Radix Popover to a controlled drawer trigger. The trigger is now a `btn-link` showing "1 src ⛬" mono label by default; clicking opens the drawer. Fail-loud "Provenance incomplete" chip still rendered when required ADR-007 keys are missing — unchanged contract.
+- ✅ Program OG image redesigned (`(public)/programs/[id]/opengraph-image.tsx`) to the editorial palette: warm paper background with paper-grain radial gradients, oxblood eyebrow rule + uppercase "GTMI · {country} · {category}" tracking, programme name in serif, "Composite score" eyebrow + Pre-cal chip when placeholder, large composite numeral with CME/PAQ split, pillar mini-bars across the bottom in the warm-cool palette, TTR Group attribution.
+- ✅ New dependency: `@radix-ui/react-dialog ^1.1.15` (matches existing `@radix-ui/react-popover` major). Tree-shaken into the drawer chunk only.
+- ✅ Tests: `provenance-trigger.test.tsx` rewritten (21 cases — readProvenance schema validation + drawer migration: trigger renders, drawer opens on click, fieldKey/label render, char-offset highlight, Tier 2 / country-substitute / Derived badges, derivedInputs block, Escape-to-close, click-to-close, full ADR-007 schema with single source card per Q13). New `program-detail.test.tsx` (15 — ProgramHeader: breadcrumb / chips / Pre-cal not duplicated / coverage math; PillarStrip: 5 cells / dashes for unscored / weight overrides; PillarBreakdown: defaults to tabs / pillar-tab switching / expand-all renders all 48 grouped by sub-factor / mode round-trip).
+- ✅ `<MethodologyBar>` deletion already shipped in Phase B; no further `theme-toggle` references; no `dark:` variants in any Phase C component.
+- ✅ Workspace test totals: scoring 164 unchanged, extraction 203 unchanged, web 208 → **226** (+18 net new for Phase C). Workspace **575 → 593**, all green. Workspace typecheck 7/7 green.
+- ✅ Live verification on `http://localhost:3002/programs/e1687f65-…` (port 3000 + 3001 held by other processes): HTTP 200, 286 KB rendered. All 30+ structural markers present (TopNav, Footer, ProgramHeader, ProgramName, CompositeScoreDisplay, CoverageChip, PreCalibrationChip on plate, PillarStrip + 5 cells, PillarBreakdown, default mode=tabs, pillar-tab-strip, all 5 pillar tabs, mode toggle: tabs + expand-all, PillarRadar, indicator table, indicator rows, policy-timeline empty state, "What this means" + "Tier 1 sources tracked" headings, closing data-table-note). Drawer correctly closed on first paint (`provenance-drawer` not in DOM until trigger clicked). 9 indicator rows on the active pillar; 9 fail-loud "Provenance incomplete" chips reflecting the genuine gaps in current AUS canary `field_values.provenance` JSONB — the drawer logic is upstream and is exercised end-to-end by the 9 vitest cases against complete fixtures. Programme OG image: HTTP 200, 1200×630 PNG, 73 KB; visual confirmation: warm paper + oxblood rule + Pre-cal chip + 16.36 composite + CME/PAQ split + 5 pillar bars in the warm-cool palette.
 
 ### Phase 4-D — Methodology + Country pages — ⬜ NOT STARTED
 

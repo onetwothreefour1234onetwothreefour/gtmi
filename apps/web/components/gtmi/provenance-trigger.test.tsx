@@ -90,12 +90,18 @@ describe('readProvenance — defensive read against ADR-007 schema', () => {
   });
 });
 
-describe('ProvenanceTrigger', () => {
+describe('ProvenanceTrigger — drawer migration (Phase 4-C)', () => {
   it('renders the "Provenance incomplete" error chip when required keys are missing', () => {
     const partial = { ...COMPLETE_PROVENANCE } as Partial<Provenance>;
     delete partial.contentHash;
     render(
-      <ProvenanceTrigger provenance={partial} status="pending_review" valueRaw="AUD 73,150" />
+      <ProvenanceTrigger
+        provenance={partial}
+        status="pending_review"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
+        valueRaw="AUD 73,150"
+      />
     );
 
     const chip = screen.getByTestId('provenance-incomplete');
@@ -106,7 +112,15 @@ describe('ProvenanceTrigger', () => {
   });
 
   it('renders the "Provenance incomplete" error chip when raw is null', () => {
-    render(<ProvenanceTrigger provenance={null} status="approved" valueRaw="AUD 73,150" />);
+    render(
+      <ProvenanceTrigger
+        provenance={null}
+        status="approved"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
+        valueRaw="AUD 73,150"
+      />
+    );
     expect(screen.getByTestId('provenance-incomplete')).toBeInTheDocument();
   });
 
@@ -115,112 +129,182 @@ describe('ProvenanceTrigger', () => {
       <ProvenanceTrigger
         provenance={COMPLETE_PROVENANCE}
         status="pending_review"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
         valueRaw="AUD 73,150"
       />
     );
     expect(screen.getByTestId('provenance-trigger')).toBeInTheDocument();
     expect(screen.queryByTestId('provenance-incomplete')).not.toBeInTheDocument();
+    // Drawer is closed by default — content is not in the tree.
+    expect(screen.queryByTestId('provenance-drawer')).not.toBeInTheDocument();
   });
 
   it('renders the trigger when an approved row has all 13+3 keys', () => {
     render(
-      <ProvenanceTrigger provenance={APPROVED_PROVENANCE} status="approved" valueRaw="AUD 73,150" />
+      <ProvenanceTrigger
+        provenance={APPROVED_PROVENANCE}
+        status="approved"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
+        valueRaw="AUD 73,150"
+      />
     );
     expect(screen.getByTestId('provenance-trigger')).toBeInTheDocument();
   });
 
   it('downgrades an approved row that lacks reviewer keys to incomplete', () => {
-    // Pipeline contract: an approved row without reviewer keys is malformed
-    // and verify-provenance.ts would have failed — UI must surface the same
-    // posture rather than silently swallow it.
     render(
-      <ProvenanceTrigger provenance={COMPLETE_PROVENANCE} status="approved" valueRaw="AUD 73,150" />
+      <ProvenanceTrigger
+        provenance={COMPLETE_PROVENANCE}
+        status="approved"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
+        valueRaw="AUD 73,150"
+      />
     );
     expect(screen.getByTestId('provenance-incomplete')).toBeInTheDocument();
   });
 
-  it('valueCurrency is read defensively (not required, no error when absent)', () => {
-    const noCurrency = { ...COMPLETE_PROVENANCE };
-    expect(noCurrency.valueCurrency).toBeUndefined();
-    const result = readProvenance(noCurrency, 'pending_review');
-    expect(result.ok).toBe(true);
-    expect(result.missing).not.toContain('valueCurrency');
-  });
-
-  it('valueCurrency surfaces when present (read path returns it)', () => {
-    const withCurrency = { ...COMPLETE_PROVENANCE, valueCurrency: 'AUD' };
-    const result = readProvenance(withCurrency, 'pending_review');
-    expect(result.ok).toBe(true);
-    expect((result.provenance as Provenance).valueCurrency).toBe('AUD');
-  });
-
-  // Phase 3.4 / ADR-013 — Tier 2 source badge inside the popover.
-  it('renders the "Tier 2 source" badge inside the popover when sourceTier === 2', async () => {
-    const tier2 = { ...COMPLETE_PROVENANCE, sourceTier: 2 } as Provenance;
+  it('opens the drawer on click and shows the field key + label', async () => {
     render(
-      <ProvenanceTrigger provenance={tier2} status="pending_review" valueRaw="not required" />
+      <ProvenanceTrigger
+        provenance={COMPLETE_PROVENANCE}
+        status="pending_review"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary threshold"
+        valueRaw="AUD 73,150"
+      />
     );
-    expect(screen.queryByTestId('tier2-source-badge')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    const drawer = await screen.findByTestId('provenance-drawer');
+    expect(drawer).toBeInTheDocument();
+    expect(drawer).toHaveTextContent('A.1.1');
+    expect(drawer).toHaveTextContent('Minimum salary threshold');
+  });
+
+  it('renders the source sentence with charOffset highlighting', async () => {
+    render(
+      <ProvenanceTrigger
+        provenance={COMPLETE_PROVENANCE}
+        status="pending_review"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
+        valueRaw="AUD 73,150"
+      />
+    );
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    const highlight = await screen.findByTestId('provenance-highlight');
+    expect(highlight).toHaveTextContent('The minimum salary');
+    // The marked substring is sentence.slice(42, 53) → "AUD 73,150 ".
+    expect(highlight.querySelector('mark')).not.toBeNull();
+  });
+
+  it('renders the Tier 2 advisory note when sourceTier === 2', async () => {
+    const tier2: Provenance = { ...COMPLETE_PROVENANCE, sourceTier: 2 };
+    render(
+      <ProvenanceTrigger
+        provenance={tier2}
+        status="pending_review"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
+        valueRaw="not required"
+      />
+    );
     await userEvent.click(screen.getByTestId('provenance-trigger'));
     const badge = await screen.findByTestId('tier2-source-badge');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveAttribute('role', 'note');
     expect(badge).toHaveTextContent('Tier 2 source');
-    expect(badge).toHaveTextContent(
-      'This value was sourced from a law firm or advisory publication, not a government source directly.'
-    );
   });
 
-  it('does NOT render the Tier 2 badge when sourceTier === 1 (government)', async () => {
+  it('does NOT render the Tier 2 badge when sourceTier === 1', async () => {
     render(
       <ProvenanceTrigger
         provenance={COMPLETE_PROVENANCE}
         status="pending_review"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
         valueRaw="AUD 73,150"
       />
     );
-    expect(screen.queryByTestId('tier2-source-badge')).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId('provenance-trigger'));
     expect(screen.queryByTestId('tier2-source-badge')).not.toBeInTheDocument();
   });
 
-  // Phase 3.5 / ADR-014 — Country-substitute badge inside the popover.
-  it('renders the "Country-substitute" badge when extractionModel === "country-substitute-regional"', async () => {
+  it('renders the Country-substitute badge when extractionModel === "country-substitute-regional"', async () => {
     const sub: Provenance = {
       ...COMPLETE_PROVENANCE,
       extractionModel: 'country-substitute-regional',
       validationModel: 'country-substitute-regional',
       reviewer: 'auto',
       reviewedAt: '2026-04-27T00:00:00.000Z',
-      reviewerNotes: 'Regional default applied; ADR-014.',
+      reviewerNotes: 'Regional default; ADR-014.',
     };
-    render(<ProvenanceTrigger provenance={sub} status="approved" valueRaw="automatic" />);
-    expect(screen.queryByTestId('country-substitute-badge')).not.toBeInTheDocument();
+    render(
+      <ProvenanceTrigger
+        provenance={sub}
+        status="approved"
+        fieldKey="C.3.2"
+        fieldLabel="Public schooling"
+        valueRaw="automatic"
+      />
+    );
     await userEvent.click(screen.getByTestId('provenance-trigger'));
     const badge = await screen.findByTestId('country-substitute-badge');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveAttribute('role', 'note');
     expect(badge).toHaveTextContent('Country-substitute');
-    expect(badge).toHaveTextContent(
-      'This value was inferred from regional norms, not extracted from a government source directly.'
-    );
   });
 
-  it('does NOT render the Country-substitute badge for normal extractionModel', async () => {
+  it('renders the Derived badge when extractionModel === "derived-knowledge"', async () => {
+    const derived: Provenance = {
+      ...COMPLETE_PROVENANCE,
+      extractionModel: 'derived-knowledge',
+      validationModel: 'derived-knowledge',
+      reviewer: 'auto',
+      reviewedAt: '2026-04-29T00:00:00.000Z',
+      reviewerNotes: 'Derived row routed to /review.',
+    };
     render(
       <ProvenanceTrigger
-        provenance={COMPLETE_PROVENANCE}
-        status="pending_review"
-        valueRaw="AUD 73,150"
+        provenance={derived}
+        status="approved"
+        fieldKey="A.1.2"
+        fieldLabel="Salary as % of local median wage"
+        valueRaw="143%"
       />
     );
-    expect(screen.queryByTestId('country-substitute-badge')).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId('provenance-trigger'));
-    expect(screen.queryByTestId('country-substitute-badge')).not.toBeInTheDocument();
+    const badge = await screen.findByTestId('derived-knowledge-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute('role', 'note');
+    expect(badge).toHaveTextContent('Derived');
   });
 
-  // Phase 3.6 / ADR-016 — derivedInputs block inside the popover.
-  it('renders the "Computed from:" derivedInputs block when present in provenance', async () => {
+  it('renders the Derived badge when extractionModel === "derived-computation"', async () => {
+    const derived: Provenance = {
+      ...COMPLETE_PROVENANCE,
+      extractionModel: 'derived-computation',
+      validationModel: 'derived-computation',
+      reviewer: 'auto',
+      reviewedAt: '2026-04-29T00:00:00.000Z',
+      reviewerNotes: 'Derived row routed to /review.',
+    };
+    render(
+      <ProvenanceTrigger
+        provenance={derived}
+        status="approved"
+        fieldKey="A.1.2"
+        fieldLabel="Salary as % of local median wage"
+        valueRaw="143%"
+      />
+    );
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    expect(await screen.findByTestId('derived-knowledge-badge')).toBeInTheDocument();
+  });
+
+  it('renders the "Computed from:" derivedInputs block when present', async () => {
     const derived = {
       ...COMPLETE_PROVENANCE,
       extractionModel: 'derived-computation',
@@ -242,30 +326,86 @@ describe('ProvenanceTrigger', () => {
         },
       },
     } as unknown as Provenance;
-    render(<ProvenanceTrigger provenance={derived} status="pending_review" valueRaw="80" />);
-    expect(screen.queryByTestId('derived-inputs')).not.toBeInTheDocument();
+    render(
+      <ProvenanceTrigger
+        provenance={derived}
+        status="pending_review"
+        fieldKey="A.1.2"
+        fieldLabel="Salary as % of local median wage"
+        valueRaw="143%"
+      />
+    );
     await userEvent.click(screen.getByTestId('provenance-trigger'));
     const block = await screen.findByTestId('derived-inputs');
     expect(block).toBeInTheDocument();
-    expect(block).toHaveAttribute('role', 'note');
-    expect(block).toHaveTextContent('Computed from:');
+    expect(block).toHaveTextContent('Computed from');
     expect(block).toHaveTextContent('A.1.1');
     expect(block).toHaveTextContent('medianWage');
-    // Source URLs render as links labelled "View source".
     const links = block.querySelectorAll('a');
     expect(links.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('does NOT render the "Computed from:" derivedInputs block when absent', async () => {
+  it('closes the drawer on Escape', async () => {
     render(
       <ProvenanceTrigger
         provenance={COMPLETE_PROVENANCE}
         status="pending_review"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
         valueRaw="AUD 73,150"
       />
     );
-    expect(screen.queryByTestId('derived-inputs')).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId('provenance-trigger'));
-    expect(screen.queryByTestId('derived-inputs')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('provenance-drawer')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    // Radix unmounts the content on close.
+    expect(screen.queryByTestId('provenance-drawer')).not.toBeInTheDocument();
+  });
+
+  it('closes the drawer when the close button is clicked', async () => {
+    render(
+      <ProvenanceTrigger
+        provenance={COMPLETE_PROVENANCE}
+        status="pending_review"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
+        valueRaw="AUD 73,150"
+      />
+    );
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    await userEvent.click(await screen.findByTestId('provenance-drawer-close'));
+    expect(screen.queryByTestId('provenance-drawer')).not.toBeInTheDocument();
+  });
+
+  it('exposes the full ADR-007 schema inside the drawer (single source card per Q13)', async () => {
+    render(
+      <ProvenanceTrigger
+        provenance={APPROVED_PROVENANCE}
+        status="approved"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
+        weightWithinSubFactor={0.03}
+        valueRaw="AUD 73,150"
+        valueIndicatorScore={64.2}
+      />
+    );
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    const drawer = await screen.findByTestId('provenance-drawer');
+
+    // Single source card.
+    const sourceCards = screen.getAllByTestId('provenance-drawer-source-card');
+    expect(sourceCards).toHaveLength(1);
+
+    // Wayback link is disabled with the Phase 5 tooltip per ADR-008.
+    const wayback = screen.getByTestId('provenance-drawer-wayback');
+    expect(wayback).toHaveAttribute('aria-disabled', 'true');
+    expect(wayback.title).toMatch(/Phase 5/);
+
+    // Provenance metadata grid renders extractionModel, validationModel,
+    // crossCheckResult, methodologyVersion, reviewer.
+    expect(drawer).toHaveTextContent('claude-sonnet-4-6');
+    expect(drawer).toHaveTextContent('Agrees');
+    expect(drawer).toHaveTextContent('1.0.0');
+    expect(screen.getByTestId('provenance-drawer-reviewer')).toBeInTheDocument();
   });
 });

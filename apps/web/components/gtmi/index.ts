@@ -8,6 +8,7 @@ export { WeightSlider } from './weight-slider';
 export { SplitSpecimen } from './split-specimen';
 export { PillarsSpecimen } from './pillars-specimen';
 export { ProvenanceTrigger } from './provenance-trigger';
+export { ProvenanceDrawer } from './provenance-drawer';
 export { ProvenanceHighlight } from './provenance-highlight';
 export { PolicyTimeline, type PolicyTimelineEvent } from './policy-timeline';
 export { EmptyState } from './empty-state';
@@ -22,6 +23,10 @@ export { IndicatorRow } from './indicator-row';
 export { SubFactorAccordion } from './sub-factor-accordion';
 export { PillarBreakdownTable } from './pillar-breakdown-table';
 export { PillarComparison } from './pillar-comparison';
+// Phase 4-C — programme detail editorial layout.
+export { ProgramHeader } from './program-header';
+export { PillarStrip } from './pillar-strip';
+export { PillarBreakdown } from './pillar-breakdown';
 export { CountryFlag } from './country-flag';
 export { JsonLd } from './json-ld';
 

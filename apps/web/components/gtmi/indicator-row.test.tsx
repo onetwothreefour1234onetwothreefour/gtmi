@@ -49,7 +49,7 @@ describe('IndicatorRow', () => {
     expect(row).toHaveTextContent('Minimum salary threshold');
     expect(row).toHaveTextContent('AUD 73,150');
     expect(row).toHaveTextContent('64.20');
-    expect(row).toHaveTextContent('50%');
+    expect(row).toHaveTextContent('50.0%');
   });
 
   it('renders the currency code beside the raw value when provenance.valueCurrency is present', () => {
