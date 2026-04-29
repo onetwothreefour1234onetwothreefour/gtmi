@@ -44,6 +44,7 @@ export {
   DeriveStageImpl,
   deriveA12,
   deriveB24,
+  deriveD12,
   deriveD13,
   deriveD14,
   deriveD22,
@@ -53,6 +54,7 @@ export type {
   CitizenshipResidenceEntry,
   DerivedA12Input,
   DerivedB24Input,
+  DerivedD12Input,
   DerivedD13Input,
   DerivedD14Input,
   DerivedD22Input,
@@ -64,6 +66,7 @@ export type {
   NonGovCostsPolicyEntry,
   PrPresenceFieldEntry,
   PrPresencePolicyEntry,
+  PrTimelinePolicyEntry,
 } from './stages/derive';
 export { DiscoverStageImpl, writeToSourcesTable } from './stages/discover';
 export {
@@ -94,3 +97,7 @@ export * from './data/country-citizenship-policy';
 // Phase 3.6.2 / ITEM 2 — country-level lookups for B.2.4 / D.1.3 / D.1.4.
 export * from './data/country-non-gov-costs';
 export * from './data/country-pr-presence';
+// Phase 3.6.4 / FIX 2 — country-level D.1.2 PR timeline lookup.
+export * from './data/country-pr-timeline';
+// Phase 3.6.4 / FIX 1 — currency detection (with bare-$ country fallback).
+export { detectCurrency, BARE_DOLLAR_COUNTRY_FALLBACK } from './utils/currency';

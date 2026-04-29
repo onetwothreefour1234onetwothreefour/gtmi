@@ -9,6 +9,7 @@ import {
   ValidateStageImpl,
   deriveA12,
   deriveB24,
+  deriveD12,
   deriveD13,
   deriveD14,
   deriveD22,
@@ -21,6 +22,7 @@ import {
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
   COUNTRY_NON_GOV_COSTS_POLICY,
   COUNTRY_PR_PRESENCE_POLICY,
+  COUNTRY_PR_TIMELINE,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -347,7 +349,15 @@ export const extractSingleProgram = task({
     // --- Stage 2: Batch extract LLM fields. Exclude E.3.2 (always API),
     // E.3.1 (when V-Dem-handled), and A.1.2 / D.2.2 (Phase 3.6 derive
     // stage owns these — see ADR-016). ---
-    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2', 'D.2.3', 'B.2.4', 'D.1.3', 'D.1.4']);
+    const DERIVED_FIELD_KEYS = new Set([
+      'A.1.2',
+      'D.1.2',
+      'D.2.2',
+      'D.2.3',
+      'B.2.4',
+      'D.1.3',
+      'D.1.4',
+    ]);
     const llmFields: FieldSpec[] = allFieldDefs
       .filter(
         (d) =>
@@ -461,15 +471,16 @@ export const extractSingleProgram = task({
       const d11Boolean: boolean | null =
         d11Raw === null ? null : ['true', 'yes', '1'].includes(d11Raw.toLowerCase().trim());
 
-      const d12Live = lookupExtraction('D.1.2');
-      const d12Db = d12Live ? null : await readApprovedFieldValue('D.1.2');
-      const d12Raw = d12Live?.output.valueRaw ?? d12Db?.valueRaw ?? null;
-      const d12Years: number | null = (() => {
-        if (d12Raw === null) return null;
-        const n = Number.parseFloat(d12Raw.replace(/[^0-9.]/g, ''));
-        return Number.isFinite(n) ? n : null;
-      })();
-      const d12SourceUrl = d12Live?.sourceUrl ?? d12Db?.sourceUrl ?? null;
+      // Phase 3.6.4 / FIX 2 — D.1.2 derived from COUNTRY_PR_TIMELINE.
+      const d12PolicyEntry = COUNTRY_PR_TIMELINE[country] ?? null;
+      const d12DerivedResult = deriveD12({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: d12PolicyEntry,
+      });
+      const d12Years: number | null = d12DerivedResult?.numericValue ?? null;
+      const d12SourceUrl: string | null = d12PolicyEntry?.sourceUrl ?? null;
 
       const a12Result = deriveA12({
         programId,
@@ -519,7 +530,15 @@ export const extractSingleProgram = task({
         policy: prPresence,
       });
 
-      for (const derived of [a12Result, d22Result, d23Result, b24Result, d13Result, d14Result]) {
+      for (const derived of [
+        a12Result,
+        d12DerivedResult,
+        d22Result,
+        d23Result,
+        b24Result,
+        d13Result,
+        d14Result,
+      ]) {
         if (!derived) continue;
         try {
           await publish.executeDerived(derived.extraction, derived.provenance);

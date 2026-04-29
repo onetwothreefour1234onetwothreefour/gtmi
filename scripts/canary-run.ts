@@ -7,6 +7,7 @@ import {
   ValidateStageImpl,
   deriveA12,
   deriveB24,
+  deriveD12,
   deriveD13,
   deriveD14,
   deriveD22,
@@ -19,6 +20,7 @@ import {
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
   COUNTRY_NON_GOV_COSTS_POLICY,
   COUNTRY_PR_PRESENCE_POLICY,
+  COUNTRY_PR_TIMELINE,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -402,7 +404,15 @@ async function main() {
     const e31HandledByVdemPath = PHASE3_VDEM_ENABLED && vdemResult !== null;
     // Phase 3.6.1 / FIX 6 — D.2.3 added to derived field keys (handled by
     // deriveD23 against the country dual-citizenship policy lookup).
-    const DERIVED_FIELD_KEYS = new Set(['A.1.2', 'D.2.2', 'D.2.3', 'B.2.4', 'D.1.3', 'D.1.4']);
+    const DERIVED_FIELD_KEYS = new Set([
+      'A.1.2',
+      'D.1.2',
+      'D.2.2',
+      'D.2.3',
+      'B.2.4',
+      'D.1.3',
+      'D.1.4',
+    ]);
     const targetedMissingSet = PHASE3_TARGETED_RERUN ? new Set(missingFieldKeys) : null;
     const llmFields: FieldSpec[] = allFieldDefs
       .filter(
@@ -681,16 +691,19 @@ async function main() {
       const d11Boolean: boolean | null =
         d11Raw === null ? null : ['true', 'yes', '1'].includes(d11Raw.toLowerCase().trim());
 
-      // D.1.2 — years to PR.
-      const d12Live = lookupExtraction('D.1.2');
-      const d12Db = d12Live ? null : await readApprovedFieldValue('D.1.2');
-      const d12Raw = d12Live?.output.valueRaw ?? d12Db?.valueRaw ?? null;
-      const d12Years: number | null = (() => {
-        if (d12Raw === null) return null;
-        const n = Number.parseFloat(d12Raw.replace(/[^0-9.]/g, ''));
-        return Number.isFinite(n) ? n : null;
-      })();
-      const d12SourceUrl = d12Live?.sourceUrl ?? d12Db?.sourceUrl ?? null;
+      // D.1.2 — years to PR. Phase 3.6.4 / FIX 2: D.1.2 is now derived
+      // from COUNTRY_PR_TIMELINE rather than LLM-extracted (unreliable
+      // because the rule lives on PR-authority pages, not the visa page).
+      // The derived D.1.2 result feeds deriveD22 below.
+      const d12PolicyEntry = COUNTRY_PR_TIMELINE[countryIso] ?? null;
+      const d12DerivedResult = deriveD12({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: d12PolicyEntry,
+      });
+      const d12Years: number | null = d12DerivedResult?.numericValue ?? null;
+      const d12SourceUrl: string | null = d12PolicyEntry?.sourceUrl ?? null;
 
       const a12Result = deriveA12({
         programId,
@@ -741,7 +754,15 @@ async function main() {
         policy: prPresence,
       });
 
-      for (const derived of [a12Result, d22Result, d23Result, b24Result, d13Result, d14Result]) {
+      for (const derived of [
+        a12Result,
+        d12DerivedResult,
+        d22Result,
+        d23Result,
+        b24Result,
+        d13Result,
+        d14Result,
+      ]) {
         if (!derived) continue;
         try {
           await publish.executeDerived(derived.extraction, derived.provenance);

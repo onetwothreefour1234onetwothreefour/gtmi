@@ -1,4 +1,4 @@
-import { db, fieldDefinitions, fieldValues, reviewQueue } from '@gtmi/db';
+import { db, fieldDefinitions, fieldValues, programs, reviewQueue } from '@gtmi/db';
 import { normalizeRawValue, ScoringError } from '@gtmi/scoring';
 import { and, eq } from 'drizzle-orm';
 import { detectCurrency } from '../utils/currency';
@@ -108,10 +108,18 @@ export class HumanReviewStageImpl implements HumanReviewStage {
     let normalizationError: string | null = null;
     try {
       // Strip currency prefix for numeric fields before normalization, mirroring publish.ts.
+      // Phase 3.6.4 / FIX 1 — pass program country_iso so bare-`$` resolves
+      // to the program's national currency.
       let rawForNorm = rawAsString;
       let detectedCurrency: string | undefined;
       if (fieldDef.normalizationFn === 'min_max' || fieldDef.normalizationFn === 'z_score') {
-        const detected = detectCurrency(rawAsString);
+        const programCountryRows = await db
+          .select({ countryIso: programs.countryIso })
+          .from(programs)
+          .where(eq(programs.id, extraction.programId))
+          .limit(1);
+        const detectedCountryIso = programCountryRows[0]?.countryIso;
+        const detected = detectCurrency(rawAsString, detectedCountryIso);
         if (detected) {
           detectedCurrency = detected.code;
           rawForNorm = detected.stripped;

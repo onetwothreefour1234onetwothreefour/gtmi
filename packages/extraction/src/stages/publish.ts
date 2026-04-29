@@ -488,10 +488,18 @@ export class PublishStageImpl implements PublishStage {
     }
 
     // For numeric fields, detect and preserve currency code before normalization strips it.
+    // Phase 3.6.4 / FIX 1 — pass program country_iso so bare-`$` extractions
+    // resolve to the program's national currency (AUS→AUD, SGP→SGD, …).
     let rawForNormalization = rawAsString;
     let valueCurrency: string | undefined;
     if (fieldDef.normalizationFn === 'min_max' || fieldDef.normalizationFn === 'z_score') {
-      const detected = detectCurrency(rawAsString);
+      const programCountryRows = await db
+        .select({ countryIso: programs.countryIso })
+        .from(programs)
+        .where(eq(programs.id, extraction.programId))
+        .limit(1);
+      const detectedCountryIso = programCountryRows[0]?.countryIso;
+      const detected = detectCurrency(rawAsString, detectedCountryIso);
       if (detected) {
         valueCurrency = detected.code;
         rawForNormalization = detected.stripped;

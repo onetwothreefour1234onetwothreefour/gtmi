@@ -131,6 +131,8 @@ export interface DeriveStageInputs {
   d13?: import('../stages/derive').DerivedD13Input;
   /** Phase 3.6.2 / ITEM 2 — D.1.4 PR retention rules. */
   d14?: import('../stages/derive').DerivedD14Input;
+  /** Phase 3.6.4 / FIX 2 — D.1.2 minimum years of residence to PR eligibility. */
+  d12?: import('../stages/derive').DerivedD12Input;
 }
 
 export interface DeriveStage {

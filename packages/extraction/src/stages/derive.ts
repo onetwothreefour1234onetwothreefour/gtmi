@@ -627,6 +627,97 @@ export function deriveD14(input: DerivedD14Input): DerivedRow | null {
   return buildPrPresenceRow('D.1.4', input, input.policy.d14);
 }
 
+/**
+ * Phase 3.6.4 / FIX 2 — D.1.2 (minimum years of residence to PR
+ * eligibility). Country-deterministic in the cohort: the rule is set by
+ * the immigration / citizenship authority. Same pattern as D.2.3 / B.2.4
+ * — derived-knowledge, confidence 0.7, routes to /review. valueRaw is
+ * the integer-year as a string (e.g. "2"); valueNormalized is the bare
+ * number, matching the min_max numeric path the scoring engine expects
+ * for D.1.2.
+ *
+ * Skips when:
+ *   - no entry exists for the country
+ *   - the entry's d12MinYearsToPr is null (no realistic PR pathway,
+ *     e.g. GCC monarchies)
+ */
+export interface PrTimelinePolicyEntry {
+  iso3: string;
+  d12MinYearsToPr: number | null;
+  notes: string;
+  sourceUrl: string;
+  sourceYear: number;
+}
+
+export interface DerivedD12Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  policy: PrTimelinePolicyEntry | null;
+}
+
+export function deriveD12(input: DerivedD12Input): DerivedRow | null {
+  if (input.policy === null) {
+    console.log(`  [D.1.2] derived skip — no COUNTRY_PR_TIMELINE entry for ${input.countryIso}`);
+    return null;
+  }
+  if (input.policy.d12MinYearsToPr === null) {
+    console.log(
+      `  [D.1.2] derived skip — ${input.countryIso} has no realistic PR pathway (d12MinYearsToPr=null)`
+    );
+    return null;
+  }
+
+  const years = input.policy.d12MinYearsToPr;
+  const valueRaw = String(years);
+  const sourceSentence = input.policy.notes;
+
+  const derivedInputs = {
+    'D.1.2': {
+      years,
+      sourceUrl: input.policy.sourceUrl,
+      sourceYear: input.policy.sourceYear,
+    },
+  };
+
+  const crossCheckResult: CrossCheckOutcome = 'not_checked';
+  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
+    sourceUrl: input.policy.sourceUrl,
+    geographicLevel: 'national',
+    sourceTier: null,
+    scrapeTimestamp: new Date().toISOString(),
+    contentHash: createHash('sha256')
+      .update(`derived-knowledge:D.1.2:${input.programId}:${input.countryIso}:${years}`, 'utf8')
+      .digest('hex'),
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    validationModel: DERIVE_KNOWLEDGE_MODEL,
+    validationConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    crossCheckResult,
+    crossCheckUrl: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    methodologyVersion: input.methodologyVersion,
+    reviewDecision: 'approve',
+    derivedInputs,
+  };
+
+  const extraction: ExtractionOutput = {
+    programId: input.programId,
+    fieldDefinitionKey: 'D.1.2',
+    valueRaw,
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractedAt: new Date(),
+  };
+
+  return { extraction, provenance, numericValue: years };
+}
+
 // ────────────────────────────────────────────────────────────────────
 // Stage orchestrator. Pure inputs (no DB) — the canary / Trigger.dev
 // caller resolves DB-backed fields and the static-table entries before
@@ -657,6 +748,10 @@ export class DeriveStageImpl implements DeriveStage {
     if (inputs.d14) {
       const d14 = deriveD14(inputs.d14);
       if (d14) out.push(d14);
+    }
+    if (inputs.d12) {
+      const d12 = deriveD12(inputs.d12);
+      if (d12) out.push(d12);
     }
     return out;
   }
