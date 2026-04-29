@@ -128,8 +128,114 @@ describe('deriveA12 — skip conditions', () => {
 
   it('skips when valueRaw does not parse to a positive number', () => {
     expect(deriveA12({ ...baseValid, a11ValueRaw: 'not a number' })).toBeNull();
-    expect(deriveA12({ ...baseValid, a11ValueRaw: '0' })).toBeNull();
+    // Phase 3.6.6 / FIX 1 — "0" no longer skips; it triggers the
+    // points-based `not_applicable` row instead (covered below).
     expect(deriveA12({ ...baseValid, a11ValueRaw: '-100' })).toBeNull();
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────
+// A.1.2 — Phase 3.6.6 / FIX 1 — points-based not_applicable
+// ────────────────────────────────────────────────────────────────────
+
+describe('deriveA12 — points-based not_applicable (FIX 1, country-agnostic)', () => {
+  const baseValid = {
+    programId: 'test-prog',
+    countryIso: 'CAN',
+    methodologyVersion: '1.0.0',
+    a11ValueRaw: '0',
+    a11ValueCurrency: null,
+    a11SourceUrl: 'https://www.canada.ca/...',
+    a11SourceSentence: 'No fixed salary threshold; points-based system.',
+    medianWage: { ...AUS_MEDIAN, iso3: 'CAN', medianWageUsd: 56_000 },
+    fxRate: null,
+  };
+
+  it('writes a not_applicable row when A.1.1 valueRaw is "0"', () => {
+    const r = deriveA12({ ...baseValid, a11ValueRaw: '0' });
+    expect(r).not.toBeNull();
+    expect(r!.extraction.fieldDefinitionKey).toBe('A.1.2');
+    expect(r!.extraction.valueRaw).toBe('not_applicable');
+    expect(r!.extraction.extractionModel).toBe('derived-knowledge');
+    expect(r!.extraction.extractionConfidence).toBe(0.9);
+    expect(r!.provenance.sourceUrl).toBe('derived:points-based-program-type');
+    expect(r!.provenance.sourceSentence).toContain('points-based');
+  });
+
+  it('writes a not_applicable row when A.1.3 = "no_salary_route"', () => {
+    const r = deriveA12({
+      ...baseValid,
+      a11ValueRaw: 'AUD 73,150',
+      a13ValueRaw: 'no_salary_route',
+    });
+    expect(r).not.toBeNull();
+    expect(r!.extraction.valueRaw).toBe('not_applicable');
+  });
+
+  it('writes a not_applicable row when A.1.3 = "points_only"', () => {
+    const r = deriveA12({ ...baseValid, a11ValueRaw: 'AUD 73,150', a13ValueRaw: 'points_only' });
+    expect(r).not.toBeNull();
+    expect(r!.extraction.valueRaw).toBe('not_applicable');
+  });
+
+  it('writes a not_applicable row when A.1.3 = "not_required"', () => {
+    const r = deriveA12({ ...baseValid, a11ValueRaw: 'AUD 73,150', a13ValueRaw: 'not_required' });
+    expect(r).not.toBeNull();
+    expect(r!.extraction.valueRaw).toBe('not_applicable');
+  });
+
+  it('takes the normal derive path when A.1.1 has a positive value with a valid currency (AUS case unchanged)', () => {
+    const r = deriveA12({
+      programId: 'test-prog',
+      countryIso: 'AUS',
+      methodologyVersion: '1.0.0',
+      a11ValueRaw: '73150',
+      a11ValueCurrency: 'AUD',
+      a11SourceUrl: 'https://immi.homeaffairs.gov.au/...',
+      a11SourceSentence:
+        'The annual income threshold is currently AUD 73,150 per year for the Core Skills Stream.',
+      a13ValueRaw: 'salary_required',
+      medianWage: AUS_MEDIAN,
+      fxRate: AUD_FX,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.extraction.fieldDefinitionKey).toBe('A.1.2');
+    expect(r!.extraction.valueRaw).not.toBe('not_applicable');
+    expect(r!.extraction.extractionModel).toBe('derived-computation');
+    // 73150 / 1.518 / 60200 * 100 ≈ 80.0 (annual sentence → not annualised again)
+    expect(r!.numericValue).toBeCloseTo(80.0, 1);
+  });
+
+  it('takes the normal derive path with monthly annualisation (SGP case unchanged)', () => {
+    const SGP_MEDIAN: MedianWageEntry = {
+      iso3: 'SGP',
+      usdYear: 2023,
+      medianWageUsd: 60_000,
+      source: 'OECD',
+      sourceUrl: 'https://stats.oecd.org/Index.aspx?DataSetCode=AV_AN_WAGE',
+    };
+    const SGD_FX: FxRateEntry = {
+      code: 'SGD',
+      year: 2024,
+      lcuPerUsd: 1.34,
+      sourceUrl: 'https://data.worldbank.org/indicator/PA.NUS.FCRF',
+    };
+    const r = deriveA12({
+      programId: 'test-prog',
+      countryIso: 'SGP',
+      methodologyVersion: '1.0.0',
+      a11ValueRaw: '3300',
+      a11ValueCurrency: 'SGD',
+      a11SourceUrl: 'https://www.mom.gov.sg/...',
+      a11SourceSentence: 'Minimum qualifying salary is S$3,300 per month.',
+      a13ValueRaw: 'salary_required',
+      medianWage: SGP_MEDIAN,
+      fxRate: SGD_FX,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.extraction.valueRaw).not.toBe('not_applicable');
+    // 3300 * 12 / 1.34 / 60000 * 100 ≈ 49.3
+    expect(r!.numericValue).toBeCloseTo(49.3, 1);
   });
 });
 

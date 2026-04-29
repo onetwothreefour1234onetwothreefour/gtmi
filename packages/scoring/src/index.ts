@@ -14,8 +14,9 @@ export {
   NO_LIMIT_MARKER,
   isNumericNoLimitSentinel,
   isNoLimitMarker,
+  isNotApplicableMarker,
 } from './sentinels';
-export type { NoLimitMarker } from './sentinels';
+export type { NoLimitMarker, NotApplicableMarker } from './sentinels';
 export type {
   ScoringInput,
   ScoringOutput,

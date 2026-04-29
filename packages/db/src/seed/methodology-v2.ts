@@ -143,6 +143,67 @@ Return null only if age is not addressed at all on the page.`
   ),
 
   // ────────────────────────────────────────────────────────────────────
+  // B.2.1 — Phase 3.6.6 / FIX 3: multi-currency acceptance. Country-agnostic.
+  // The original v1 prompt asked for USD-denominated values, but
+  // government fee pages publish in local currency (CAD, AUD, GBP,
+  // SGD, HKD, NZD, JPY, EUR, etc.). The model returned empty when it
+  // saw a local-currency figure. Now we extract the value AS STATED
+  // with its currency code; FX conversion happens downstream at score
+  // time, not at extraction.
+  // ────────────────────────────────────────────────────────────────────
+  'B.2.1': withPreamble(
+    `Extraction Task: B.2.1 — Principal applicant fees
+Question: What is the total government fee a principal applicant must pay to the issuing authority for a standard application, AS STATED on the source page?
+
+Currency handling (IMPORTANT):
+
+Return the value and currency code AS STATED on the page. Do NOT attempt to convert to USD; downstream code performs the conversion using verified FX rates.
+Accept any currency: CAD X (Canada), AUD X / A$X (Australia), GBP X / £X (UK), EUR X / €X (Eurozone), SGD X / S$X (Singapore), HKD X / HK$X (Hong Kong), NZD X / NZ$X (New Zealand), JPY X / ¥X (Japan), CHF X (Switzerland), AED X (UAE), SAR X (Saudi Arabia), MYR X / RM X (Malaysia), THB X / ฿X (Thailand), USD X / US$X (USA), and any other ISO 4217 code or its standard symbol.
+Format the output as the currency code (or its primary symbol) followed by the numeric amount: "CAD 1485" or "$1485" with country context, "GBP 1500", "€1170", "S$345".
+If the page mixes prefix and suffix forms (e.g. "1500 GBP" or "GBP 1500"), normalise to currency-prefix form.
+If the page lists fees in multiple currencies (rare — usually a USD-equivalent in parentheses), prefer the original local currency.
+
+Recall hints:
+
+Include application fee, issuance fee, and mandatory levies to the issuing authority.
+Exclude employer-borne levies (see B.2.3) and non-government costs (see B.2.4).
+If fees vary by stream or duration, report the standard 2-4 year visa case and note variations.
+If multiple components are stated separately (e.g. "processing fee 850 + biometrics 85 + right of permanent residence fee 575"), sum them and explain in notes.
+
+Edge cases:
+
+If the page explicitly says "no fee" or the fee is zero, return 0 (no currency code needed).
+If the page is silent on fees, return null.
+"Immigration Health Surcharge" (UK), "Right of Permanent Residence Fee" (Canada), and similar government health/landing surcharges are PART of B.2.1.`
+  ),
+
+  // ────────────────────────────────────────────────────────────────────
+  // B.2.2 — Phase 3.6.6 / FIX 3: multi-currency acceptance. Same
+  // pattern as B.2.1.
+  // ────────────────────────────────────────────────────────────────────
+  'B.2.2': withPreamble(
+    `Extraction Task: B.2.2 — Per-dependant fees
+Question: What is the government fee per accompanying dependant paid to the issuing authority, AS STATED on the source page?
+
+Currency handling (IMPORTANT):
+
+Return the value and currency code AS STATED on the page. Do NOT attempt to convert to USD.
+Accept any currency: CAD X, AUD X / A$X, GBP X / £X, EUR X / €X, SGD X / S$X, HKD X / HK$X, NZD X / NZ$X, JPY X / ¥X, CHF X, AED X, SAR X, MYR X / RM X, USD X / US$X, and any other ISO 4217 code or symbol.
+Format as currency-prefix: "CAD 825", "GBP 490", "€775", "A$1620".
+
+Recall hints:
+
+If the page distinguishes spouse vs child fees, report the higher (common adult dependant case) and note the other.
+If a "right of permanent residence fee" or similar landing fee is charged per dependant, include it.
+
+Edge cases:
+
+If dependants are not permitted, return null with notes "no dependants permitted".
+If the page is silent on per-dependant fees, return null.
+If dependants are charged the same as the principal applicant, report that single amount and explain in notes.`
+  ),
+
+  // ────────────────────────────────────────────────────────────────────
   // B.2.3 — Negative-match: model returns empty for points-based
   // programmes with no employer sponsorship. Reinforce the 0 path.
   // ────────────────────────────────────────────────────────────────────

@@ -45,3 +45,26 @@ export function isNoLimitMarker(value: unknown): value is NoLimitMarker {
     (value as Record<string, unknown>)['__noLimit'] === true
   );
 }
+
+// Phase 3.6.6 / FIX 1 — "not applicable" marker for indicators that do
+// not apply to a given programme. The canonical case is A.1.2 (salary as
+// % of median wage) on points-based programmes (CAN Express Entry FSW,
+// NZL SMC, AUT RWR Card, AUS 189 Points Tested): there is no salary
+// threshold, so no percentage exists. The published row carries
+// valueRaw='not_applicable' and valueNormalized={notApplicable: true,
+// reason}. The engine treats it like missing for scoring, while the
+// audit rollup classifies it POPULATED (real curated answer, not a
+// blank).
+export interface NotApplicableMarker {
+  notApplicable: true;
+  reason: string;
+}
+
+export function isNotApplicableMarker(value: unknown): value is NotApplicableMarker {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as Record<string, unknown>)['notApplicable'] === true
+  );
+}

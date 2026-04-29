@@ -691,6 +691,12 @@ async function main() {
       const a11SourceSentence: string | null =
         a11Live?.output.sourceSentence ?? a11Db?.sourceSentence ?? null;
 
+      // Phase 3.6.6 / FIX 1 — A.1.3 raw value, country-agnostic gate
+      // for the points-based not_applicable branch in deriveA12.
+      const a13Live = lookupExtraction('A.1.3');
+      const a13Db = a13Live ? null : await readApprovedFieldValue('A.1.3');
+      const a13ValueRaw: string | null = a13Live?.output.valueRaw ?? a13Db?.valueRaw ?? null;
+
       // D.1.1 — boolean.
       const d11Live = lookupExtraction('D.1.1');
       const d11Db = d11Live ? null : await readApprovedFieldValue('D.1.1');
@@ -720,6 +726,7 @@ async function main() {
         a11ValueCurrency,
         a11SourceUrl,
         a11SourceSentence,
+        a13ValueRaw,
         medianWage: COUNTRY_MEDIAN_WAGE[countryIso] ?? null,
         fxRate: a11ValueCurrency ? (FX_RATES[a11ValueCurrency.toUpperCase()] ?? null) : null,
       });
@@ -791,10 +798,19 @@ async function main() {
     // ── Country-substitute fallback: write synthetic rows for empty
     //    `country_substitute_regional` fields when a regional default exists.
     //    Phase 3.5 / ADR-014. Auto-approved (no review queue).
+    //
+    // Phase 3.6.6 / FIX 2 — coverage-gap sentinels (`not_addressed`,
+    // `not_found`, `not_stated`) returned by the LLM count as empty for
+    // the substitute gate. Without this, a cached "not_addressed" hit
+    // for C.3.2 would skip both the substitute path AND the per-field
+    // publish loop (which excludes country_substitute_regional fields),
+    // leaving the row unwritten. Country-agnostic.
+    const COVERAGE_GAP_SENTINELS = new Set(['not_addressed', 'not_found', 'not_stated', '']);
     for (const def of allFieldDefs) {
       if (def.normalizationFn !== 'country_substitute_regional') continue;
       const r = allExtractionResults.get(def.key);
-      if (r && r.output.valueRaw !== '') continue; // extracted; no substitution needed
+      const extractedRaw = r?.output.valueRaw.trim().toLowerCase() ?? '';
+      if (r && !COVERAGE_GAP_SENTINELS.has(extractedRaw)) continue; // genuine extraction; no substitution needed
       try {
         const written = await publish.executeCountrySubstitute(
           programId,

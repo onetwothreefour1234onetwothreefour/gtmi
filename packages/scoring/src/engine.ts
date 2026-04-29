@@ -13,7 +13,7 @@ import {
   normalizeZScore,
   parseIndicatorValue,
 } from './normalize';
-import { isNoLimitMarker } from './sentinels';
+import { isNoLimitMarker, isNotApplicableMarker } from './sentinels';
 import {
   INSUFFICIENT_DISCLOSURE_THRESHOLD,
   CME_WEIGHT,
@@ -121,9 +121,14 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
 
   const valueByDefId = new Map<string, unknown>();
   for (const fv of input.fieldValues) {
-    if (fv.valueNormalized !== null && fv.valueNormalized !== undefined) {
-      valueByDefId.set(fv.fieldDefinitionId, fv.valueNormalized);
-    }
+    if (fv.valueNormalized === null || fv.valueNormalized === undefined) continue;
+    // Phase 3.6.6 / FIX 1 — `notApplicable: true` rows exist for
+    // coverage/audit purposes but contribute no score (the indicator
+    // genuinely does not apply to the programme). Excluding them here
+    // mirrors the missing-data path and keeps min_max / z_score
+    // parsing honest.
+    if (isNotApplicableMarker(fv.valueNormalized)) continue;
+    valueByDefId.set(fv.fieldDefinitionId, fv.valueNormalized);
   }
 
   // Step 3: Score each present indicator (only within active scope)

@@ -106,6 +106,16 @@ function normalizeDerivedValueRaw(
   valueRaw: string,
   normalizationFn: string
 ): number | string | boolean | Record<string, unknown> | null {
+  // Phase 3.6.6 / FIX 1 — derived `not_applicable` row (A.1.2 on
+  // points-based programmes). Returns the structured marker regardless
+  // of the field's normalisation fn so the engine can short-circuit
+  // scoring (engine.ts skips rows with notApplicable=true).
+  if (valueRaw === 'not_applicable') {
+    return {
+      notApplicable: true,
+      reason: 'Points-based programme — no minimum salary requirement',
+    };
+  }
   if (normalizationFn === 'min_max' || normalizationFn === 'z_score') {
     const n = Number.parseFloat(valueRaw);
     return Number.isFinite(n) ? n : null;
@@ -284,7 +294,12 @@ export class PublishStageImpl implements PublishStage {
         `executeDerived refused: extractionModel must be 'derived-computation' or 'derived-knowledge', got '${provenance.extractionModel}'`
       );
     }
-    if (provenance.extractionConfidence >= 0.85) {
+    // Phase 3.6.6 / FIX 1 — `not_applicable` rows (e.g. A.1.2 on
+    // points-based programmes) carry deliberately high confidence
+    // (rule-based, not LLM-extracted) but are still forced into
+    // pending_review by the unconditional status='pending_review' write
+    // below. Skip the cap for this exact valueRaw.
+    if (extraction.valueRaw !== 'not_applicable' && provenance.extractionConfidence >= 0.85) {
       throw new Error(
         `executeDerived refused: extractionConfidence must be below 0.85 (forces /review), got ${provenance.extractionConfidence}`
       );

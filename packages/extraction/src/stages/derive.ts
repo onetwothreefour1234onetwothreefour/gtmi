@@ -78,6 +78,16 @@ export interface DerivedA12Input {
    * compatibility; missing → ambiguous → annualised (safe default).
    */
   a11SourceSentence?: string | null;
+  /**
+   * Phase 3.6.6 / FIX 1 — A.1.3 raw value from field_values. When the
+   * programme is points-based ("no_salary_route" / "points_only" /
+   * "not_required") OR A.1.1 was extracted as "0", deriveA12 emits a
+   * `not_applicable` derived-knowledge row instead of attempting the
+   * percentage calculation. Country-agnostic — applies to CAN Express
+   * Entry FSW, NZL SMC, AUT RWR Card, AUS 189 Points Tested, and any
+   * future points-based programme. Optional for backwards compatibility.
+   */
+  a13ValueRaw?: string | null;
   /** Median-wage table entry for this country, null if missing. */
   medianWage: MedianWageEntry | null;
   /** FX rate for the A.1.1 currency, null if missing or currency null. */
@@ -247,10 +257,100 @@ function buildBaseProvenance(args: {
 }
 
 /**
+ * Phase 3.6.6 / FIX 1 — A.1.3 categorical values that signal a
+ * points-based or salary-free pathway. Country-agnostic.
+ */
+const POINTS_BASED_A13_VALUES: ReadonlySet<string> = new Set([
+  'no_salary_route',
+  'points_only',
+  'not_required',
+]);
+
+/**
+ * Phase 3.6.6 / FIX 1 — emit A.1.2 as a `not_applicable` derived-
+ * knowledge row. Used when the programme has no minimum salary
+ * threshold (points-based selection or zero-floor pathways).
+ */
+function buildA12NotApplicableRow(input: DerivedA12Input): DerivedRow {
+  const sourceSentence =
+    'This programme uses a points-based selection system with no minimum salary threshold requirement.';
+  const valueRaw = 'not_applicable';
+
+  const derivedInputs = {
+    'A.1.1': {
+      valueRaw: input.a11ValueRaw,
+      valueCurrency: input.a11ValueCurrency,
+      sourceUrl: input.a11SourceUrl,
+    },
+    'A.1.3': {
+      valueRaw: input.a13ValueRaw ?? null,
+    },
+    rule: 'points_based_no_salary_threshold',
+  };
+
+  const crossCheckResult: CrossCheckOutcome = 'not_checked';
+  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
+    sourceUrl: 'derived:points-based-program-type',
+    geographicLevel: 'global',
+    sourceTier: null,
+    scrapeTimestamp: new Date().toISOString(),
+    contentHash: createHash('sha256')
+      .update(
+        `derived-knowledge:A.1.2:not_applicable:${input.programId}:${input.countryIso}`,
+        'utf8'
+      )
+      .digest('hex'),
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractionConfidence: 0.9,
+    validationModel: DERIVE_KNOWLEDGE_MODEL,
+    validationConfidence: 0.9,
+    crossCheckResult,
+    crossCheckUrl: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    methodologyVersion: input.methodologyVersion,
+    reviewDecision: 'approve',
+    derivedInputs,
+  };
+
+  const extraction: ExtractionOutput = {
+    programId: input.programId,
+    fieldDefinitionKey: 'A.1.2',
+    valueRaw,
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionConfidence: 0.9,
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractedAt: new Date(),
+  };
+
+  return { extraction, provenance, numericValue: 0 };
+}
+
+/**
  * Compute A.1.2 (salary as % of local median wage). Pure. Returns null
  * on any skip condition. Skips emit a one-line console.log.
  */
 export function deriveA12(input: DerivedA12Input): DerivedRow | null {
+  // Phase 3.6.6 / FIX 1 — points-based / salary-free programmes get a
+  // derived-knowledge `not_applicable` row instead of skipping. Triggers:
+  //   - A.1.1 valueRaw === "0" (no salary threshold, e.g. CAN Express
+  //     Entry FSW where the LLM correctly returns 0 + "no salary route"),
+  //   - A.1.3 in {"no_salary_route", "points_only", "not_required"}.
+  // Country-agnostic. Runs BEFORE the currency/median-wage gates so
+  // points-based programmes never get classified ABSENT for A.1.2.
+  const a11IsZero = input.a11ValueRaw !== null && input.a11ValueRaw.trim() === '0';
+  const a13Trimmed = (input.a13ValueRaw ?? '').trim().toLowerCase();
+  const a13IsPointsBased = POINTS_BASED_A13_VALUES.has(a13Trimmed);
+  if (a11IsZero || a13IsPointsBased) {
+    console.log(
+      `  [A.1.2] derived not_applicable — points-based programme for ${input.countryIso} (a11Zero=${a11IsZero}, a13="${a13Trimmed}")`
+    );
+    return buildA12NotApplicableRow(input);
+  }
+
   if (input.a11ValueRaw === null || input.a11ValueRaw === '') {
     console.log(`  [A.1.2] derived skip — A.1.1 not POPULATED for ${input.countryIso}`);
     return null;
