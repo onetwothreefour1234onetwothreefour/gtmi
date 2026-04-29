@@ -54,9 +54,9 @@ export async function getReviewQueueStats(): Promise<ReviewQueueStats> {
         WHERE status = 'pending_review'
           AND extracted_at < NOW() - INTERVAL '3 days'
       )::int AS "slaRisk",
-      EXTRACT(EPOCH FROM AVG(NOW() - extracted_at)) FILTER (
+      EXTRACT(EPOCH FROM AVG(NOW() - extracted_at) FILTER (
         WHERE status = 'pending_review'
-      ) / 3600.0 AS "avgAgeHours",
+      )) / 3600.0 AS "avgAgeHours",
       COUNT(*) FILTER (
         WHERE status = 'pending_review'
           AND (provenance ->> 'extractionConfidence')::float >= 0.9
