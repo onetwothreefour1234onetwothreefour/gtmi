@@ -51,3 +51,11 @@ export { CountryHeader } from './country-header';
 export { CountryProgramsTable } from './country-programs-table';
 export { CountryRadar, type CountryRadarProgram } from './country-radar';
 export { TaxTreatmentCard } from './tax-treatment-card';
+
+// Phase 4-E — internal tools (review queue + changes audit).
+export { InternalBadge } from './internal-badge';
+export { ReviewQueueStats } from './review-queue-stats';
+export { ReviewQueueTable } from './review-queue-table';
+export { ReviewFilterTabs } from './review-filter-tabs';
+export { BulkApproveDialog } from './bulk-approve-dialog';
+export { ChangesAudit, type ChangesFilterTab } from './changes-audit';

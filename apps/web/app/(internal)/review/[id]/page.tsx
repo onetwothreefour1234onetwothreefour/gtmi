@@ -1,19 +1,51 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getReviewDetail } from '@/lib/review-queries';
+import { ProvenanceHighlight, CountryFlag, DataTableNote } from '@/components/gtmi';
+import { getReviewDetail, listPendingReview } from '@/lib/review-queries';
+import { reviewIdTag, relativeAge } from '@/lib/review-queue-helpers';
 import { approveFieldValue, rejectFieldValue } from '@/app/(internal)/review/actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ReviewDetailPage({ params }: { params: Promise<{ id: string }> }) {
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+function readCharOffsets(raw: unknown): [number, number] | null {
+  if (raw === null || raw === undefined || typeof raw !== 'object') return null;
+  const v = (raw as Record<string, unknown>).charOffsets;
+  if (Array.isArray(v) && v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number') {
+    return [v[0], v[1]];
+  }
+  return null;
+}
+
+function readSourceTier(raw: unknown): number | null {
+  if (raw === null || raw === undefined || typeof raw !== 'object') return null;
+  const v = (raw as Record<string, unknown>).sourceTier;
+  return typeof v === 'number' ? v : null;
+}
+
+function readScrapedAt(raw: unknown): string | null {
+  if (raw === null || raw === undefined || typeof raw !== 'object') return null;
+  const v = (raw as Record<string, unknown>).scrapedAt;
+  return typeof v === 'string' ? v : null;
+}
+
+export default async function ReviewDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const row = await getReviewDetail(id);
+  const [row, pendingRows] = await Promise.all([getReviewDetail(id), listPendingReview()]);
   if (!row) notFound();
 
-  // Both wrappers read `id` from a hidden form input rather than relying on
-  // the closure binding. Inline server actions inside server components have
-  // historically been finicky about closures across Next.js minor versions —
-  // a hidden input is robust regardless.
+  const ids = pendingRows.map((p) => p.id);
+  const idx = ids.indexOf(id);
+  const prevId = idx > 0 ? ids[idx - 1] : null;
+  const nextId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
+
+  // Both wrappers read `id` from a hidden form input rather than relying
+  // on the closure binding (inline server actions inside server components
+  // have historically been finicky about closures across Next.js minor
+  // versions — a hidden input is robust regardless).
   async function approve(fd: FormData): Promise<void> {
     'use server';
     const fvId = (fd.get('id') as string | null) ?? '';
@@ -30,170 +62,354 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
   }
 
   const isPending = row.status === 'pending_review';
-  const statusBanner =
-    row.status === 'approved' ? (
-      <div className="mb-6 rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-        Approved
-      </div>
-    ) : row.status === 'rejected' ? (
-      <div className="mb-6 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-        Rejected
-      </div>
-    ) : null;
+  const charOffsets = readCharOffsets(row.provenance);
+  const sourceTier = row.sourceTier ?? readSourceTier(row.provenance);
+  const scrapedAt = readScrapedAt(row.provenance);
 
   return (
-    <main className="mx-auto max-w-4xl p-8">
-      <div className="mb-4 text-sm">
-        <Link href="/review" className="text-blue-600 hover:underline">
-          ← Review Queue
-        </Link>
-      </div>
+    <main className="px-8 pb-16 pt-8" style={{ background: 'var(--paper)' }}>
+      <div className="mx-auto max-w-[960px]">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-6 flex items-center gap-2 text-data-sm text-ink-4"
+        >
+          <Link href="/review" className="hover:text-ink">
+            ← Review queue
+          </Link>
+          <span aria-hidden>·</span>
+          <span className="num text-ink">{reviewIdTag(row.id)}</span>
+        </nav>
 
-      <header className="mb-6">
-        <p className="text-sm text-gray-500">
-          {row.countryName} — {row.programName}
-        </p>
-        <h1 className="text-2xl font-bold">
-          <span className="font-mono">{row.fieldKey}</span>
-        </h1>
-        <p className="mt-1 text-xs text-gray-500">{row.fieldLabel}</p>
-      </header>
-
-      {statusBanner}
-
-      <section className="mb-6 rounded border border-gray-200 p-4">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Raw value</h2>
-        <p className="whitespace-pre-wrap rounded bg-gray-50 p-3 text-sm">
-          {row.valueRaw ?? <em className="text-gray-400">(no raw value)</em>}
-        </p>
-
-        {row.sourceSentence && (
-          <div className="mt-3">
-            <p className="mb-1 text-xs font-medium text-gray-500">Source sentence</p>
-            <blockquote className="border-l-2 border-gray-300 pl-3 text-sm italic text-gray-700">
-              {row.sourceSentence}
-            </blockquote>
+        <header
+          className="mb-6 grid items-end gap-8 md:grid-cols-[1.4fr_1fr]"
+          data-testid="review-detail-header"
+        >
+          <div>
+            <p className="eyebrow mb-2">
+              <span className="num text-ink-3">{row.fieldKey}</span> · {row.countryName} ·{' '}
+              {row.programName}
+            </p>
+            <h1
+              className="serif text-ink"
+              style={{
+                fontSize: 36,
+                fontWeight: 400,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.1,
+                margin: 0,
+              }}
+            >
+              {row.fieldLabel}
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-data-sm text-ink-4">
+              <span className="inline-flex items-center gap-2">
+                <CountryFlag iso={row.countryIso} countryName={row.countryName} size="sm" />
+                {row.countryName}
+              </span>
+              <span aria-hidden>·</span>
+              <Link
+                href={`/programs/${row.programId}`}
+                className="serif italic hover:text-ink"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {row.programName}
+              </Link>
+              <span aria-hidden>·</span>
+              <span className="num">Pillar {row.pillar}</span>
+              {row.extractedAt && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="num">{relativeAge(row.extractedAt)}</span>
+                </>
+              )}
+            </div>
           </div>
-        )}
+          <StatusBanner status={row.status} />
+        </header>
 
-        <div className="mt-3 flex gap-4 text-xs text-gray-500">
-          {row.extractionConfidence !== null && (
-            <span>
-              Extraction confidence:{' '}
-              <span
-                className={row.extractionConfidence >= 0.85 ? 'text-green-600' : 'text-amber-600'}
+        <section
+          className="mb-6 border bg-paper-2 p-5"
+          style={{ borderColor: 'var(--rule)' }}
+          data-testid="review-detail-source"
+        >
+          <p className="eyebrow mb-3">Extracted source</p>
+
+          {row.sourceSentence ? (
+            charOffsets ? (
+              <ProvenanceHighlight sentence={row.sourceSentence} charOffsets={charOffsets} />
+            ) : (
+              <p
+                className="serif"
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  color: 'var(--ink-2)',
+                  fontStyle: 'italic',
+                }}
               >
-                {(row.extractionConfidence * 100).toFixed(0)}%
-              </span>
-            </span>
+                {row.sourceSentence}
+              </p>
+            )
+          ) : (
+            <p className="italic text-ink-4" data-testid="no-source-sentence">
+              No source sentence stored on this row.
+            </p>
           )}
-          {row.validationConfidence !== null && (
-            <span>
-              Validation confidence:{' '}
-              <span
-                className={row.validationConfidence >= 0.85 ? 'text-green-600' : 'text-amber-600'}
-              >
-                {(row.validationConfidence * 100).toFixed(0)}%
-              </span>
-            </span>
-          )}
-        </div>
 
-        <div className="mt-3">
-          <details>
-            <summary className="cursor-pointer text-xs text-gray-500">
-              Normalized value (JSON)
-            </summary>
-            <pre className="mt-2 overflow-auto rounded bg-gray-50 p-3 text-xs">
-              {JSON.stringify(row.valueNormalized, null, 2)}
-            </pre>
-          </details>
-        </div>
-
-        <div className="mt-3">
-          <details>
-            <summary className="cursor-pointer text-xs text-gray-500">Provenance</summary>
-            <pre className="mt-2 overflow-auto rounded bg-gray-50 p-3 text-xs">
-              {JSON.stringify(row.provenance, null, 2)}
-            </pre>
-          </details>
-        </div>
-      </section>
-
-      {row.sourceUrl && (
-        <section className="mb-6 rounded border border-gray-200 p-4">
-          <h2 className="mb-2 text-sm font-semibold text-gray-700">Source</h2>
-          <a
-            href={row.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="break-all text-sm text-blue-600 hover:underline"
+          <dl
+            className="num mt-4 grid grid-cols-2 gap-x-6 gap-y-2 border-t pt-3 text-ink-4 md:grid-cols-4"
+            style={{ borderColor: 'var(--rule)', fontSize: 11 }}
           >
-            {row.sourceUrl}
-          </a>
-          {row.sourceTier && <p className="mt-1 text-xs text-gray-500">Tier {row.sourceTier}</p>}
-        </section>
-      )}
+            <div>
+              <dt className="text-ink-5">Extraction conf.</dt>
+              <dd
+                className={
+                  row.extractionConfidence !== null && row.extractionConfidence < 0.85
+                    ? 'text-warning'
+                    : 'text-positive'
+                }
+                data-testid="extraction-confidence"
+              >
+                {row.extractionConfidence !== null
+                  ? `${(row.extractionConfidence * 100).toFixed(0)}%`
+                  : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-ink-5">Validation conf.</dt>
+              <dd
+                className={
+                  row.validationConfidence !== null && row.validationConfidence < 0.85
+                    ? 'text-warning'
+                    : 'text-positive'
+                }
+                data-testid="validation-confidence"
+              >
+                {row.validationConfidence !== null
+                  ? `${(row.validationConfidence * 100).toFixed(0)}%`
+                  : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-ink-5">Tier</dt>
+              <dd>{sourceTier !== null ? `Tier ${sourceTier}` : '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-ink-5">Scraped</dt>
+              <dd>{scrapedAt ? scrapedAt.slice(0, 10) : '—'}</dd>
+            </div>
+          </dl>
 
-      {isPending && (
-        <section className="mb-6">
-          <h2 className="mb-2 text-sm font-semibold text-gray-700">Decision</h2>
-          <div className="flex flex-col gap-3">
-            <form action={approve}>
+          {row.sourceUrl && (
+            <p className="mt-3 break-all text-data-sm">
+              <a
+                href={row.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent underline-offset-4 hover:underline"
+              >
+                {row.sourceUrl} ↗
+              </a>
+            </p>
+          )}
+        </section>
+
+        {isPending && (
+          <section
+            className="mb-6 grid items-start gap-4 border bg-paper p-5 md:grid-cols-[1.6fr_1fr]"
+            style={{ borderColor: 'var(--rule)' }}
+            data-testid="review-decision-section"
+          >
+            <form action={approve} className="flex flex-col gap-2">
               <input type="hidden" name="id" value={id} />
-              <label className="text-sm font-medium text-gray-700">
-                Edit raw value before approving <span className="text-gray-400">(optional)</span>
+              <label className="eyebrow" htmlFor="editedRaw">
+                Raw value <span className="text-ink-5">(edit before approving if needed)</span>
               </label>
-              <input
+              <textarea
+                id="editedRaw"
                 name="editedRaw"
                 defaultValue={row.valueRaw ?? ''}
-                className="mt-1 w-full rounded border border-gray-300 p-2 font-mono text-sm"
+                rows={3}
+                className="num border bg-paper p-2 text-data-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                style={{ borderColor: 'var(--rule)', fontSize: 13 }}
               />
-              <p className="text-xs text-gray-500">Leave unchanged to approve as-is.</p>
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  className="mt-2 rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
-                >
-                  Approve
-                </button>
-              </div>
-            </form>
-
-            <form action={reject}>
-              <input type="hidden" name="id" value={id} />
+              <p className="text-data-sm text-ink-4">
+                Leave unchanged to approve the LLM-extracted value as-is.
+              </p>
               <button
                 type="submit"
-                className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+                className="btn mt-2 w-fit"
+                style={{ background: 'var(--positive)', borderColor: 'var(--positive)' }}
+                data-testid="approve-button"
+              >
+                Approve
+              </button>
+            </form>
+
+            <form action={reject} className="flex flex-col gap-2">
+              <input type="hidden" name="id" value={id} />
+              <p className="eyebrow">Reject</p>
+              <p className="text-data-sm text-ink-3">
+                Mark the row rejected. It will not contribute to scoring; the row stays on{' '}
+                <span className="num">field_values</span> with{' '}
+                <span className="num">status=&apos;rejected&apos;</span> for audit.
+              </p>
+              <button
+                type="submit"
+                className="btn w-fit"
+                style={{ background: 'var(--negative)', borderColor: 'var(--negative)' }}
+                data-testid="reject-button"
               >
                 Reject
               </button>
             </form>
+          </section>
+        )}
+
+        <section
+          className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2"
+          data-testid="review-detail-meta"
+        >
+          <details className="border p-4" style={{ borderColor: 'var(--rule)' }}>
+            <summary className="cursor-pointer text-data-sm text-ink-3">
+              Normalized value (JSON)
+            </summary>
+            <pre
+              className="num mt-3 overflow-auto bg-paper-2 p-3 text-data-sm"
+              style={{ fontSize: 11 }}
+            >
+              {JSON.stringify(row.valueNormalized, null, 2)}
+            </pre>
+          </details>
+
+          <details className="border p-4" style={{ borderColor: 'var(--rule)' }}>
+            <summary className="cursor-pointer text-data-sm text-ink-3">Provenance JSONB</summary>
+            <pre
+              className="num mt-3 overflow-auto bg-paper-2 p-3 text-data-sm"
+              style={{ fontSize: 11 }}
+            >
+              {JSON.stringify(row.provenance, null, 2)}
+            </pre>
+          </details>
+
+          {row.extractionPromptMd && (
+            <details className="border p-4" style={{ borderColor: 'var(--rule)' }}>
+              <summary className="cursor-pointer text-data-sm text-ink-3">
+                Extraction prompt
+              </summary>
+              <pre
+                className="num mt-3 overflow-auto bg-paper-2 p-3 text-data-sm"
+                style={{ fontSize: 11, whiteSpace: 'pre-wrap' }}
+              >
+                {row.extractionPromptMd}
+              </pre>
+            </details>
+          )}
+
+          {!!row.scoringRubricJsonb && (
+            <details className="border p-4" style={{ borderColor: 'var(--rule)' }}>
+              <summary className="cursor-pointer text-data-sm text-ink-3">Scoring rubric</summary>
+              <pre
+                className="num mt-3 overflow-auto bg-paper-2 p-3 text-data-sm"
+                style={{ fontSize: 11 }}
+              >
+                {JSON.stringify(row.scoringRubricJsonb, null, 2)}
+              </pre>
+            </details>
+          )}
+        </section>
+
+        <nav
+          aria-label="Review queue navigation"
+          className="mt-6 flex items-center justify-between border-t pt-4 text-data-sm"
+          style={{ borderColor: 'var(--rule)' }}
+          data-testid="review-detail-pagination"
+        >
+          <span className="num text-ink-4">
+            {idx >= 0 ? `${idx + 1} of ${pendingRows.length} pending` : '—'}
+          </span>
+          <div className="flex items-center gap-3">
+            {prevId ? (
+              <Link href={`/review/${prevId}`} className="btn-link">
+                ← Previous
+              </Link>
+            ) : (
+              <span className="text-ink-5">← Previous</span>
+            )}
+            {nextId ? (
+              <Link href={`/review/${nextId}`} className="btn-link">
+                Next →
+              </Link>
+            ) : (
+              <span className="text-ink-5">Next →</span>
+            )}
           </div>
-        </section>
-      )}
+        </nav>
 
-      {row.extractionPromptMd && (
-        <section className="mb-6">
-          <details>
-            <summary className="cursor-pointer text-sm text-gray-500">Extraction prompt</summary>
-            <pre className="mt-2 overflow-auto rounded bg-gray-50 p-3 text-xs">
-              {row.extractionPromptMd}
-            </pre>
-          </details>
-        </section>
-      )}
-
-      {!!row.scoringRubricJsonb && (
-        <section className="mb-6">
-          <details>
-            <summary className="cursor-pointer text-sm text-gray-500">Scoring rubric</summary>
-            <pre className="mt-2 overflow-auto rounded bg-gray-50 p-3 text-xs">
-              {JSON.stringify(row.scoringRubricJsonb, null, 2)}
-            </pre>
-          </details>
-        </section>
-      )}
+        <div className="mt-6">
+          <DataTableNote>
+            Approve writes <code className="num">field_values.status=&apos;approved&apos;</code> and
+            re-runs the normalization function if the raw value was edited. Reject writes{' '}
+            <code className="num">status=&apos;rejected&apos;</code> and removes the row from
+            scoring; the audit trail stays.
+          </DataTableNote>
+        </div>
+      </div>
     </main>
+  );
+}
+
+function StatusBanner({ status }: { status: string }) {
+  if (status === 'approved') {
+    return (
+      <div
+        className="border bg-paper p-4"
+        style={{ borderColor: 'var(--positive)' }}
+        data-testid="review-status-banner"
+        data-status="approved"
+      >
+        <p className="eyebrow" style={{ color: 'var(--positive)' }}>
+          Approved
+        </p>
+        <p className="serif mt-1" style={{ fontSize: 17, fontWeight: 500 }}>
+          Already accepted into the public score.
+        </p>
+      </div>
+    );
+  }
+  if (status === 'rejected') {
+    return (
+      <div
+        className="border bg-paper p-4"
+        style={{ borderColor: 'var(--negative)' }}
+        data-testid="review-status-banner"
+        data-status="rejected"
+      >
+        <p className="eyebrow" style={{ color: 'var(--negative)' }}>
+          Rejected
+        </p>
+        <p className="serif mt-1" style={{ fontSize: 17, fontWeight: 500 }}>
+          Excluded from scoring; row retained for audit.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="border bg-paper-2 p-4"
+      style={{ borderColor: 'var(--rule)' }}
+      data-testid="review-status-banner"
+      data-status="pending"
+    >
+      <p className="eyebrow">Pending review</p>
+      <p
+        className="serif mt-1"
+        style={{ fontSize: 14, fontWeight: 400, fontStyle: 'italic', lineHeight: 1.45 }}
+      >
+        Read the source sentence; verify that the raw value matches; approve to flow it into the
+        public composite, or reject to leave the indicator empty.
+      </p>
+    </div>
   );
 }

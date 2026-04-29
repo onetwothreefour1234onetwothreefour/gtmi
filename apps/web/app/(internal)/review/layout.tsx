@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { InternalBadge } from '@/components/gtmi';
 
 async function signOut() {
   'use server';
@@ -9,6 +10,15 @@ async function signOut() {
   redirect('/login');
 }
 
+/**
+ * Internal route shell. Phase 4-E redesign: replaces the Phase 4.1
+ * neutral header bar with the editorial `<InternalBadge>` (ink surface,
+ * paper text, oxblood pulse dot, mono uppercase tracking) above a
+ * paper-2 chrome strip carrying the signed-in user + sign-out form.
+ *
+ * Auth-gated unchanged: any unauthenticated request still redirects
+ * to /login. middleware.ts continues to enforce the route protection.
+ */
 export default async function ReviewLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const {
@@ -18,13 +28,21 @@ export default async function ReviewLayout({ children }: { children: React.React
   if (!user) redirect('/login');
 
   return (
-    <div>
-      <div className="border-b border-gray-200 bg-white px-6 py-2 flex items-center justify-between text-sm text-gray-600">
-        <span className="font-medium text-gray-800">GTMI Review</span>
+    <div className="min-h-screen bg-paper text-ink">
+      <InternalBadge />
+      <div
+        className="flex items-center justify-between border-b px-8 py-2 text-data-sm"
+        style={{ borderColor: 'var(--rule)', background: 'var(--paper-2)' }}
+      >
+        <span className="num text-ink-3" style={{ fontSize: 12 }}>
+          GTMI · Editorial review
+        </span>
         <div className="flex items-center gap-4">
-          <span>{user.email}</span>
+          <span className="num text-ink-4" style={{ fontSize: 12 }}>
+            {user.email}
+          </span>
           <form action={signOut}>
-            <button type="submit" className="text-gray-400 hover:text-gray-700">
+            <button type="submit" className="btn-link text-data-sm">
               Sign out
             </button>
           </form>

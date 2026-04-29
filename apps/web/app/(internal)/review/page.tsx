@@ -1,112 +1,151 @@
-import Link from 'next/link';
+import {
+  ReviewQueueStats,
+  ReviewQueueTable,
+  ReviewFilterTabs,
+  BulkApproveDialog,
+  DataTableNote,
+} from '@/components/gtmi';
 import { listPendingReview, listRecentlyReviewed } from '@/lib/review-queries';
+import { getReviewQueueStats } from '@/lib/review-queue-stats';
+import {
+  matchesReviewTab,
+  readProvenanceConfidence,
+  type ReviewFilterTab,
+} from '@/lib/review-queue-helpers';
+import type { ReviewListRow } from '@/lib/review-queries';
+import { bulkApproveHighConfidence } from './actions';
 
 export const dynamic = 'force-dynamic';
 
-const STATUS_COLORS: Record<string, string> = {
-  approved: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
-};
+const VALID_TABS: ReviewFilterTab[] = ['all', 'pending', 'in-review', 'flagged', 'high-confidence'];
+
+function parseTab(raw: string | undefined): ReviewFilterTab {
+  return VALID_TABS.includes(raw as ReviewFilterTab) ? (raw as ReviewFilterTab) : 'all';
+}
 
 export default async function ReviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; view?: string }>;
 }) {
-  const { tab } = await searchParams;
-  const activeTab = tab === 'reviewed' ? 'reviewed' : 'pending';
+  const { tab: rawTab, view: rawView } = await searchParams;
+  const activeTab = parseTab(rawTab);
+  const view = rawView === 'reviewed' ? 'reviewed' : 'pending';
 
-  const [pendingRows, recentRows] = await Promise.all([
+  const [pendingRows, recentRows, stats] = await Promise.all([
     listPendingReview(),
     listRecentlyReviewed(20),
+    getReviewQueueStats(),
   ]);
 
-  const rows = activeTab === 'pending' ? pendingRows : recentRows;
+  const datasetRows: ReviewListRow[] = view === 'reviewed' ? recentRows : pendingRows;
 
-  const groups = new Map<string, { label: string; rows: typeof rows }>();
-  for (const row of rows) {
-    const key = `${row.countryIso}::${row.programId}`;
-    if (!groups.has(key)) {
-      groups.set(key, { label: `${row.countryName} — ${row.programName}`, rows: [] });
+  // Bucket counts for the chip badges (computed against the active dataset
+  // so the numbers match what the table will show on tab change).
+  const counts: Record<ReviewFilterTab, number> = {
+    all: datasetRows.length,
+    pending: 0,
+    'in-review': 0,
+    flagged: 0,
+    'high-confidence': 0,
+  };
+  for (const row of datasetRows) {
+    const prov = readProvenanceConfidence(row.provenance);
+    for (const t of VALID_TABS) {
+      if (t === 'all') continue;
+      if (matchesReviewTab(t, row.status, prov)) counts[t] += 1;
     }
-    groups.get(key)!.rows.push(row);
   }
 
+  const visible = datasetRows.filter((row) =>
+    matchesReviewTab(activeTab, row.status, readProvenanceConfidence(row.provenance))
+  );
+
+  // Pinned at SSR so the queue table's relative-age column doesn't drift on
+  // hydration. Re-renders with the next request.
+  const renderedAt = new Date();
+
   return (
-    <main className="mx-auto max-w-5xl p-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold">Review Queue</h1>
-      </header>
-
-      <nav className="mb-6 flex gap-1 border-b border-gray-200">
-        <Link
-          href="/review"
-          className={`px-4 py-2 text-sm font-medium ${
-            activeTab === 'pending'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
+    <main className="px-8 pb-16 pt-10" style={{ background: 'var(--paper)' }}>
+      <div className="mx-auto max-w-page-wide">
+        <header
+          className="mb-8 grid items-end gap-12 md:grid-cols-[1.4fr_1fr]"
+          data-testid="review-queue-header"
         >
-          Pending{' '}
-          <span className="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-            {pendingRows.length}
-          </span>
-        </Link>
-        <Link
-          href="/review?tab=reviewed"
-          className={`px-4 py-2 text-sm font-medium ${
-            activeTab === 'reviewed'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Recently Reviewed
-        </Link>
-      </nav>
+          <div>
+            <p className="eyebrow mb-3">Review queue · Editorial</p>
+            <h1
+              className="serif text-ink"
+              style={{
+                fontSize: 56,
+                fontWeight: 400,
+                letterSpacing: '-0.025em',
+                lineHeight: 1.05,
+                margin: 0,
+              }}
+            >
+              Pending review.
+            </h1>
+            <p className="mt-4 max-w-[540px] text-ink-3" style={{ fontSize: 15, lineHeight: 1.6 }}>
+              Indicator updates flagged by the extraction pipeline that need editorial sign-off
+              before the public composite recomputes.
+            </p>
+          </div>
+          <ReviewQueueStats stats={stats} />
+        </header>
 
-      {rows.length === 0 ? (
-        <p className="text-gray-500">
-          {activeTab === 'pending' ? 'Nothing to review.' : 'No recently reviewed items.'}
-        </p>
-      ) : (
-        Array.from(groups.entries()).map(([key, group]) => (
-          <section key={key} className="mb-8">
-            <h2 className="mb-2 text-lg font-semibold">{group.label}</h2>
-            <ul className="divide-y divide-gray-200 rounded border border-gray-200">
-              {group.rows.map((row) => (
-                <li key={row.id}>
-                  <Link
-                    href={`/review/${row.id}`}
-                    className="flex items-start justify-between gap-4 px-4 py-3 hover:bg-gray-50"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-sm font-mono text-gray-700">
-                        {row.fieldKey} · pillar {row.pillar}
-                      </div>
-                      <div className="text-sm text-gray-900">{row.fieldLabel}</div>
-                      <div className="mt-1 line-clamp-2 text-xs text-gray-500">
-                        {row.valueRaw ?? <em>(no raw value)</em>}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      {activeTab === 'reviewed' && (
-                        <span
-                          className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[row.status] ?? 'bg-gray-100 text-gray-600'}`}
-                        >
-                          {row.status}
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-400">
-                        {row.extractedAt?.toISOString().slice(0, 10) ?? '—'}
-                      </span>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))
-      )}
+        <div
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 border-y py-3"
+          style={{ borderColor: 'var(--rule)' }}
+        >
+          <ReviewFilterTabs counts={counts} active={activeTab} />
+          <div className="flex flex-wrap items-center gap-3">
+            <ViewToggle active={view} />
+            <BulkApproveDialog
+              candidateCount={stats.highConfidence}
+              onConfirm={bulkApproveHighConfidence}
+            />
+          </div>
+        </div>
+
+        <ReviewQueueTable rows={visible} now={renderedAt} />
+
+        <div className="mt-6">
+          <DataTableNote>
+            Bulk approve gate: <code className="num">extractionConfidence ≥ 0.85</code> AND{' '}
+            <code className="num">validationConfidence ≥ 0.85</code> AND the validator did not flag
+            the source sentence as a mismatch. Composite-impact deltas (Q9) are not yet computed —
+            the Impact column shows <span className="num">—</span> for every row.
+          </DataTableNote>
+        </div>
+      </div>
     </main>
+  );
+}
+
+function ViewToggle({ active }: { active: 'pending' | 'reviewed' }) {
+  // Server component link toggle so URL state is the single source of truth.
+  return (
+    <div
+      className="flex border"
+      style={{ borderColor: 'var(--rule)' }}
+      data-testid="review-view-toggle"
+    >
+      <a
+        href="/review"
+        className={`chip h-7 cursor-pointer border-0 ${active === 'pending' ? 'chip-ink' : ''}`}
+        aria-pressed={active === 'pending'}
+      >
+        Pending
+      </a>
+      <a
+        href="/review?view=reviewed"
+        className={`chip h-7 cursor-pointer border-0 border-l ${active === 'reviewed' ? 'chip-ink' : ''}`}
+        style={{ borderLeftColor: 'var(--rule)' }}
+        aria-pressed={active === 'reviewed'}
+      >
+        Recently reviewed
+      </a>
+    </div>
   );
 }

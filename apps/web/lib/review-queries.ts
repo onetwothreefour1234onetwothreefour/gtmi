@@ -14,15 +14,17 @@ export type ReviewListRow = {
   status: string;
   valueRaw: string | null;
   extractedAt: Date | null;
+  /** Stripped from `field_values.provenance`. May be null on partial rows. */
+  provenance: unknown;
+  /** Source URL backing the row, if a `sources` row is linked. */
+  sourceUrl: string | null;
 };
 
 export type ReviewDetailRow = ReviewListRow & {
   valueNormalized: unknown;
-  provenance: unknown;
   sourceSentence: string | null;
   extractionConfidence: number | null;
   validationConfidence: number | null;
-  sourceUrl: string | null;
   sourceTier: number | null;
   extractionPromptMd: string;
   scoringRubricJsonb: unknown;
@@ -42,11 +44,14 @@ export async function listRecentlyReviewed(limit = 20): Promise<ReviewListRow[]>
       status: fieldValues.status,
       valueRaw: fieldValues.valueRaw,
       extractedAt: fieldValues.extractedAt,
+      provenance: fieldValues.provenance,
+      sourceUrl: sources.url,
     })
     .from(fieldValues)
     .innerJoin(programs, eq(programs.id, fieldValues.programId))
     .innerJoin(countries, eq(countries.isoCode, programs.countryIso))
     .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
+    .leftJoin(sources, eq(sources.id, fieldValues.sourceId))
     .where(inArray(fieldValues.status, ['approved', 'rejected']))
     .orderBy(desc(fieldValues.reviewedAt))
     .limit(limit);
@@ -68,11 +73,14 @@ export async function listPendingReview(): Promise<ReviewListRow[]> {
       status: fieldValues.status,
       valueRaw: fieldValues.valueRaw,
       extractedAt: fieldValues.extractedAt,
+      provenance: fieldValues.provenance,
+      sourceUrl: sources.url,
     })
     .from(fieldValues)
     .innerJoin(programs, eq(programs.id, fieldValues.programId))
     .innerJoin(countries, eq(countries.isoCode, programs.countryIso))
     .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
+    .leftJoin(sources, eq(sources.id, fieldValues.sourceId))
     .where(eq(fieldValues.status, 'pending_review'))
     .orderBy(desc(fieldValues.extractedAt));
 

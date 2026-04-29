@@ -2,7 +2,7 @@
 
 import { db, fieldValues, fieldDefinitions, reviewQueue } from '@gtmi/db';
 import { normalizeRawValue, ScoringError } from '@gtmi/scoring';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
@@ -31,7 +31,6 @@ export async function approveFieldValue(id: string, editedRaw?: string): Promise
   if (editedRaw !== undefined && editedRaw.trim().length > 0) {
     update['valueRaw'] = editedRaw;
 
-    // Re-run normalization so value_normalized stays in sync with the edited raw value.
     const defRows = await db
       .select({
         normalizationFn: fieldDefinitions.normalizationFn,
@@ -48,8 +47,6 @@ export async function approveFieldValue(id: string, editedRaw?: string): Promise
         update['valueNormalized'] = reNormalized;
       } catch (err) {
         const msg = err instanceof ScoringError ? err.message : String(err);
-        // Log but don't block the approve — reviewer may be entering a non-numeric value
-        // that the LLM would also not be able to normalize. Surface in DB as null.
         console.warn(`[approveFieldValue] Re-normalization failed for ${id}: ${msg}`);
         update['valueNormalized'] = null;
       }
@@ -70,8 +67,6 @@ export async function approveFieldValue(id: string, editedRaw?: string): Promise
   }
   revalidatePath('/review');
   revalidatePath(`/review/${id}`);
-  // redirect throws NEXT_REDIRECT; must be the final statement so the framework
-  // intercepts it. Do not wrap in try/catch — that swallows the redirect signal.
   redirect('/review');
 }
 
@@ -103,7 +98,56 @@ export async function rejectFieldValue(id: string): Promise<void> {
   }
   revalidatePath('/review');
   revalidatePath(`/review/${id}`);
-  // redirect throws NEXT_REDIRECT; must be the final statement so the framework
-  // intercepts it. Do not wrap in try/catch — that swallows the redirect signal.
   redirect('/review');
+}
+
+/**
+ * Phase 4-E: bulk-approve every pending row that clears the auto-approve
+ * gate (extractionConfidence ≥ 0.85, validationConfidence ≥ 0.85, and
+ * provenance.isValid !== false). Triggered from the queue header after a
+ * client-side confirmation dialog.
+ *
+ * Returns the count of approved rows so the caller can revalidate UI hints.
+ * Wrapped in a single transaction so a failure rolls every row back.
+ */
+export async function bulkApproveHighConfidence(): Promise<{ approved: number }> {
+  const userId = await requireReviewer();
+
+  const candidates = await db
+    .select({ id: fieldValues.id })
+    .from(fieldValues)
+    .where(
+      and(
+        eq(fieldValues.status, 'pending_review'),
+        sql`(${fieldValues.provenance} ->> 'extractionConfidence')::float >= 0.85`,
+        sql`(${fieldValues.provenance} ->> 'validationConfidence')::float >= 0.85`,
+        sql`(${fieldValues.provenance} ->> 'isValid') IS DISTINCT FROM 'false'`
+      )
+    );
+
+  if (candidates.length === 0) {
+    return { approved: 0 };
+  }
+
+  const ids = candidates.map((c) => c.id);
+  const reviewedAt = new Date();
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(fieldValues)
+        .set({ status: 'approved', reviewedAt, reviewedBy: userId })
+        .where(inArray(fieldValues.id, ids));
+      await tx
+        .update(reviewQueue)
+        .set({ status: 'approved', resolvedAt: reviewedAt })
+        .where(inArray(reviewQueue.fieldValueId, ids));
+    });
+  } catch (err) {
+    console.error(`[review/actions] bulk-approve transaction failed for ${ids.length} rows:`, err);
+    throw err;
+  }
+
+  revalidatePath('/review');
+  return { approved: ids.length };
 }
