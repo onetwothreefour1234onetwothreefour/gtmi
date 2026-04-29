@@ -20,9 +20,7 @@ export { RankingsFilters } from './rankings-filters';
 export { AdvisorModeToggle } from './advisor-mode-toggle';
 export { RankingsExplorer } from './rankings-explorer';
 export { IndicatorRow } from './indicator-row';
-export { SubFactorAccordion } from './sub-factor-accordion';
 export { PillarBreakdownTable } from './pillar-breakdown-table';
-export { PillarComparison } from './pillar-comparison';
 // Phase 4-C — programme detail editorial layout.
 export { ProgramHeader } from './program-header';
 export { PillarStrip } from './pillar-strip';
@@ -45,3 +43,11 @@ export { ThisEdition } from './this-edition';
 export { WorldMap, type WorldMapCountryScore } from './world-map';
 export { EditorsQuote } from './editors-quote';
 export { ProvenanceProof } from './provenance-proof';
+
+// Phase 4-D — methodology + country pages.
+export { WeightTree } from './weight-tree';
+export { FalsifiabilityCommitments } from './falsifiability-commitments';
+export { CountryHeader } from './country-header';
+export { CountryProgramsTable } from './country-programs-table';
+export { CountryRadar, type CountryRadarProgram } from './country-radar';
+export { TaxTreatmentCard } from './tax-treatment-card';
