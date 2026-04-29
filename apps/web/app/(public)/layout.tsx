@@ -1,6 +1,14 @@
 import { TopNav, GtmiFooter } from '@/components/gtmi';
 import { getCohortStats } from '@/lib/queries/cohort-stats';
 
+// Runtime render. The layout itself queries the DB (cohort stats for the
+// footer's last-refresh line); without this directive Next.js attempts a
+// build-time prerender of every leaf page that consumes this layout, which
+// fails on Cloud Build because DATABASE_URL is a Cloud Run runtime secret.
+// Cross-request caching is preserved by the `unstable_cache` wrapper inside
+// `getCohortStats`.
+export const dynamic = 'force-dynamic';
+
 /**
  * Public route shell — Phase 4-B redesign. Replaces the Phase 4.1 sticky
  * 60px header + 3-column footer with the editorial `<TopNav>` (rankings
