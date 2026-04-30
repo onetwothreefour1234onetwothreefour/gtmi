@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { RUBRIC_SCORES, methodologyV1, methodologyV2, PHASE_3_5_RESTRUCTURED_KEYS } from '@gtmi/db';
-import { REGIONAL_SUBSTITUTES } from '@gtmi/scoring';
+// Self-import via the package alias breaks vitest in CI (Vite can't
+// resolve `@gtmi/scoring` to the package's own source while the package
+// is being built). Use a relative path so the test runs against the
+// in-tree module directly.
+import { REGIONAL_SUBSTITUTES } from '../src/normalize';
 
 // Phase 3.8 / P0 — single source of truth for categorical vocabularies.
 //
