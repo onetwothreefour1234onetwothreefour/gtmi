@@ -2,6 +2,7 @@ import { db, fieldDefinitions, fieldValues, programs, reviewQueue } from '@gtmi/
 import { normalizeRawValue, ScoringError } from '@gtmi/scoring';
 import { and, eq } from 'drizzle-orm';
 import { detectCurrency } from '../utils/currency';
+import { isNumericInSanityRange, NUMERIC_SANITY_RANGES } from './publish';
 import { randomUUID } from 'node:crypto';
 import type {
   CrossCheckResult,
@@ -129,6 +130,18 @@ export class HumanReviewStageImpl implements HumanReviewStage {
       if (detectedCurrency) {
         // Stash detected currency so it's visible in the review UI.
         (extraction as unknown as Record<string, unknown>)['detectedCurrency'] = detectedCurrency;
+      }
+      // Phase 3.8 / P1 — sanity-range check mirrors publish.ts. Out-of-range
+      // numerics drop valueNormalized to null with a normalizationError so
+      // the reviewer sees the bad value AND the reason it didn't auto-score.
+      if (
+        (fieldDef.normalizationFn === 'min_max' || fieldDef.normalizationFn === 'z_score') &&
+        typeof valueNormalized === 'number' &&
+        !isNumericInSanityRange(extraction.fieldDefinitionKey, valueNormalized)
+      ) {
+        const r = NUMERIC_SANITY_RANGES[extraction.fieldDefinitionKey];
+        normalizationError = `out_of_sanity_range: ${valueNormalized} not in [${r?.min}, ${r?.max}]`;
+        valueNormalized = null;
       }
     } catch (err) {
       normalizationError = err instanceof ScoringError ? err.message : String(err);

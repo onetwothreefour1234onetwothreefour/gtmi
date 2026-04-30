@@ -17,6 +17,43 @@ import { detectCurrency } from '../utils/currency';
 
 const COUNTRY_SUBSTITUTE_MODEL = 'country-substitute-regional';
 
+// ────────────────────────────────────────────────────────────────────
+// Phase 3.8 / P1 — per-field sanity ranges for numeric (min_max / z_score)
+// indicators. Distinct from PHASE2_PLACEHOLDER_PARAMS, which calibrates
+// the scoring distribution; these bounds catch obviously wrong LLM
+// extractions (negative salaries, 99,999-day SLAs) and route them to
+// /review with valueIndicatorScore=null instead of producing a
+// nonsense score. Bounds are intentionally generous — they exclude
+// only impossible values, not unusual ones.
+//
+// Exported for testing.
+// ────────────────────────────────────────────────────────────────────
+export const NUMERIC_SANITY_RANGES: Record<string, { min: number; max: number }> = {
+  'A.1.1': { min: 0, max: 1_000_000 }, // salary threshold (local currency, USD-equiv)
+  'A.1.2': { min: 0, max: 1000 }, // salary as % of median
+  'A.2.2': { min: 0, max: 30 }, // minimum years of work experience
+  'A.3.3': { min: 0, max: 999 }, // applicant age cap (999 = "no cap" sentinel)
+  'B.1.1': { min: 0, max: 3650 }, // SLA processing days (~10 years)
+  'B.1.3': { min: 0, max: 50 }, // application steps
+  'B.2.1': { min: 0, max: 100_000 }, // principal applicant fees
+  'B.2.2': { min: 0, max: 100_000 }, // per-dependant fees
+  'B.3.2': { min: 0, max: 20 }, // in-person visits
+  'C.2.2': { min: 0, max: 999 }, // dependent child age cap
+  'D.1.2': { min: 0, max: 50 }, // years to PR
+  'D.2.2': { min: 0, max: 99 }, // years to citizenship
+  'D.3.1': { min: 0, max: 366 }, // tax residency trigger days
+  'E.1.1': { min: 0, max: 1000 }, // policy changes count (severity-weighted)
+  'E.1.3': { min: 0, max: 200 }, // program age in years
+  'E.3.1': { min: -5, max: 5 }, // V-Dem / WGI rule of law
+  'E.3.2': { min: -5, max: 5 }, // WGI government effectiveness
+};
+
+export function isNumericInSanityRange(fieldKey: string, value: number): boolean {
+  const range = NUMERIC_SANITY_RANGES[fieldKey];
+  if (!range) return true; // unknown field — fail open, the rubric/normalize gate already ran
+  return value >= range.min && value <= range.max;
+}
+
 /**
  * Phase 3.7 / ADR-019 — rubric helpers used by the categorical
  * pre-flight gate. The on-disk shape is
@@ -476,8 +513,11 @@ export class PublishStageImpl implements PublishStage {
     // Coverage-gap sentinels — LLM returned a "not found" marker instead of real data.
     // Skip persistence entirely: treat the field as ABSENT so scoring coverage math
     // is honest (absence of evidence must not be scored as evidence).
+    // Phase 3.8 / P1 — extended to country_substitute_regional so the
+    // substitute path can fire cleanly when the LLM also returns a sentinel.
     if (
-      fieldDef.normalizationFn === 'categorical' &&
+      (fieldDef.normalizationFn === 'categorical' ||
+        fieldDef.normalizationFn === 'country_substitute_regional') &&
       (rawAsString === 'not_addressed' || rawAsString === 'not_found')
     ) {
       console.log(
@@ -497,8 +537,13 @@ export class PublishStageImpl implements PublishStage {
     // Country-agnostic. Skipped for the `not_stated` and
     // `not_addressed` / `not_found` sentinels, which already have
     // dedicated branches above.
+    // Phase 3.8 / P1 — extend the rubric gate to country_substitute_regional
+    // so an LLM-extracted bare string for C.3.2 (and any future regional-
+    // substitute field) is also rejected when out-of-rubric instead of
+    // crashing in the scoring engine's reverse-lookup.
     if (
-      fieldDef.normalizationFn === 'categorical' &&
+      (fieldDef.normalizationFn === 'categorical' ||
+        fieldDef.normalizationFn === 'country_substitute_regional') &&
       isCategoricalRubric(fieldDef.scoringRubricJsonb) &&
       !rubricIncludesValue(fieldDef.scoringRubricJsonb, rawAsString)
     ) {
@@ -559,7 +604,11 @@ export class PublishStageImpl implements PublishStage {
     // rollup) but with `value_indicator_score = null` so the scoring
     // engine applies the missing-data penalty. The reviewer can replace
     // it with a real categorical value at /review time.
-    if (fieldDef.normalizationFn === 'categorical' && rawAsString === 'not_stated') {
+    if (
+      (fieldDef.normalizationFn === 'categorical' ||
+        fieldDef.normalizationFn === 'country_substitute_regional') &&
+      rawAsString === 'not_stated'
+    ) {
       const methodologyRows = await db
         .select({ id: methodologyVersions.id })
         .from(methodologyVersions)
@@ -630,25 +679,90 @@ export class PublishStageImpl implements PublishStage {
 
     // Phase 3.5: NormalizedValue is now a wider type (number | string |
     // boolean | Record<string, unknown>) to support boolean_with_annotation.
-    let valueNormalized: number | string | boolean | Record<string, unknown>;
+    //
+    // Phase 3.8 / P1 — universal gate: if normalize fails, the
+    // boolean_with_annotation shape check fails, or a numeric value
+    // falls outside the field's sanity range, persist a pending_review
+    // row with valueNormalized=null + valueIndicatorScore=null and
+    // record the reason in provenance. The previous behavior (throw and
+    // crash the pipeline) hid the bad row from /review and forced the
+    // analyst to dig through logs.
+    let valueNormalized: number | string | boolean | Record<string, unknown> | null = null;
+    let normalizationFailureReason: string | null = null;
     try {
       valueNormalized = normalizeRawValue(rawForNormalization, fieldDef);
+      if (fieldDef.normalizationFn === 'boolean_with_annotation') {
+        validateBooleanWithAnnotationShape(
+          extraction.fieldDefinitionKey,
+          valueNormalized as Record<string, unknown>
+        );
+      }
+      if (
+        (fieldDef.normalizationFn === 'min_max' || fieldDef.normalizationFn === 'z_score') &&
+        typeof valueNormalized === 'number' &&
+        !isNumericInSanityRange(extraction.fieldDefinitionKey, valueNormalized)
+      ) {
+        const r = NUMERIC_SANITY_RANGES[extraction.fieldDefinitionKey];
+        normalizationFailureReason = `out_of_sanity_range: ${valueNormalized} not in [${r?.min}, ${r?.max}]`;
+        valueNormalized = null;
+      }
     } catch (error) {
       const msg = error instanceof ScoringError ? error.message : String(error);
-      throw new Error(
-        `Normalization failed for field "${extraction.fieldDefinitionKey}" / program "${extraction.programId}": ${msg}`
-      );
+      normalizationFailureReason = `normalize_failed: ${msg}`;
+      valueNormalized = null;
     }
 
-    // Phase 3.5 / ADR-014: validate the structured shape for
-    // boolean_with_annotation BEFORE writing. The scoring engine performs
-    // its own check at score time, but failing here gives a specific
-    // publish-time error (and prevents persisting a malformed object).
-    if (fieldDef.normalizationFn === 'boolean_with_annotation') {
-      validateBooleanWithAnnotationShape(
-        extraction.fieldDefinitionKey,
-        valueNormalized as Record<string, unknown>
+    if (normalizationFailureReason !== null) {
+      console.log(
+        `  [${extraction.fieldDefinitionKey}] valueRaw="${rawAsString}" → ${normalizationFailureReason} — forcing pending_review`
       );
+      const methodologyRowsForReview = await db
+        .select({ id: methodologyVersions.id })
+        .from(methodologyVersions)
+        .where(eq(methodologyVersions.versionTag, provenance.methodologyVersion))
+        .limit(1);
+      if (methodologyRowsForReview.length === 0) {
+        throw new Error(
+          `Publish failed: no methodology_version found with version_tag "${provenance.methodologyVersion}"`
+        );
+      }
+      const methodologyVersionIdForReview = methodologyRowsForReview[0]!.id;
+      const provenanceForReview = {
+        ...provenance,
+        normalizationError: normalizationFailureReason,
+      };
+      const insertedReview = await db
+        .insert(fieldValues)
+        .values({
+          programId: extraction.programId,
+          fieldDefinitionId,
+          valueRaw: extraction.valueRaw,
+          valueNormalized: null,
+          valueIndicatorScore: null,
+          provenance: provenanceForReview,
+          status: 'pending_review',
+          extractedAt: extraction.extractedAt,
+          reviewedAt: null,
+          methodologyVersionId: methodologyVersionIdForReview,
+        })
+        .onConflictDoUpdate({
+          target: [fieldValues.programId, fieldValues.fieldDefinitionId],
+          set: {
+            valueRaw: extraction.valueRaw,
+            valueNormalized: null,
+            valueIndicatorScore: null,
+            provenance: provenanceForReview,
+            status: 'pending_review',
+            extractedAt: extraction.extractedAt,
+            reviewedAt: null,
+            methodologyVersionId: methodologyVersionIdForReview,
+          },
+        })
+        .returning({ id: fieldValues.id });
+      console.log(
+        `Published [${insertedReview[0]?.id}] (normalize/sanity failure, score=null) — program: ${extraction.programId}, field: ${extraction.fieldDefinitionKey}`
+      );
+      return;
     }
 
     const methodologyRows = await db
