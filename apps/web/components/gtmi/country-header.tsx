@@ -55,7 +55,7 @@ export function CountryHeader({
           aria-label="Breadcrumb"
           className="mb-6 flex items-center gap-2 text-data-sm text-ink-4"
         >
-          <Link href="/programs" className="hover:text-ink">
+          <Link href="/countries" className="hover:text-ink">
             Countries
           </Link>
           <span aria-hidden>›</span>
