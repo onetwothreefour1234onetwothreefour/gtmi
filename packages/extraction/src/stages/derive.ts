@@ -1101,6 +1101,211 @@ export function deriveD33(input: DerivedD33Input): DerivedRow | null {
 }
 
 // ────────────────────────────────────────────────────────────────────
+// Phase 3.9 / W20 — E-pillar derives: E.1.3 (program age) and E.1.1
+// (severity-weighted policy-change count, 5-yr window).
+//
+// E.1.3 is fully deterministic: current_year - launch_year, capped at
+// 20. The launch_year lives on the programs table; canary-run resolves
+// it before calling. derived-computation model.
+//
+// E.1.1 is per-program curated data — change events with severity
+// buckets — summed via the methodology-defined weights. Country-
+// agnostic: the mechanism keys off programId, not country code.
+// derived-knowledge model.
+// ────────────────────────────────────────────────────────────────────
+
+export interface DerivedE13Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  /** programs.launch_year for this program. null if not set. */
+  launchYear: number | null;
+  /** Current calendar year used for the subtraction (typically Date.now()'s year). */
+  currentYear: number;
+  /**
+   * Optional source URL (the programme's official launch announcement
+   * if known). When null, the derive uses a sentinel
+   * 'derived-from-programs-table' string so provenance is still
+   * non-empty.
+   */
+  sourceUrl?: string | null;
+}
+
+export function deriveE13(input: DerivedE13Input): DerivedRow | null {
+  if (input.launchYear === null) {
+    console.log(
+      `  [E.1.3] derived skip — programs.launch_year is null for program ${input.programId}`
+    );
+    return null;
+  }
+  const rawYears = input.currentYear - input.launchYear;
+  if (rawYears < 0) {
+    console.log(
+      `  [E.1.3] derived skip — launch_year ${input.launchYear} is in the future relative to currentYear ${input.currentYear}`
+    );
+    return null;
+  }
+  const years = Math.min(rawYears, 20);
+  const valueRaw = String(years);
+  const sourceSentence = `Program age = ${input.currentYear} − ${input.launchYear} = ${rawYears} year(s), capped at 20 → ${years}.`;
+  const sourceUrl = input.sourceUrl ?? 'urn:gtmi:derived:programs-table:launch_year';
+
+  const derivedInputs = {
+    'E.1.3': {
+      currentYear: input.currentYear,
+      launchYear: input.launchYear,
+      cappedAt: 20,
+      result: years,
+    },
+  };
+
+  const crossCheckResult: CrossCheckOutcome = 'not_checked';
+  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
+    sourceUrl,
+    geographicLevel: 'national',
+    sourceTier: null,
+    scrapeTimestamp: new Date().toISOString(),
+    contentHash: createHash('sha256')
+      .update(
+        `derived-computation:E.1.3:${input.programId}:${input.launchYear}:${input.currentYear}`,
+        'utf8'
+      )
+      .digest('hex'),
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionModel: DERIVE_EXTRACTION_MODEL,
+    extractionConfidence: DERIVE_CONFIDENCE,
+    validationModel: DERIVE_EXTRACTION_MODEL,
+    validationConfidence: DERIVE_CONFIDENCE,
+    crossCheckResult,
+    crossCheckUrl: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    methodologyVersion: input.methodologyVersion,
+    reviewDecision: 'approve',
+    derivedInputs,
+  };
+
+  const extraction: ExtractionOutput = {
+    programId: input.programId,
+    fieldDefinitionKey: 'E.1.3',
+    valueRaw,
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionConfidence: DERIVE_CONFIDENCE,
+    extractionModel: DERIVE_EXTRACTION_MODEL,
+    extractedAt: new Date(),
+  };
+
+  return { extraction, provenance, numericValue: years };
+}
+
+export interface PolicyChangeEventEntry {
+  year: number;
+  severity: 'major' | 'moderate' | 'minor';
+  description: string;
+}
+
+export interface ProgramPolicyHistoryEntry {
+  programId: string;
+  programName: string;
+  windowStartYear: number;
+  windowEndYear: number;
+  events: PolicyChangeEventEntry[];
+  sourceUrl: string;
+  notes?: string;
+}
+
+export interface DerivedE11Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  history: ProgramPolicyHistoryEntry | null;
+}
+
+function severityWeightInternal(s: 'major' | 'moderate' | 'minor'): number {
+  switch (s) {
+    case 'major':
+      return 3;
+    case 'moderate':
+      return 2;
+    case 'minor':
+      return 1;
+  }
+}
+
+/**
+ * Phase 3.9 / W20 — Compute E.1.1 (severity-weighted count of material
+ * policy changes over a 5-year window). Per-program curated data;
+ * country-agnostic mechanism. Returns null when no history is curated
+ * for the programme (LLM extraction will run instead).
+ */
+export function deriveE11(input: DerivedE11Input): DerivedRow | null {
+  if (input.history === null) {
+    console.log(
+      `  [E.1.1] derived skip — no PROGRAM_POLICY_HISTORY entry for program ${input.programId}`
+    );
+    return null;
+  }
+  const sum = input.history.events.reduce((acc, e) => acc + severityWeightInternal(e.severity), 0);
+  const valueRaw = String(sum);
+  const representative = input.history.events[0];
+  const sourceSentence = representative
+    ? `${representative.year} (${representative.severity}): ${representative.description}`
+    : `No material changes recorded in window ${input.history.windowStartYear}-${input.history.windowEndYear}.`;
+
+  const derivedInputs = {
+    'E.1.1': {
+      windowStartYear: input.history.windowStartYear,
+      windowEndYear: input.history.windowEndYear,
+      eventCount: input.history.events.length,
+      severitySum: sum,
+      events: input.history.events,
+    },
+  };
+
+  const crossCheckResult: CrossCheckOutcome = 'not_checked';
+  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
+    sourceUrl: input.history.sourceUrl,
+    geographicLevel: 'national',
+    sourceTier: null,
+    scrapeTimestamp: new Date().toISOString(),
+    contentHash: createHash('sha256')
+      .update(
+        `derived-knowledge:E.1.1:${input.programId}:${sum}:${input.history.events.length}`,
+        'utf8'
+      )
+      .digest('hex'),
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    validationModel: DERIVE_KNOWLEDGE_MODEL,
+    validationConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    crossCheckResult,
+    crossCheckUrl: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    methodologyVersion: input.methodologyVersion,
+    reviewDecision: 'approve',
+    derivedInputs,
+  };
+
+  const extraction: ExtractionOutput = {
+    programId: input.programId,
+    fieldDefinitionKey: 'E.1.1',
+    valueRaw,
+    sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractedAt: new Date(),
+  };
+
+  return { extraction, provenance, numericValue: sum };
+}
+
+// ────────────────────────────────────────────────────────────────────
 // Stage orchestrator. Pure inputs (no DB) — the canary / Trigger.dev
 // caller resolves DB-backed fields and the static-table entries before
 // calling execute().
@@ -1146,6 +1351,14 @@ export class DeriveStageImpl implements DeriveStage {
     if (inputs.d33) {
       const d33 = deriveD33(inputs.d33);
       if (d33) out.push(d33);
+    }
+    if (inputs.e13) {
+      const e13 = deriveE13(inputs.e13);
+      if (e13) out.push(e13);
+    }
+    if (inputs.e11) {
+      const e11 = deriveE11(inputs.e11);
+      if (e11) out.push(e11);
     }
     return out;
   }

@@ -52,6 +52,8 @@ export {
   deriveD24,
   deriveD31,
   deriveD33,
+  deriveE11,
+  deriveE13,
 } from './stages/derive';
 export type {
   CitizenshipResidenceEntry,
@@ -66,14 +68,18 @@ export type {
   DerivedD24Input,
   DerivedD31Input,
   DerivedD33Input,
+  DerivedE11Input,
+  DerivedE13Input,
   DerivedRow,
   DualCitizenshipPolicyEntry,
   FxRateEntry,
   MedianWageEntry,
   NonGovCostsPolicyEntry,
+  PolicyChangeEventEntry,
   PrPresenceFieldEntry,
   PrPresencePolicyEntry,
   PrTimelinePolicyEntry,
+  ProgramPolicyHistoryEntry,
   TaxBasisPolicyEntry,
   TaxResidencyPolicyEntry,
 } from './stages/derive';
@@ -165,6 +171,8 @@ export * from './data/country-pr-timeline';
 export * from './data/country-civic-test-policy';
 export * from './data/country-tax-residency';
 export * from './data/country-tax-basis';
+// Phase 3.9 / W20 — per-program policy-change history for E.1.1 derive.
+export * from './data/program-policy-history';
 // Phase 3.9 / W3 — per-country cross-departmental authority registry.
 export * from './data/country-departments';
 // Phase 3.9 / W5 — per-program curated discovery hints.

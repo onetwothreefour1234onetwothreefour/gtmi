@@ -154,6 +154,10 @@ export interface DeriveStageInputs {
   d31?: import('../stages/derive').DerivedD31Input;
   /** Phase 3.9 / W21 — D.3.3 territorial vs. worldwide taxation. */
   d33?: import('../stages/derive').DerivedD33Input;
+  /** Phase 3.9 / W20 — E.1.3 program age (years since launch, capped at 20). */
+  e13?: import('../stages/derive').DerivedE13Input;
+  /** Phase 3.9 / W20 — E.1.1 severity-weighted policy-change count. */
+  e11?: import('../stages/derive').DerivedE11Input;
 }
 
 export interface DeriveStage {

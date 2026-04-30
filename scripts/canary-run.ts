@@ -15,6 +15,8 @@ import {
   deriveD24,
   deriveD31,
   deriveD33,
+  deriveE11,
+  deriveE13,
   dynamicTierQuotas,
   dynamicUrlCap,
   loadArchivedScrape,
@@ -31,6 +33,7 @@ import {
   COUNTRY_PR_TIMELINE,
   COUNTRY_TAX_BASIS,
   COUNTRY_TAX_RESIDENCY,
+  PROGRAM_POLICY_HISTORY,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -1063,6 +1066,23 @@ async function main() {
         policy: COUNTRY_TAX_BASIS[countryIso] ?? null,
       });
 
+      // Phase 3.9 / W20 — E.1.3 (program age) + E.1.1 (severity-weighted
+      // policy-change count). E.1.3 reads launch_year from the programs
+      // table; E.1.1 reads from the per-program policy-history lookup.
+      const e13Result = deriveE13({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        launchYear: target.launchYear ?? null,
+        currentYear: new Date().getUTCFullYear(),
+      });
+      const e11Result = deriveE11({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        history: PROGRAM_POLICY_HISTORY[programId] ?? null,
+      });
+
       for (const derived of [
         a12Result,
         d12DerivedResult,
@@ -1074,6 +1094,8 @@ async function main() {
         d24Result,
         d31Result,
         d33Result,
+        e13Result,
+        e11Result,
       ]) {
         if (!derived) continue;
         try {
