@@ -314,3 +314,66 @@ describe('mergeDiscoveredUrls — proven URL origin', () => {
     expect(result.filter((u) => u.tier === 2)).toHaveLength(2);
   });
 });
+
+describe('mergeDiscoveredUrls — Phase 3.9 / W10 yield-ranked merge', () => {
+  it('promotes URLs with higher yield within the same origin band', () => {
+    // Three Tier-1 fresh URLs; B has high yield, A has medium, C has none.
+    const fresh = [
+      du('https://gov.example/a', 1, 'national', 'a'),
+      du('https://gov.example/b', 1, 'national', 'b'),
+      du('https://gov.example/c', 1, 'national', 'c'),
+    ];
+    const yieldByUrl = new Map<string, number>([
+      ['https://gov.example/a', 5],
+      ['https://gov.example/b', 12],
+      // c absent → 0
+    ]);
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: [],
+      cap: 3,
+      yieldByUrl,
+    });
+    expect(result.map((u) => u.url)).toEqual([
+      'https://gov.example/b',
+      'https://gov.example/a',
+      'https://gov.example/c',
+    ]);
+  });
+
+  it('respects origin rank above yield (fieldProven beats higher-yield fresh)', () => {
+    // fieldProven A has yield=0; fresh B has yield=20. fieldProven should
+    // still rank first because origin is the primary sort key.
+    const fieldProven = [du('https://gov.example/a', 1, 'national', 'proven')];
+    const fresh = [du('https://gov.example/b', 1, 'national', 'fresh')];
+    const yieldByUrl = new Map<string, number>([['https://gov.example/b', 20]]);
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromFieldProven: fieldProven,
+      fromSourcesTable: [],
+      cap: 2,
+      yieldByUrl,
+    });
+    expect(result.map((u) => u.url)).toEqual(['https://gov.example/a', 'https://gov.example/b']);
+  });
+
+  it('falls back to current Phase-3.7 ordering when yieldByUrl is absent', () => {
+    // Same inputs as the first W10 test but with no yield map. Order
+    // becomes the input-order stable sort (a, b, c).
+    const fresh = [
+      du('https://gov.example/a', 1, 'national', 'a'),
+      du('https://gov.example/b', 1, 'national', 'b'),
+      du('https://gov.example/c', 1, 'national', 'c'),
+    ];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: [],
+      cap: 3,
+    });
+    expect(result.map((u) => u.url)).toEqual([
+      'https://gov.example/a',
+      'https://gov.example/b',
+      'https://gov.example/c',
+    ]);
+  });
+});

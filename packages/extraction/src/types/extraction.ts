@@ -30,6 +30,16 @@ export interface ScrapeResult {
    * archive write's file extension (.pdf vs .md).
    */
   contentType?: string;
+  /**
+   * Phase 3.9 / W11 — true when the archive write detected that this
+   * content_hash matches the most recent archived scrape for the same
+   * (program, URL). The page hasn't changed since the last successful
+   * scrape; extract.ts skips the LLM batch entirely and the existing
+   * field_values rows stay authoritative. A scrape_history row is
+   * still inserted with status='unchanged' so we have an audit trail
+   * of the re-check.
+   */
+  unchanged?: boolean;
 }
 
 export interface ExtractionInput {

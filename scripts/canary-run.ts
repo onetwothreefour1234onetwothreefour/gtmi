@@ -14,6 +14,7 @@ import {
   deriveD23,
   dynamicTierQuotas,
   dynamicUrlCap,
+  loadFieldUrlYield,
   loadProgramSourcesAsDiscovered,
   loadProvenUrlsForMissingFields,
   mergeDiscoveredUrls,
@@ -338,6 +339,13 @@ async function main() {
       missingFieldKeys
     );
     const registryUrls = await loadProgramSourcesAsDiscovered(programId);
+    // Phase 3.9 / W10 — yield-ranked merge. Loads per-URL yield scores
+    // for the currently-missing fields from the field_url_yield
+    // materialized view, then mergeDiscoveredUrls uses them as a
+    // secondary sort key within each tier+origin band. URLs that have
+    // historically produced more values for the gap fields surface to
+    // the front of the scrape order so early-exit kicks in sooner.
+    const yieldByUrl = await loadFieldUrlYield(missingFieldKeys);
     const mergedDiscoveredUrls = mergeDiscoveredUrls({
       freshFromStage0: discoveryResult.discoveredUrls,
       fromFieldProven: fieldProvenUrls,
@@ -345,12 +353,13 @@ async function main() {
       fromProvenance: provenUrls,
       cap,
       quotas,
+      yieldByUrl,
     });
     console.log(
       `[Discovery merge] populated=${populatedFieldCount} → cap=${cap} (quotas T1=${quotas[1]} T2=${quotas[2]} T3=${quotas[3]})`
     );
     console.log(
-      `[Discovery merge] fresh=${discoveryResult.discoveredUrls.length} + fieldProven=${fieldProvenUrls.length} + registry=${registryUrls.length} + proven=${provenUrls.length} → merged=${mergedDiscoveredUrls.length}`
+      `[Discovery merge] fresh=${discoveryResult.discoveredUrls.length} + fieldProven=${fieldProvenUrls.length} + registry=${registryUrls.length} + proven=${provenUrls.length} → merged=${mergedDiscoveredUrls.length} (yieldByUrl=${yieldByUrl.size} URLs ranked)`
     );
 
     console.log('Discovered URLs (post-merge):');

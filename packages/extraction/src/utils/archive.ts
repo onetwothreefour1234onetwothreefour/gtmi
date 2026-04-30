@@ -14,7 +14,7 @@
 // hasn't changed since the last successful scrape."
 
 import { db, scrapeHistory, sources } from '@gtmi/db';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { archivePathFor, contentTypeForExt, getStorage } from '@gtmi/storage';
 import type { ScrapeResult } from '../types/extraction';
 
@@ -37,6 +37,34 @@ export interface ArchiveScrapeResult {
   scrapeHistoryId: string;
   storagePath: string;
   byteSize: number;
+  /**
+   * Phase 3.9 / W11 — true when the archive write detected the same
+   * content_hash as the last successful scrape for this source. The
+   * caller (scrape.ts) propagates this onto the ScrapeResult so the
+   * extraction pipeline can short-circuit.
+   */
+  unchanged: boolean;
+}
+
+/**
+ * Phase 3.9 / W11 — return the content_hash of the most recent archived
+ * scrape for a source, or null if none exists. Used to detect whether a
+ * fresh scrape produced byte-identical content to the last successful
+ * one (the page hasn't changed) so the orchestrator can skip the LLM
+ * extraction batch entirely.
+ */
+async function lastArchivedHash(sourceId: string): Promise<string | null> {
+  try {
+    const rows = await db
+      .select({ contentHash: scrapeHistory.contentHash })
+      .from(scrapeHistory)
+      .where(and(eq(scrapeHistory.sourceId, sourceId), eq(scrapeHistory.status, 'archived')))
+      .orderBy(desc(scrapeHistory.scrapedAt))
+      .limit(1);
+    return rows[0]?.contentHash ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -92,6 +120,15 @@ export async function archiveScrapeResult(
     return null;
   }
 
+  // Phase 3.9 / W11 — hash short-circuit. If the new scrape's
+  // content_hash matches the last archived scrape for this source, the
+  // page hasn't changed. Skip the GCS upload (the storage object
+  // already exists at the same hash-derived path) and insert a
+  // scrape_history row tagged status='unchanged' as the audit trail
+  // of the re-check.
+  const previousHash = await lastArchivedHash(sourceId);
+  const isUnchanged = previousHash !== null && previousHash === result.contentHash;
+
   // Phase 3.9 / W1 — choose archive extension from result.contentType
   // when caller didn't override. PDF scrapes archive as .pdf so future
   // re-extraction can re-parse the source bytes.
@@ -115,24 +152,30 @@ export async function archiveScrapeResult(
   const contentType = contentTypeForExt(ext);
   const bytes = Buffer.from(result.contentMarkdown, 'utf8');
 
-  try {
-    await getStorage().upload({
-      storagePath,
-      contentBytes: bytes,
-      contentType,
-      metadata: {
-        programId,
-        countryIso,
-        sourceUrl: result.url,
-        contentHash: result.contentHash,
-        layer: result.layer ?? 'unknown',
-        extractorVersion: EXTRACTOR_VERSION,
-      },
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[archive] GCS upload failed for ${result.url}: ${msg}`);
-    return null;
+  // Phase 3.9 / W11 — skip the GCS re-upload when content hasn't
+  // changed. The storage object already exists at the same path
+  // (hash-derived), so re-uploading is a no-op-with-cost — both
+  // network bytes and the GCS preconditionFailed handling.
+  if (!isUnchanged) {
+    try {
+      await getStorage().upload({
+        storagePath,
+        contentBytes: bytes,
+        contentType,
+        metadata: {
+          programId,
+          countryIso,
+          sourceUrl: result.url,
+          contentHash: result.contentHash,
+          layer: result.layer ?? 'unknown',
+          extractorVersion: EXTRACTOR_VERSION,
+        },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[archive] GCS upload failed for ${result.url}: ${msg}`);
+      return null;
+    }
   }
 
   try {
@@ -150,7 +193,11 @@ export async function archiveScrapeResult(
         byteSize: bytes.byteLength,
         contentType,
         extractorVersion: EXTRACTOR_VERSION,
-        status: 'archived',
+        // Phase 3.9 / W11 — 'unchanged' rows are the audit trail of
+        // hash-confirmation re-checks; they share storage_path with
+        // the prior 'archived' row but stamp a fresh scraped_at so
+        // the freshness clock for url-monitoring stays current.
+        status: isUnchanged ? 'unchanged' : 'archived',
       })
       .returning({ id: scrapeHistory.id });
     const id = inserted[0]?.id;
@@ -158,7 +205,17 @@ export async function archiveScrapeResult(
       console.warn(`[archive] scrape_history insert returned no id for ${result.url}`);
       return null;
     }
-    return { scrapeHistoryId: id, storagePath, byteSize: bytes.byteLength };
+    if (isUnchanged) {
+      console.log(
+        `  [archive] HASH_UNCHANGED ${result.url} (hash matches last scrape; skipping LLM extraction)`
+      );
+    }
+    return {
+      scrapeHistoryId: id,
+      storagePath,
+      byteSize: bytes.byteLength,
+      unchanged: isUnchanged,
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[archive] scrape_history insert failed for ${result.url}: ${msg}`);

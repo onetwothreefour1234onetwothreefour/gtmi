@@ -115,7 +115,9 @@ export class ScrapeStageImpl implements ScrapeStage {
   /**
    * Phase 3.9 / W0 — best-effort archive write. Mutates the result with
    * scrapeHistoryId/archivePath on success; silent on failure (the
-   * archive helper logs its own warnings).
+   * archive helper logs its own warnings). W11: also propagates the
+   * `unchanged` flag so extract.ts can short-circuit re-extraction
+   * when content_hash matches the prior archived scrape.
    */
   private async maybeArchive(result: ScrapeResult, context?: ScrapeContext): Promise<void> {
     if (!context || context.skipArchive) return;
@@ -129,6 +131,9 @@ export class ScrapeStageImpl implements ScrapeStage {
     if (archived) {
       result.scrapeHistoryId = archived.scrapeHistoryId;
       result.archivePath = archived.storagePath;
+      if (archived.unchanged) {
+        result.unchanged = true;
+      }
     }
   }
 

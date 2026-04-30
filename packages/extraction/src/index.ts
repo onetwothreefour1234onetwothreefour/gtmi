@@ -74,6 +74,7 @@ export {
   TIER_QUOTAS,
   dynamicTierQuotas,
   dynamicUrlCap,
+  loadFieldUrlYield,
   loadProgramSourcesAsDiscovered,
   loadProvenUrlsForMissingFields,
   mergeDiscoveredUrls,

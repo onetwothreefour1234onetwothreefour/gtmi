@@ -103,6 +103,15 @@ interface MergeArgs {
   /** Phase 3.6.2 / ITEM 4 — explicit per-tier quota override. When unset,
    * dynamicTierQuotas(cap) is used. */
   quotas?: { 1: number; 2: number; 3: number };
+  /**
+   * Phase 3.9 / W10 — per-URL yield score derived from the
+   * field_url_yield materialized view. Higher = this URL has produced
+   * more populated values for the currently-missing fields in past runs.
+   * Within each tier and origin band, URLs with higher yield are
+   * promoted to the front. Empty/absent map = no yield bias (current
+   * Phase 3.7 ranking unchanged).
+   */
+  yieldByUrl?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -156,14 +165,24 @@ export function mergeDiscoveredUrls(args: MergeArgs): DiscoveredUrl[] {
   // Within each tier, order: fieldProven → registry → proven → fresh
   // (stable within each origin). fieldProven wins because the URL has
   // already produced a value for THIS programme on this exact field.
+  // Phase 3.9 / W10 — secondary sort by per-URL yield score (descending)
+  // so within an origin band, URLs that have historically produced more
+  // values for the currently-missing fields are promoted. yieldByUrl is
+  // keyed on normalised URL.
   const ORIGIN_RANK: Record<Tagged['origin'], number> = {
     fieldProven: 0,
     registry: 1,
     proven: 2,
     fresh: 3,
   };
+  const yieldByUrl = args.yieldByUrl ?? new Map<string, number>();
+  const yieldFor = (t: Tagged): number => yieldByUrl.get(t.normalised) ?? 0;
   for (const t of [1, 2, 3] as const) {
-    byTier[t].sort((a, b) => ORIGIN_RANK[a.origin] - ORIGIN_RANK[b.origin]);
+    byTier[t].sort((a, b) => {
+      const originDelta = ORIGIN_RANK[a.origin] - ORIGIN_RANK[b.origin];
+      if (originDelta !== 0) return originDelta;
+      return yieldFor(b) - yieldFor(a);
+    });
   }
 
   // Apply per-tier quotas, then fall through if a tier is short.
@@ -187,6 +206,52 @@ export function mergeDiscoveredUrls(args: MergeArgs): DiscoveredUrl[] {
     }
   }
   return out.slice(0, cap);
+}
+
+/**
+ * Phase 3.9 / W10 — load yield scores per URL for the currently-missing
+ * fields. Reads field_url_yield (the materialized view created in
+ * migration 00014 + populated by extraction_attempts writes).
+ *
+ * Returns a Map<normalisedUrl, score> where score = sum of
+ * attempts_yielded across the missing field set, weighted by
+ * mean_confidence. Empty map when missingFieldKeys is empty (no signal
+ * available) or when the view is empty (pre-backfill / fresh DB).
+ *
+ * The score is informational — used by mergeDiscoveredUrls as a
+ * secondary sort key within each origin band. Higher score = URL has
+ * historically produced more populated values for the gap fields.
+ */
+export async function loadFieldUrlYield(
+  missingFieldKeys: string[],
+  database: DbClient = db
+): Promise<Map<string, number>> {
+  if (missingFieldKeys.length === 0) return new Map();
+  const keysList = sql.join(
+    missingFieldKeys.map((k) => sql`${k}`),
+    sql`, `
+  );
+  try {
+    const rows = await database.execute<{ source_url: string; score: number }>(sql`
+      SELECT
+        y.source_url AS source_url,
+        SUM(GREATEST(y.attempts_yielded, 0) * COALESCE(y.mean_confidence, 0.5))::float AS score
+      FROM field_url_yield y
+      WHERE y.field_key IN (${keysList})
+        AND y.attempts_yielded > 0
+      GROUP BY y.source_url
+    `);
+    const iter = Array.isArray(rows)
+      ? rows
+      : ((rows as unknown as { rows?: { source_url: string; score: number }[] }).rows ?? []);
+    const map = new Map<string, number>();
+    for (const r of iter) {
+      map.set(normaliseUrl(r.source_url), Number(r.score));
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
 }
 
 /**

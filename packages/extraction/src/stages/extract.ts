@@ -619,12 +619,26 @@ export class ExtractStageImpl implements ExtractStage {
         : null;
 
     for (let i = 0; i < scrapes.length; i++) {
+      const scrape = scrapes[i]!;
+
+      // Phase 3.9 / W11 — hash short-circuit. The archive write
+      // detected this scrape's content_hash matches the last
+      // successful scrape for the same source URL. Page hasn't
+      // changed; skip the LLM batch entirely and rely on the
+      // existing field_values rows. Saves the full extraction cost
+      // for unchanged URLs in weekly maintenance / re-run scenarios.
+      if (scrape.unchanged === true) {
+        console.log(
+          `  [Batch] Skipping ${scrape.url} — content unchanged since last archived scrape (W11 short-circuit)`
+        );
+        continue;
+      }
+
       if (i > 0) {
         console.log(`  [Batch] Waiting ${INTER_BATCH_DELAY_MS / 1000}s before next URL batch...`);
         await new Promise((r) => setTimeout(r, INTER_BATCH_DELAY_MS));
       }
 
-      const scrape = scrapes[i]!;
       const batchOutput = await this.executeBatch(
         scrape,
         fields,
