@@ -148,6 +148,12 @@ export interface DeriveStageInputs {
   d14?: import('../stages/derive').DerivedD14Input;
   /** Phase 3.6.4 / FIX 2 — D.1.2 minimum years of residence to PR eligibility. */
   d12?: import('../stages/derive').DerivedD12Input;
+  /** Phase 3.9 / W21 — D.2.4 civic / language / integration test burden. */
+  d24?: import('../stages/derive').DerivedD24Input;
+  /** Phase 3.9 / W21 — D.3.1 tax-residency trigger (days/yr). */
+  d31?: import('../stages/derive').DerivedD31Input;
+  /** Phase 3.9 / W21 — D.3.3 territorial vs. worldwide taxation. */
+  d33?: import('../stages/derive').DerivedD33Input;
 }
 
 export interface DeriveStage {

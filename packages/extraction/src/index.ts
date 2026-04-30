@@ -49,9 +49,13 @@ export {
   deriveD14,
   deriveD22,
   deriveD23,
+  deriveD24,
+  deriveD31,
+  deriveD33,
 } from './stages/derive';
 export type {
   CitizenshipResidenceEntry,
+  CivicTestPolicyEntry,
   DerivedA12Input,
   DerivedB24Input,
   DerivedD12Input,
@@ -59,6 +63,9 @@ export type {
   DerivedD14Input,
   DerivedD22Input,
   DerivedD23Input,
+  DerivedD24Input,
+  DerivedD31Input,
+  DerivedD33Input,
   DerivedRow,
   DualCitizenshipPolicyEntry,
   FxRateEntry,
@@ -67,6 +74,8 @@ export type {
   PrPresenceFieldEntry,
   PrPresencePolicyEntry,
   PrTimelinePolicyEntry,
+  TaxBasisPolicyEntry,
+  TaxResidencyPolicyEntry,
 } from './stages/derive';
 export { DiscoverStageImpl, writeToSourcesTable } from './stages/discover';
 export {
@@ -152,6 +161,10 @@ export * from './data/country-non-gov-costs';
 export * from './data/country-pr-presence';
 // Phase 3.6.4 / FIX 2 — country-level D.1.2 PR timeline lookup.
 export * from './data/country-pr-timeline';
+// Phase 3.9 / W21 — country-level D.2.4 / D.3.1 / D.3.3 lookups.
+export * from './data/country-civic-test-policy';
+export * from './data/country-tax-residency';
+export * from './data/country-tax-basis';
 // Phase 3.9 / W3 — per-country cross-departmental authority registry.
 export * from './data/country-departments';
 // Phase 3.9 / W5 — per-program curated discovery hints.

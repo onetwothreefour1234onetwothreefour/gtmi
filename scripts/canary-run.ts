@@ -12,6 +12,9 @@ import {
   deriveD14,
   deriveD22,
   deriveD23,
+  deriveD24,
+  deriveD31,
+  deriveD33,
   dynamicTierQuotas,
   dynamicUrlCap,
   loadArchivedScrape,
@@ -21,10 +24,13 @@ import {
   mergeDiscoveredUrls,
   planCanaryCost,
   scoreProgramFromDb,
+  COUNTRY_CIVIC_TEST_POLICY,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
   COUNTRY_NON_GOV_COSTS_POLICY,
   COUNTRY_PR_PRESENCE_POLICY,
   COUNTRY_PR_TIMELINE,
+  COUNTRY_TAX_BASIS,
+  COUNTRY_TAX_RESIDENCY,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -1037,6 +1043,26 @@ async function main() {
         policy: prPresence,
       });
 
+      // Phase 3.9 / W21 — country-level D.2.4 / D.3.1 / D.3.3 derives.
+      const d24Result = deriveD24({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: COUNTRY_CIVIC_TEST_POLICY[countryIso] ?? null,
+      });
+      const d31Result = deriveD31({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: COUNTRY_TAX_RESIDENCY[countryIso] ?? null,
+      });
+      const d33Result = deriveD33({
+        programId,
+        countryIso,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: COUNTRY_TAX_BASIS[countryIso] ?? null,
+      });
+
       for (const derived of [
         a12Result,
         d12DerivedResult,
@@ -1045,6 +1071,9 @@ async function main() {
         b24Result,
         d13Result,
         d14Result,
+        d24Result,
+        d31Result,
+        d33Result,
       ]) {
         if (!derived) continue;
         try {

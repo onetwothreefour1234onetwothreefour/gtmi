@@ -884,6 +884,223 @@ export function deriveD12(input: DerivedD12Input): DerivedRow | null {
 }
 
 // ────────────────────────────────────────────────────────────────────
+// Phase 3.9 / W21 — country-level derives for D.2.4, D.3.1, D.3.3.
+//
+// All three are country-deterministic (citizenship-test burden, tax
+// residency-trigger day-count, and tax-base scope are set by national
+// citizenship/tax law, not the visa programme). Same pattern as the
+// D.1.2 / B.2.4 / D.2.3 derives — country-level lookup, deterministic
+// output, derived-knowledge confidence (0.7) routing to /review.
+// ────────────────────────────────────────────────────────────────────
+
+export interface CivicTestPolicyEntry {
+  iso3: string;
+  burden: 'none' | 'light' | 'moderate' | 'heavy' | null;
+  notes: string;
+  sourceUrl: string;
+  sourceYear: number;
+}
+
+export interface DerivedD24Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  policy: CivicTestPolicyEntry | null;
+}
+
+export interface TaxResidencyPolicyEntry {
+  iso3: string;
+  triggerDays: number | null;
+  notes: string;
+  sourceUrl: string;
+  sourceYear: number;
+}
+
+export interface DerivedD31Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  policy: TaxResidencyPolicyEntry | null;
+}
+
+export interface TaxBasisPolicyEntry {
+  iso3: string;
+  basis: 'worldwide' | 'worldwide_with_remittance_basis' | 'territorial' | 'hybrid' | null;
+  notes: string;
+  sourceUrl: string;
+  sourceYear: number;
+}
+
+export interface DerivedD33Input {
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  policy: TaxBasisPolicyEntry | null;
+}
+
+function buildCountryDerivedRow(args: {
+  fieldKey: string;
+  programId: string;
+  countryIso: string;
+  methodologyVersion: string;
+  valueRaw: string;
+  numericValue: number;
+  sourceUrl: string;
+  sourceSentence: string;
+  derivedInputs: Record<string, unknown>;
+}): DerivedRow {
+  const crossCheckResult: CrossCheckOutcome = 'not_checked';
+  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
+    sourceUrl: args.sourceUrl,
+    geographicLevel: 'national',
+    sourceTier: null,
+    scrapeTimestamp: new Date().toISOString(),
+    contentHash: createHash('sha256')
+      .update(
+        `derived-knowledge:${args.fieldKey}:${args.programId}:${args.countryIso}:${args.valueRaw}`,
+        'utf8'
+      )
+      .digest('hex'),
+    sourceSentence: args.sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    validationModel: DERIVE_KNOWLEDGE_MODEL,
+    validationConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    crossCheckResult,
+    crossCheckUrl: null,
+    reviewedBy: null,
+    reviewedAt: null,
+    methodologyVersion: args.methodologyVersion,
+    reviewDecision: 'approve',
+    derivedInputs: args.derivedInputs,
+  };
+
+  const extraction: ExtractionOutput = {
+    programId: args.programId,
+    fieldDefinitionKey: args.fieldKey,
+    valueRaw: args.valueRaw,
+    sourceSentence: args.sourceSentence,
+    characterOffsets: { start: 0, end: 0 },
+    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
+    extractionModel: DERIVE_KNOWLEDGE_MODEL,
+    extractedAt: new Date(),
+  };
+
+  return { extraction, provenance, numericValue: args.numericValue };
+}
+
+/**
+ * Phase 3.9 / W21 — Compute D.2.4 (civic / language / integration test
+ * burden for citizenship). Country-deterministic, set by citizenship law.
+ *
+ * Skips when:
+ *   - no entry exists for the country
+ *   - the entry's burden is null (no realistic naturalisation pathway,
+ *     e.g. GCC monarchies)
+ */
+export function deriveD24(input: DerivedD24Input): DerivedRow | null {
+  if (input.policy === null) {
+    console.log(
+      `  [D.2.4] derived skip — no COUNTRY_CIVIC_TEST_POLICY entry for ${input.countryIso}`
+    );
+    return null;
+  }
+  if (input.policy.burden === null) {
+    console.log(
+      `  [D.2.4] derived skip — ${input.countryIso} has no realistic naturalisation pathway`
+    );
+    return null;
+  }
+  return buildCountryDerivedRow({
+    fieldKey: 'D.2.4',
+    programId: input.programId,
+    countryIso: input.countryIso,
+    methodologyVersion: input.methodologyVersion,
+    valueRaw: input.policy.burden,
+    numericValue: 0,
+    sourceUrl: input.policy.sourceUrl,
+    sourceSentence: input.policy.notes,
+    derivedInputs: {
+      'D.2.4': {
+        burden: input.policy.burden,
+        sourceUrl: input.policy.sourceUrl,
+        sourceYear: input.policy.sourceYear,
+      },
+    },
+  });
+}
+
+/**
+ * Phase 3.9 / W21 — Compute D.3.1 (tax-residency trigger, days/year).
+ * Country-deterministic, set by national tax code. Skips when no entry
+ * for the country, or when the country uses a non-day-count primary
+ * mechanism (territorial / domicile-based — handled by D.3.3 instead).
+ */
+export function deriveD31(input: DerivedD31Input): DerivedRow | null {
+  if (input.policy === null) {
+    console.log(`  [D.3.1] derived skip — no COUNTRY_TAX_RESIDENCY entry for ${input.countryIso}`);
+    return null;
+  }
+  if (input.policy.triggerDays === null) {
+    console.log(
+      `  [D.3.1] derived skip — ${input.countryIso} uses non-day-count primary mechanism (see D.3.3)`
+    );
+    return null;
+  }
+  const days = input.policy.triggerDays;
+  return buildCountryDerivedRow({
+    fieldKey: 'D.3.1',
+    programId: input.programId,
+    countryIso: input.countryIso,
+    methodologyVersion: input.methodologyVersion,
+    valueRaw: String(days),
+    numericValue: days,
+    sourceUrl: input.policy.sourceUrl,
+    sourceSentence: input.policy.notes,
+    derivedInputs: {
+      'D.3.1': {
+        triggerDays: days,
+        sourceUrl: input.policy.sourceUrl,
+        sourceYear: input.policy.sourceYear,
+      },
+    },
+  });
+}
+
+/**
+ * Phase 3.9 / W21 — Compute D.3.3 (territorial vs. worldwide taxation
+ * for residents). Country-deterministic, set by national tax code.
+ */
+export function deriveD33(input: DerivedD33Input): DerivedRow | null {
+  if (input.policy === null) {
+    console.log(`  [D.3.3] derived skip — no COUNTRY_TAX_BASIS entry for ${input.countryIso}`);
+    return null;
+  }
+  if (input.policy.basis === null) {
+    console.log(`  [D.3.3] derived skip — ${input.countryIso} basis unknown/contested`);
+    return null;
+  }
+  return buildCountryDerivedRow({
+    fieldKey: 'D.3.3',
+    programId: input.programId,
+    countryIso: input.countryIso,
+    methodologyVersion: input.methodologyVersion,
+    valueRaw: input.policy.basis,
+    numericValue: 0,
+    sourceUrl: input.policy.sourceUrl,
+    sourceSentence: input.policy.notes,
+    derivedInputs: {
+      'D.3.3': {
+        basis: input.policy.basis,
+        sourceUrl: input.policy.sourceUrl,
+        sourceYear: input.policy.sourceYear,
+      },
+    },
+  });
+}
+
+// ────────────────────────────────────────────────────────────────────
 // Stage orchestrator. Pure inputs (no DB) — the canary / Trigger.dev
 // caller resolves DB-backed fields and the static-table entries before
 // calling execute().
@@ -917,6 +1134,18 @@ export class DeriveStageImpl implements DeriveStage {
     if (inputs.d12) {
       const d12 = deriveD12(inputs.d12);
       if (d12) out.push(d12);
+    }
+    if (inputs.d24) {
+      const d24 = deriveD24(inputs.d24);
+      if (d24) out.push(d24);
+    }
+    if (inputs.d31) {
+      const d31 = deriveD31(inputs.d31);
+      if (d31) out.push(d31);
+    }
+    if (inputs.d33) {
+      const d33 = deriveD33(inputs.d33);
+      if (d33) out.push(d33);
     }
     return out;
   }
