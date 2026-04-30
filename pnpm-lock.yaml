@@ -211,6 +211,9 @@ importers:
       '@gtmi/shared':
         specifier: workspace:*
         version: link:../shared
+      '@gtmi/storage':
+        specifier: workspace:*
+        version: link:../storage
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
