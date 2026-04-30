@@ -788,17 +788,33 @@ const STRUCTURED_BOOL_RUBRIC = {
   ],
 };
 
+// Phase 3.8 / P0 reconciliation — the 4-value rubric is the single
+// source of truth for C.3.2 vocabulary. REGIONAL_SUBSTITUTES (in
+// packages/scoring/src/normalize.ts) writes a *subset* of these values
+// (automatic for OECD, fee_paying for GCC) when extraction is empty;
+// LLM-extracted values can be any of the four, scored via the rubric.
+// 100 / 40 are analyst-set; 20 / 0 fill the gradient for restricted / none.
 const C32_REGIONAL_RUBRIC = {
   categories: [
     {
       value: 'automatic',
       score: 100,
-      description: 'public schooling automatic for visa-holder dependants',
+      description: 'public schooling available on the same basis as citizens/PRs.',
     },
     {
       value: 'fee_paying',
       score: 40,
-      description: 'fee-paying access only (Gulf-style)',
+      description: 'access available but foreign-student or fee-paying levy applies.',
+    },
+    {
+      value: 'restricted',
+      score: 20,
+      description: 'case-by-case basis or local-authority approval; not guaranteed.',
+    },
+    {
+      value: 'none',
+      score: 0,
+      description: 'no access to public education.',
     },
   ],
 };

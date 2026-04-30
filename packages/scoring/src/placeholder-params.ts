@@ -27,8 +27,8 @@ export const PHASE2_PLACEHOLDER_PARAMS: NormalizationParams = {
   'B.1.3': { min: 1, max: 10 }, // number of application steps — min_max
   'B.2.1': { mean: 2500, stddev: 2000 }, // principal applicant fees USD — z_score
   'B.2.2': { mean: 1200, stddev: 900 }, // per-dependant fees USD — z_score
-  'B.2.3': { mean: 5000, stddev: 3000 }, // employer levies USD — z_score
-  'B.2.4': { mean: 1000, stddev: 700 }, // non-government costs USD — z_score
+  // B.2.3 / B.2.4 were z_score in v1; restructured to boolean_with_annotation
+  // in Phase 3.5 / ADR-014, so numeric calibration no longer applies.
   'B.3.2': { min: 0, max: 5 }, // in-person / biometric visit count — min_max
 
   // C — Conditions
@@ -36,8 +36,8 @@ export const PHASE2_PLACEHOLDER_PARAMS: NormalizationParams = {
 
   // D — Pathways
   'D.1.2': { min: 0, max: 10 }, // years to PR eligibility — min_max
-  'D.1.3': { min: 0, max: 365 }, // PR-accrual physical presence days/yr — min_max
-  'D.1.4': { min: 0, max: 365 }, // PR retention days/yr — min_max
+  // D.1.3 / D.1.4 were min_max in v1; restructured to boolean_with_annotation
+  // in Phase 3.5 / ADR-014, so numeric calibration no longer applies.
   'D.2.2': { min: 5, max: 30 }, // years to citizenship — min_max
   'D.3.1': { min: 0, max: 365 }, // tax residency trigger days — min_max
 

@@ -1135,27 +1135,30 @@ Edge cases:
 Question: What is the dependent child's access to public education?
 Allowed values:
 
-"full_access": same basis as citizens/PRs.
-"fee_based": access granted but foreign-student or fee-paying levy applies.
-"limited": access in specific circumstances only (age bands, regions).
-"no_access": no access to public education.
+"automatic": public schooling available on the same basis as citizens/PRs (no extra fees).
+"fee_paying": access available but foreign-student or fee-paying levy applies.
+"restricted": case-by-case basis or local-authority approval; not guaranteed.
+"none": no access to public education.
 
 Edge cases:
 
-Right to attend does not mean right to free attendance: if tuition applies, "fee_based" not "full_access".
+Right to attend does not mean right to free attendance: if tuition applies, "fee_paying" not "automatic".
 Higher-education access is separate and not required here.`,
       scoringRubricJsonb: {
         categories: [
-          { value: 'full_access', description: 'same basis as citizens/PRs.' },
           {
-            value: 'fee_based',
-            description: 'access granted but foreign-student or fee-paying levy applies.',
+            value: 'automatic',
+            description: 'public schooling available on the same basis as citizens/PRs.',
           },
           {
-            value: 'limited',
-            description: 'access in specific circumstances only (age bands, regions).',
+            value: 'fee_paying',
+            description: 'access available but foreign-student or fee-paying levy applies.',
           },
-          { value: 'no_access', description: 'no access to public education.' },
+          {
+            value: 'restricted',
+            description: 'case-by-case basis or local-authority approval; not guaranteed.',
+          },
+          { value: 'none', description: 'no access to public education.' },
         ],
       },
       normalizationFn: 'categorical',

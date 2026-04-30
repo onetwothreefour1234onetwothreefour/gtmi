@@ -86,18 +86,27 @@ export const RUBRIC_SCORES: Record<string, Record<string, number>> = {
     by_permit_no_work_rights: 25,
     not_permitted: 0,
   },
+  // C.3.1 — `automatic` and `conditional_rhca` were added inline to the
+  // rubric; their scores are mirrored here so applyRubricScores doesn't
+  // throw when re-seeding. `automatic` is an analyst-introduced alias of
+  // `full_access`; `conditional_rhca` matches the levy / RHCA pattern.
   'C.3.1': {
     full_access: 100,
+    automatic: 100,
+    conditional_rhca: 70,
     levy_required: 70,
     insurance_required: 50,
     emergency_only: 20,
     no_access: 0,
   },
+  // C.3.2 vocabulary aligned with REGIONAL_SUBSTITUTES and the v2 prompt.
+  // 100/40 are analyst-set (mirror REGIONAL_SUBSTITUTES['C.3.2']); 20 / 0
+  // fill the gradient for restricted / none.
   'C.3.2': {
-    full_access: 100,
-    fee_based: 60,
-    limited: 30,
-    no_access: 0,
+    automatic: 100,
+    fee_paying: 40,
+    restricted: 20,
+    none: 0,
   },
   'D.2.4': {
     none: 100,
