@@ -412,6 +412,29 @@ After 3.1–3.5, expected per-programme coverage **42–44/48** (43 average). Ga
 
 ---
 
+### Phase 3.8 — Bulk-approve-all + on-demand re-score (ADR-020) — ✅ COMPLETE
+
+**Goal:** close two analyst pain-points after Phase 3.7 — (a) 61 approved rows still required per-row clicks for borderline confidence; (b) `value_indicator_score` had no in-app refresh after a calibration commit. Both unblocked with two server actions and three confirmation-dialogged buttons.
+
+- ✅ `bulkApproveAllPending` server action + `<BulkApproveAllDialog>` (amber `--warning` styling). Skips the extractionConfidence ≥ 0.85 / validationConfidence ≥ 0.85 filter; keeps the ADR-019 categorical-rubric `EXISTS` clause.
+- ✅ `rescoreFieldValue(id)` + per-row "Re-score" button on `/review/[id]`. Rewrites `value_indicator_score` from the stored `value_normalized` + current `PHASE2_PLACEHOLDER_PARAMS`. Failures are non-fatal — log + persist NULL.
+- ✅ `rescoreProgram(programId)` and `rescoreCohort()` server actions. Cohort iterates per programme so a single failure doesn't roll back the rest. ~30-60s in steady state at 30-country scale; flagged for Trigger.dev promotion when cohort size makes the in-process variant unsafe.
+- ✅ `<RescoreCohortDialog>` wired into the queue header. Confirm button shows a `Re-scoring…` pending state to mitigate double-clicks during the in-flight wait.
+
+**New files:**
+
+- `apps/web/app/(internal)/review/rescore-actions.ts` — three new server actions (rescoreFieldValue / rescoreProgram / rescoreCohort), kept separate from `actions.ts` so the file's purpose stays clear.
+- `apps/web/components/gtmi/bulk-approve-all-dialog.tsx` — amber-styled `<BulkApproveAllDialog>`.
+- `apps/web/components/gtmi/rescore-cohort-dialog.tsx` — `<RescoreCohortDialog>` with a pending-state confirm button.
+
+**Out of scope (deferred):**
+
+- Programme-level composite refresh (the `scores` table). Today the re-score actions rewrite `field_values.value_indicator_score` only; the composite refresh still requires `scripts/run-paq-score.ts` per country.
+- Trigger.dev fallback for `rescoreCohort`.
+- By-country / by-programme filters on bulk-approve-all.
+
+---
+
 ## Phase 4 — Public Dashboard
 
 **Goal:** Interactive public-facing web dashboard. Every data point shows provenance on hover.
