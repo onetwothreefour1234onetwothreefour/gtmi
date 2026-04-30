@@ -1,41 +1,75 @@
 /**
- * Phase 2 PAQ scoring run.
+ * Phase 2 PAQ scoring CLI.
  *
- * Reads approved field_values for a program, runs the scoring engine, and
- * writes the result to the scores table.
+ * Resolves a programme by --country (with a fallback keyword) or
+ * --programId, then delegates to `scoreProgramFromDb` in
+ * @gtmi/extraction (Phase 3.8 / ADR-022). The orchestration that used
+ * to live inline here — methodology-version lookup, CME load,
+ * approved-field-values read, ScoringInput build, runScoringEngine,
+ * scores upsert — is now a single shared helper used by:
+ *
+ *   - this CLI,
+ *   - apps/web/app/(internal)/review/rescore-actions.ts (the manual
+ *     re-score buttons), and
+ *   - scripts/canary-run.ts (auto-rescore after extraction).
  *
  *  ⚠️  PHASE 2 PLACEHOLDER RANGES — NOT PUBLICATION-READY
  *
- * The NORMALIZATION_PARAMS below are engineer-chosen ranges used to unblock
- * Phase 2 end-to-end scoring. They are NOT calibrated against real cross-program
- * distribution data. Every score written by this script is tagged with
- * `provenance.phase2Placeholder = true` in the scores row so downstream
- * consumers can refuse to publish until Phase 3 replaces these with real
- * distribution stats from ≥5 scored programs.
+ * The scoring uses PHASE2_PLACEHOLDER_PARAMS from @gtmi/scoring —
+ * engineer-chosen ranges that are NOT calibrated against real
+ * cross-programme distribution data. Every score row is tagged with
+ * `metadata.phase2Placeholder = true`; downstream consumers should
+ * refuse to publish until Phase 5 calibration replaces the ranges.
  *
- * Scope: ACTIVE_FIELD_CODES (Wave 1 ∪ Wave 2 when WAVE_2_ENABLED). Out-of-scope
- * fields do not contribute to denominators or weight re-normalization.
+ * Scope: ACTIVE_FIELD_CODES (Wave 1 ∪ Wave 2 when WAVE_2_ENABLED).
+ * Out-of-scope fields do not contribute to denominators or weight
+ * re-normalisation.
  *
  * Usage:
  *   npx tsx scripts/run-paq-score.ts --country AUS [--programId <uuid>]
  */
 
-import { db, fieldDefinitions, fieldValues, methodologyVersions, scores } from '@gtmi/db';
-import { runScoringEngine, PHASE2_PLACEHOLDER_PARAMS } from '@gtmi/scoring';
-import type { ScoringInput } from '@gtmi/scoring';
-import { eq, and } from 'drizzle-orm';
-import { ACTIVE_FIELD_CODES } from './wave-config';
+import { db } from '@gtmi/db';
+import { scoreProgramFromDb } from '@gtmi/extraction';
 
-// Phase 3.7 / ADR-019 — placeholder normalization params now live in
-// `packages/scoring/src/placeholder-params.ts` so publish-time scoring,
-// /review edits, the audit backfill, and this run-paq-score helper all
-// share one source of truth. Calibration replaces them in Phase 5.
-const NORMALIZATION_PARAMS = PHASE2_PLACEHOLDER_PARAMS;
+async function resolveProgramId(
+  countryArg: string,
+  programIdArg: string | undefined
+): Promise<{ id: string; name: string }> {
+  if (programIdArg) {
+    const row = await db.query.programs.findFirst({
+      where: (p, { eq }) => eq(p.id, programIdArg),
+    });
+    if (!row) {
+      console.error(`No program found: ${programIdArg}`);
+      process.exit(1);
+    }
+    return { id: row.id, name: row.name };
+  }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-async function main() {
+  const defaultKeywords: Record<string, string> = {
+    AUS: 'skills in demand',
+    SGP: 's pass',
+    CAN: 'express entry',
+    GBR: 'skilled worker visa',
+  };
+  const keyword = defaultKeywords[countryArg];
+  const allForCountry = await db.query.programs.findMany({
+    where: (p, { eq }) => eq(p.countryIso, countryArg),
+    columns: { id: true, name: true },
+  });
+  if (allForCountry.length === 0) {
+    console.error(`No programs found for country_iso="${countryArg}"`);
+    process.exit(1);
+  }
+  const matched = keyword
+    ? allForCountry.filter((r) => r.name.toLowerCase().includes(keyword))
+    : [];
+  const selected = (matched.length > 0 ? matched : allForCountry)[0]!;
+  return { id: selected.id, name: selected.name };
+}
+
+async function main(): Promise<void> {
   const countryArgIdx = process.argv.indexOf('--country');
   const countryArg = countryArgIdx !== -1 ? process.argv[countryArgIdx + 1] : undefined;
   if (!countryArg) {
@@ -44,220 +78,53 @@ async function main() {
     );
     process.exit(1);
   }
-
   const programIdArgIdx = process.argv.indexOf('--programId');
   const programIdArg = programIdArgIdx !== -1 ? process.argv[programIdArgIdx + 1] : undefined;
 
-  // --- 1. Resolve program ---
-  let programId: string;
-  let programName: string;
+  const program = await resolveProgramId(countryArg, programIdArg);
+  console.log(`\nProgram: ${program.name} (${program.id})`);
 
-  if (programIdArg) {
-    const rows = await db.query.programs.findFirst({
-      where: (p, { eq }) => eq(p.id, programIdArg),
-    });
-    if (!rows) {
-      console.error(`No program found: ${programIdArg}`);
-      process.exit(1);
-    }
-    programId = rows.id;
-    programName = rows.name;
-  } else {
-    const defaultKeywords: Record<string, string> = {
-      AUS: 'skills in demand',
-      SGP: 's pass',
-      CAN: 'express entry',
-      GBR: 'skilled worker visa',
-    };
-    const keyword = defaultKeywords[countryArg!];
-    const allForCountry = await db.query.programs.findMany({
-      where: (p, { eq }) => eq(p.countryIso, countryArg!),
-      columns: { id: true, name: true },
-    });
-    if (allForCountry.length === 0) {
-      console.error(`No programs found for country_iso="${countryArg}"`);
-      process.exit(1);
-    }
-    const matched = keyword
-      ? allForCountry.filter((r) => r.name.toLowerCase().includes(keyword))
-      : [];
-    const selected = (matched.length > 0 ? matched : allForCountry)[0]!;
-    programId = selected.id;
-    programName = selected.name;
-  }
+  // Phase 3.8 / ADR-022 — single delegated call. The helper handles
+  // methodology lookup, CME load, approved-field-values read,
+  // ScoringInput build, runScoringEngine, and the scores upsert.
+  const r = await scoreProgramFromDb(program.id);
 
-  console.log(`\nProgram: ${programName} (${programId})`);
-
-  // --- 2. Load methodology version ---
-  const mvRows = await db.select().from(methodologyVersions).limit(1);
-  if (mvRows.length === 0) {
-    console.error('No methodology version found');
-    process.exit(1);
-  }
-  const mv = mvRows[0]!;
-  console.log(`Methodology: ${mv.versionTag} (${mv.id})`);
-
-  // --- 3. Load CME score from countries ---
-  const countryRow = await db.query.countries.findFirst({
-    where: (c, { eq }) => eq(c.isoCode, countryArg),
-  });
-  const cmeScore = countryRow?.imdAppealScoreCmeNormalized
-    ? parseFloat(String(countryRow.imdAppealScoreCmeNormalized))
-    : 0;
-  console.log(`CME score (IMD normalized): ${cmeScore}`);
-
-  // --- 4. Load approved field values ---
-  const approvedFVs = await db
-    .select({
-      id: fieldValues.id,
-      fieldDefinitionId: fieldValues.fieldDefinitionId,
-      valueNormalized: fieldValues.valueNormalized,
-      status: fieldValues.status,
-    })
-    .from(fieldValues)
-    .where(and(eq(fieldValues.programId, programId), eq(fieldValues.status, 'approved')));
-
-  console.log(`\nApproved field values: ${approvedFVs.length}`);
-
-  if (approvedFVs.length === 0) {
-    console.error('No approved field values — run canary first');
-    process.exit(1);
-  }
-
-  // --- 5. Load all field definitions ---
-  const allDefs = await db
-    .select({
-      id: fieldDefinitions.id,
-      key: fieldDefinitions.key,
-      pillar: fieldDefinitions.pillar,
-      subFactor: fieldDefinitions.subFactor,
-      weightWithinSubFactor: fieldDefinitions.weightWithinSubFactor,
-      scoringRubricJsonb: fieldDefinitions.scoringRubricJsonb,
-      normalizationFn: fieldDefinitions.normalizationFn,
-      direction: fieldDefinitions.direction,
-    })
-    .from(fieldDefinitions);
-
-  // --- 6. Assemble ScoringInput ---
-  const input: ScoringInput = {
-    programId,
-    methodologyVersionId: mv.id,
-    scoredAt: new Date(),
-    cmeScore,
-    fieldValues: approvedFVs.map((fv) => ({
-      id: fv.id,
-      fieldDefinitionId: fv.fieldDefinitionId,
-      valueNormalized: fv.valueNormalized,
-      status: fv.status,
-    })),
-    fieldDefinitions: allDefs.map((d) => ({
-      id: d.id,
-      key: d.key,
-      pillar: d.pillar,
-      subFactor: d.subFactor,
-      weightWithinSubFactor: parseFloat(String(d.weightWithinSubFactor)),
-      scoringRubricJsonb: d.scoringRubricJsonb as import('@gtmi/scoring').CategoricalRubric | null,
-      normalizationFn: d.normalizationFn as import('@gtmi/scoring').NormalizationFn,
-      direction: d.direction as import('@gtmi/scoring').Direction,
-    })),
-    normalizationParams: NORMALIZATION_PARAMS,
-    activeFieldKeys: ACTIVE_FIELD_CODES,
-  };
-
-  // Print which fields will be scored
-  const approvedDefIds = new Set(approvedFVs.map((fv) => fv.fieldDefinitionId));
-  const scoredDefs = allDefs.filter((d) => approvedDefIds.has(d.id));
-  console.log('\nFields being scored:');
-  for (const d of scoredDefs) {
-    const fv = approvedFVs.find((fv) => fv.fieldDefinitionId === d.id);
-    console.log(
-      `  ${d.key.padEnd(8)} ${d.normalizationFn.padEnd(12)} → normalized: ${JSON.stringify(fv?.valueNormalized)}`
-    );
-  }
-
-  // --- 7. Run scoring engine ---
-  console.log('\nRunning scoring engine...');
-  let output;
-  try {
-    output = runScoringEngine(input);
-  } catch (err) {
-    console.error('\nScoring engine error:', err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  }
-
-  // --- 8. Print results ---
+  // Console output preserves the legacy CLI shape so existing analyst
+  // muscle memory + log-grep recipes keep working.
+  console.log(`Methodology: (${r.methodologyVersionId})`);
   console.log('\n' + '='.repeat(60));
   console.log('SCORING RESULTS');
   console.log('='.repeat(60));
-  console.log(`PAQ Score:        ${output.paqScore.toFixed(2)}`);
-  console.log(`CME Score:        ${output.cmeScore.toFixed(2)}`);
-  console.log(`Composite Score:  ${output.compositeScore.toFixed(2)}`);
+  console.log(`PAQ Score:        ${r.engine.paqScore.toFixed(2)}`);
+  console.log(`CME Score:        ${r.engine.cmeScore.toFixed(2)}`);
+  console.log(`Composite Score:  ${r.engine.compositeScore.toFixed(2)}`);
   console.log(
-    `Coverage:         ${output.populatedFieldCount}/${output.activeFieldCount} Wave-1 fields (${((output.populatedFieldCount / Math.max(1, output.activeFieldCount)) * 100).toFixed(1)}%)`
+    `Coverage:         ${r.engine.populatedFieldCount}/${r.engine.activeFieldCount} active fields ` +
+      `(${((r.engine.populatedFieldCount / Math.max(1, r.engine.activeFieldCount)) * 100).toFixed(1)}%)`
   );
-  console.log(`Flagged (insufficient disclosure): ${output.flaggedInsufficientDisclosure}`);
+  console.log(`Flagged (insufficient disclosure): ${r.engine.flaggedInsufficientDisclosure}`);
+
   console.log('\nData coverage by pillar:');
-  for (const [pillar, coverage] of Object.entries(output.dataCoverageByPillar)) {
+  for (const [pillar, coverage] of Object.entries(r.engine.dataCoverageByPillar)) {
     const pct = (coverage * 100).toFixed(0);
     const bar = '█'.repeat(Math.round(coverage * 20)).padEnd(20, '░');
     console.log(`  ${pillar}: ${bar} ${pct}%`);
   }
+
   console.log('\nPillar scores:');
-  for (const [pillar, score] of Object.entries(output.pillarScores)) {
+  for (const [pillar, score] of Object.entries(r.engine.pillarScores)) {
     console.log(`  ${pillar}: ${score.toFixed(2)}`);
   }
 
-  // --- 9. Write to scores table ---
-  const coveragePct = (output.populatedFieldCount / Math.max(1, output.activeFieldCount)) * 100;
-  const metadata = {
-    phase2Placeholder: true,
-    placeholderReason:
-      'NORMALIZATION_PARAMS are engineer-chosen ranges, not calibrated from real distribution data. Do not publish publicly.',
-    activeFieldCodes: ACTIVE_FIELD_CODES,
-    activeFieldCount: output.activeFieldCount,
-    populatedFieldCount: output.populatedFieldCount,
-  };
+  console.log(`\nWritten to scores table — id: ${r.scoresRowId ?? '(no row id returned)'}`);
 
-  const inserted = await db
-    .insert(scores)
-    .values({
-      programId,
-      methodologyVersionId: mv.id,
-      scoredAt: output.scoredAt,
-      cmeScore: String(output.cmeScore),
-      paqScore: String(output.paqScore),
-      compositeScore: String(output.compositeScore),
-      pillarScores: output.pillarScores,
-      subFactorScores: output.subFactorScores,
-      dataCoveragePct: coveragePct.toFixed(2),
-      flaggedInsufficientDisclosure: output.flaggedInsufficientDisclosure,
-      metadata,
-    })
-    .onConflictDoUpdate({
-      target: [scores.programId, scores.methodologyVersionId],
-      set: {
-        scoredAt: output.scoredAt,
-        cmeScore: String(output.cmeScore),
-        paqScore: String(output.paqScore),
-        compositeScore: String(output.compositeScore),
-        pillarScores: output.pillarScores,
-        subFactorScores: output.subFactorScores,
-        dataCoveragePct: coveragePct.toFixed(2),
-        flaggedInsufficientDisclosure: output.flaggedInsufficientDisclosure,
-        metadata,
-      },
-    })
-    .returning({ id: scores.id });
-
-  console.log(`\nWritten to scores table — id: ${inserted[0]?.id}`);
-  if (output.flaggedInsufficientDisclosure) {
+  if (r.engine.flaggedInsufficientDisclosure) {
     console.log(
       '\n⚠  FLAGGED: insufficient disclosure (data coverage < 70% in one or more pillars)'
     );
     console.log(
-      '   This is expected for Phase 2 with a single program and partial field coverage.'
+      '   This is expected for partial coverage; scores are deterministic and repeatable — engine is working correctly.'
     );
-    console.log('   Scores are deterministic and repeatable — engine is working correctly.');
   }
 }
 
