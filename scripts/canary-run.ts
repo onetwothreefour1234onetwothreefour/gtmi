@@ -68,22 +68,86 @@ const TIER2_FALLBACK_CONFIDENCE_CAP = 0.85;
 // Set PHASE3_VDEM_ENABLED=false to disable for staged rollouts.
 const PHASE3_VDEM_ENABLED = process.env['PHASE3_VDEM_ENABLED'] !== 'false';
 
-// Phase 3.6.2 / ITEM 3 — targeted precision re-run mode.
-// When 'true': compute missing fields, pass them as a precision brief
-// to Stage 0, exclude ALL registry URLs (not just top 20), filter
-// extraction to only the missing fields. Cheaper than full canary when
-// coverage is already ≥42/48.
-const PHASE3_TARGETED_RERUN = process.env['PHASE3_TARGETED_RERUN'] === 'true';
+// Phase 3.6.2 / ITEM 3 — legacy targeted precision re-run env flag.
+// Phase 3.9 / W12 — superseded by `--mode narrow`. Both still honoured;
+// the env var is treated as an alias for narrow mode.
+const PHASE3_TARGETED_RERUN_ENV = process.env['PHASE3_TARGETED_RERUN'] === 'true';
+
+// Phase 3.9 / W12 — surgical re-run modes.
+//
+//   full           = default. live Stage 0 + scrape every merged URL +
+//                    extract every active field.
+//   discover-only  = live Stage 0 only. No scrape, no extract. Refreshes
+//                    the registry + telemetry.
+//   narrow         = no Stage 0 (registry + field-proven URLs only).
+//                    Extract only the field set still missing from
+//                    field_values. Equivalent to legacy
+//                    PHASE3_TARGETED_RERUN=true.
+//   gate-failed    = no Stage 0. Extract only fields whose existing
+//                    field_values row carries a normalizationError or
+//                    is otherwise gate-flagged in pending_review state.
+//   rubric-changed = no Stage 0. Extract only fields whose
+//                    field_definitions row was modified after the row's
+//                    last extracted_at — the prompt vocabulary moved.
+//   field          = explicit --field A.1.1,B.2.1. Extract only those.
+type CanaryMode = 'full' | 'discover-only' | 'narrow' | 'gate-failed' | 'rubric-changed' | 'field';
+
+const VALID_MODES: ReadonlySet<CanaryMode> = new Set([
+  'full',
+  'discover-only',
+  'narrow',
+  'gate-failed',
+  'rubric-changed',
+  'field',
+]);
 
 async function main() {
   const countryArgIdx = process.argv.indexOf('--country');
   const countryArg = countryArgIdx !== -1 ? process.argv[countryArgIdx + 1] : undefined;
   if (!countryArg || countryArg.length !== 3) {
-    throw new Error('Usage: canary-run.ts --country <ISO3> [--programId <uuid>]');
+    throw new Error('Usage: canary-run.ts --country <ISO3> [--programId <uuid>] [--mode <mode>]');
   }
 
   const programIdArgIdx = process.argv.indexOf('--programId');
   const programIdArg = programIdArgIdx !== -1 ? process.argv[programIdArgIdx + 1] : undefined;
+
+  // Phase 3.9 / W12 — mode + field-list parsing.
+  const modeArgIdx = process.argv.indexOf('--mode');
+  const modeArgRaw = modeArgIdx !== -1 ? process.argv[modeArgIdx + 1] : undefined;
+  let mode: CanaryMode = 'full';
+  if (modeArgRaw) {
+    if (!VALID_MODES.has(modeArgRaw as CanaryMode)) {
+      throw new Error(
+        `--mode "${modeArgRaw}" not recognised. Valid: ${[...VALID_MODES].join(', ')}`
+      );
+    }
+    mode = modeArgRaw as CanaryMode;
+  } else if (PHASE3_TARGETED_RERUN_ENV) {
+    // Backwards-compat: env var maps to narrow mode.
+    mode = 'narrow';
+  }
+
+  const fieldArgIdx = process.argv.indexOf('--field');
+  const fieldArg = fieldArgIdx !== -1 ? process.argv[fieldArgIdx + 1] : undefined;
+  const explicitFieldKeys =
+    fieldArg && fieldArg.trim().length > 0
+      ? fieldArg
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+      : [];
+  if (mode === 'field' && explicitFieldKeys.length === 0) {
+    throw new Error('--mode field requires --field <comma-separated keys>');
+  }
+
+  console.log(
+    `[Canary mode] ${mode}${mode === 'field' ? ` (${explicitFieldKeys.join(',')})` : ''}`
+  );
+
+  // narrow + targeted_rerun share the same env-flag-based code path
+  // already in place below; keep PHASE3_TARGETED_RERUN derived from
+  // the resolved mode so all the existing branches still trigger.
+  const PHASE3_TARGETED_RERUN = mode === 'narrow';
 
   // --- Shared: load field definitions + wave filter ---
   let allFieldDefs = await db.select().from(fieldDefinitions);
@@ -281,6 +345,16 @@ async function main() {
     );
     console.log(`Stage 0 complete: ${discoveryResult.discoveredUrls.length} URLs discovered`);
 
+    // Phase 3.9 / W12 — `discover-only` short-circuit. Stage 0 has
+    // already persisted to sources (ADR-015) and written telemetry
+    // (W8) inside discover.ts. Nothing more to do for this mode.
+    if (mode === 'discover-only') {
+      console.log(
+        `[Mode discover-only] skipping Stage 1 + Stage 2 for ${programName} (registry + telemetry refreshed)`
+      );
+      continue;
+    }
+
     // Phase 3.6 / ADR-015 — merge fresh Stage 0 results with the
     // sources-table registry from prior runs. Self-improving discovery:
     // every successful run grows the registry monotonically; subsequent
@@ -322,6 +396,61 @@ async function main() {
       : ((presentKeysRows as unknown as { rows?: { key: string }[] }).rows ?? []);
     const presentKeys = new Set((presentKeysIter as { key: string }[]).map((r) => r.key));
     const missingFieldKeys = allFieldDefs.map((d) => d.key).filter((k) => !presentKeys.has(k));
+
+    // Phase 3.9 / W12 — surgical re-run filtering. Compute the
+    // mode-specific field set that drives both the precision brief
+    // (Stage 0 hint) and the LLM extraction filter. Only `narrow` and
+    // the gate-failed / rubric-changed / field modes restrict the
+    // field set; full re-runs use ACTIVE_FIELD_CODES unchanged.
+    let modeFieldSet: Set<string> | null = null;
+    if (mode === 'narrow') {
+      modeFieldSet = new Set(missingFieldKeys);
+    } else if (mode === 'gate-failed') {
+      const rows = await db.execute<{ key: string }>(sql`
+        SELECT fd.key
+        FROM field_values fv
+        JOIN field_definitions fd ON fd.id = fv.field_definition_id
+        WHERE fv.program_id = ${programId}
+          AND fv.status = 'pending_review'
+          AND fv.provenance ? 'normalizationError'
+          AND (fv.provenance->>'normalizationError') IS NOT NULL
+      `);
+      const iter = Array.isArray(rows)
+        ? rows
+        : ((rows as unknown as { rows?: { key: string }[] }).rows ?? []);
+      modeFieldSet = new Set((iter as { key: string }[]).map((r) => r.key));
+      console.log(`[Mode gate-failed] re-extracting ${modeFieldSet.size} fields with gate flags`);
+    } else if (mode === 'rubric-changed') {
+      // Re-extract fields where the published attempt's prompt id no
+      // longer equals the field_definitions current_prompt_id (the
+      // analyst rotated the prompt; existing values are stale).
+      const rows = await db.execute<{ key: string }>(sql`
+        SELECT DISTINCT fd.key
+        FROM extraction_attempts ea
+        JOIN field_definitions fd ON fd.id = ea.field_definition_id
+        WHERE ea.program_id = ${programId}
+          AND ea.was_published = TRUE
+          AND fd.current_prompt_id IS NOT NULL
+          AND ea.extraction_prompt_id IS DISTINCT FROM fd.current_prompt_id
+      `);
+      const iter = Array.isArray(rows)
+        ? rows
+        : ((rows as unknown as { rows?: { key: string }[] }).rows ?? []);
+      modeFieldSet = new Set((iter as { key: string }[]).map((r) => r.key));
+      console.log(
+        `[Mode rubric-changed] re-extracting ${modeFieldSet.size} fields whose prompt has rotated`
+      );
+    } else if (mode === 'field') {
+      modeFieldSet = new Set(explicitFieldKeys);
+      console.log(`[Mode field] re-extracting ${modeFieldSet.size} explicit fields`);
+    }
+
+    if (modeFieldSet && modeFieldSet.size === 0) {
+      console.log(
+        `[Canary mode ${mode}] no fields to re-extract for program ${programId} — exiting cleanly`
+      );
+      continue;
+    }
 
     // Phase 3.7 / ADR-018 — same-programme field-level proven URLs are
     // the highest-priority pre-load. The URL has already produced a
@@ -438,7 +567,10 @@ async function main() {
       'D.1.3',
       'D.1.4',
     ]);
-    const targetedMissingSet = PHASE3_TARGETED_RERUN ? new Set(missingFieldKeys) : null;
+    // Phase 3.9 / W12 — modeFieldSet supersedes the legacy
+    // targetedMissingSet. Both `narrow` and the gate-failed /
+    // rubric-changed / field modes restrict the LLM batch.
+    const targetedMissingSet = modeFieldSet;
     const llmFields: FieldSpec[] = allFieldDefs
       .filter(
         (d) =>
@@ -448,10 +580,8 @@ async function main() {
           (targetedMissingSet === null || targetedMissingSet.has(d.key))
       )
       .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd, label: d.label }));
-    if (PHASE3_TARGETED_RERUN) {
-      console.log(
-        `[Targeted re-run] LLM extraction filtered to ${llmFields.length} missing field(s)`
-      );
+    if (targetedMissingSet) {
+      console.log(`[Mode ${mode}] LLM extraction filtered to ${llmFields.length} field(s)`);
     }
 
     let fieldsExtracted = 0;
