@@ -444,7 +444,20 @@ After 3.1–3.5, expected per-programme coverage **42–44/48** (43 average). Ga
 - ✅ `<RescoreCohortDialog>` copy updated. Composite-NOT-touched caveat removed; confirmation that composite + per-pillar are refreshed via the same `runScoringEngine` path the CLI uses.
 - ✅ `revalidatePath` calls cover `/`, `/programs/[id]`, `/countries/[iso]`, `/review`.
 
-**Trade-off accepted:** `scripts/run-paq-score.ts` is NOT refactored to delegate. Putting the helper in a place both the CLI and apps/web could import would either break `@gtmi/scoring`'s purity (by adding `@gtmi/db`) or require a new package for ~80 lines. Both worse than the duplication. The CLI and the web button share the actual scoring logic (`runScoringEngine` + `PHASE2_PLACEHOLDER_PARAMS`); the duplicated piece is the DB I/O around it.
+**Trade-off accepted:** `scripts/run-paq-score.ts` is NOT refactored to delegate. ~~Putting the helper in a place both the CLI and apps/web could import would either break `@gtmi/scoring`'s purity (by adding `@gtmi/db`) or require a new package for ~80 lines. Both worse than the duplication.~~ **Closed by ADR-022 below** — a third caller (canary auto-rescore) tipped the trade-off; the helper now lives in `@gtmi/extraction` and all three callers delegate to it.
+
+### Phase 3.8 follow-up — auto-rescore after canary (ADR-022) — ✅ COMPLETE
+
+**Goal:** make the canary self-sufficient. Live observation 2026-04-30 surfaced that a fresh scrape + extraction would not refresh the public dashboard's composite + per-pillar until the analyst manually clicked "Re-score cohort". The canary now triggers the same composite refresh automatically.
+
+- ✅ `scoreProgramFromDb` consolidated into `packages/extraction/src/utils/score-program.ts` (was `apps/web/lib/score-program.ts`). Re-exported from `@gtmi/extraction`. `apps/web` adds `@gtmi/extraction` as a workspace dep.
+- ✅ `scripts/run-paq-score.ts` delegates — CLI shrinks from ~270 lines to ~115; orchestration body deduped.
+- ✅ `scripts/canary-run.ts` and `jobs/src/jobs/extract-single-program.ts` (Trigger.dev twin) call `scoreProgramFromDb` after the per-target summary table; failure swallowed + logged so a low-coverage canary still completes.
+- ✅ Trigger.dev `PipelineResult` interface gains a `composite: {...} | null` field so consumers can read the new numbers off the job result.
+
+**No cache busting needed** from the script callers — public routes are `force-dynamic` and re-read on each request. The web button path keeps its explicit `revalidatePath` calls (needed inside Next.js request handlers).
+
+**Out of scope (deferred):** Trigger.dev fallback for `rescoreCohort`; programme-level re-score button on `/review/[id]`; `methodologyVersionId` "current" flag for multi-version setups.
 
 ---
 
