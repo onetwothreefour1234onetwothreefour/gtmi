@@ -112,3 +112,28 @@ describe('buildUserMessage cross-departmental hint', () => {
     expect(msg).toContain('PRECISION BRIEF');
   });
 });
+
+describe('buildUserMessage native-language acceptance (W4)', () => {
+  it('renders the NATIVE-LANGUAGE ACCEPTANCE block for JPN', () => {
+    const msg = buildUserMessage('HSP Visa', 'JPN');
+    expect(msg).toContain('NATIVE-LANGUAGE ACCEPTANCE');
+    expect(msg).toContain('Japanese');
+    expect(msg).toContain('ja)');
+  });
+
+  it('renders the block for NLD with Dutch', () => {
+    const msg = buildUserMessage('HSM Permit', 'NLD');
+    expect(msg).toContain('Dutch');
+    expect(msg).toContain('downstream pipeline will translate it to English');
+  });
+
+  it('omits the block for English-canonical AUS', () => {
+    const msg = buildUserMessage('Skills in Demand 482', 'AUS');
+    expect(msg).not.toContain('NATIVE-LANGUAGE ACCEPTANCE');
+  });
+
+  it('omits the block for unmapped countries', () => {
+    const msg = buildUserMessage('Visa', 'XYZ');
+    expect(msg).not.toContain('NATIVE-LANGUAGE ACCEPTANCE');
+  });
+});

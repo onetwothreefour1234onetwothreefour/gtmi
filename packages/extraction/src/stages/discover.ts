@@ -5,7 +5,27 @@ import { sql } from 'drizzle-orm';
 import type { DiscoveredUrl, DiscoveryResult } from '../types/extraction';
 import type { DiscoverStage } from '../types/pipeline';
 import { loadProgramSourcesAsDiscovered } from '../utils/url-merge';
-import { renderCountryDepartmentsHint } from '../data/country-departments';
+import { getCountryDepartments, renderCountryDepartmentsHint } from '../data/country-departments';
+
+// Phase 3.9 / W4 — minimal ISO 639-1 → human-readable label map for the
+// cohort's non-English government languages. Used inline in the Stage 0
+// prompt so Perplexity can be told the local language explicitly when
+// no English equivalent exists.
+const LANGUAGE_LABELS: Record<string, string> = {
+  ja: 'Japanese',
+  nl: 'Dutch',
+  de: 'German',
+  fr: 'French',
+  es: 'Spanish',
+  ar: 'Arabic',
+  zh: 'Chinese (Traditional)',
+  is: 'Icelandic',
+  no: 'Norwegian',
+  sv: 'Swedish',
+  fi: 'Finnish',
+  et: 'Estonian',
+  lt: 'Lithuanian',
+};
 
 const DISCOVERY_CACHE_TTL_DAYS = 7;
 
@@ -31,6 +51,25 @@ export function buildUserMessage(
   // in COUNTRY_DEPARTMENTS (graceful fall-through).
   const countryDeptHint = renderCountryDepartmentsHint(country);
   const countryDeptBlock = countryDeptHint ? `\n\n${countryDeptHint}\n\n` : '';
+
+  // Phase 3.9 / W4 — native-language acceptance. When the country has
+  // a non-English defaultLanguage, lift the EXCLUSIONS rule against
+  // non-English pages and tell Perplexity it MAY return native-language
+  // URLs when no English equivalent exists. Combined with W2 translation,
+  // the pipeline can reach pages that have no English version (NTA Japan,
+  // Belastingdienst tax-residency, KSA Arabic-side).
+  const dept = getCountryDepartments(country);
+  const localLangCode = dept?.defaultLanguage ?? null;
+  const localLangLabel = localLangCode ? (LANGUAGE_LABELS[localLangCode] ?? localLangCode) : null;
+  const nativeLanguageBlock = localLangCode
+    ? `\n\nNATIVE-LANGUAGE ACCEPTANCE — ${country}'s primary government language is ` +
+      `${localLangLabel} (ISO 639-1: ${localLangCode}). When a page has both an English ` +
+      `and a ${localLangLabel} version, prefer the English version. When a page has ONLY ` +
+      `a ${localLangLabel} version (common for tax-residency rules, gazette text, and ` +
+      `naturalisation forms), return the ${localLangLabel} URL — the downstream pipeline ` +
+      `will translate it to English. Do NOT skip a substantive ${localLangLabel}-only page ` +
+      `in favour of a thin English summary on a third-party site.\n\n`
+    : '';
   // Phase 3.6.1 / FIX 5 — exclusion block. Only emitted when the program
   // has registry entries from prior runs. Capped at 20 URLs by default;
   // Phase 3.6.2 / ITEM 3 lifts the cap when `excludeAllRegistry: true`
@@ -171,6 +210,7 @@ export function buildUserMessage(
     `(8) Do not include duplicate URLs, redirects, or pages that do not contain ` +
     `program-specific information.` +
     countryDeptBlock +
+    nativeLanguageBlock +
     exclusionBlock +
     precisionBrief
   );
