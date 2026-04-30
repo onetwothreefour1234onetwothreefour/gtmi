@@ -51,6 +51,7 @@ export { CountryHeader } from './country-header';
 export { CountryProgramsTable } from './country-programs-table';
 export { CountryRadar, type CountryRadarProgram } from './country-radar';
 export { TaxTreatmentCard } from './tax-treatment-card';
+export { CountriesGrid } from './countries-grid';
 
 // Phase 4-E — internal tools (review queue + changes audit).
 export { InternalBadge } from './internal-badge';
