@@ -517,6 +517,30 @@ export const validationCache = pgTable(
   ]
 );
 
+// Phase 3.9 / W2 — translation cache.
+// Memoises non-English-to-English translations of scrape markdown so
+// re-running the same scrape (or re-extracting from archive) does not
+// pay the translation LLM cost twice. Migration 00015.
+export const translationCache = pgTable(
+  'translation_cache',
+  {
+    cacheKey: text('cache_key').primaryKey(),
+    sourceLanguage: varchar('source_language', { length: 8 }).notNull(),
+    translationVersion: varchar('translation_version', { length: 32 }).notNull(),
+    sourceContentHash: text('source_content_hash').notNull(),
+    translatedText: text('translated_text').notNull(),
+    translatedAt: timestamp('translated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  () => [
+    pgPolicy('Team members can write translation_cache', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+  ]
+);
+
 // 18. crosscheck_cache
 export const crosscheckCache = pgTable(
   'crosscheck_cache',

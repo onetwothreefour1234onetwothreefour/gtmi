@@ -78,6 +78,14 @@ export interface PendingProvenanceContext {
    * survives independent of the live URL.
    */
   archivePath?: string;
+  /**
+   * Phase 3.9 / W2 — translation provenance. When the winning scrape
+   * was translated from a non-English source, these carry through to
+   * the pending_review row so /review surfaces the "Translated from
+   * {lang}" verification banner.
+   */
+  translatedFrom?: string;
+  translationVersion?: string;
 }
 
 export interface HumanReviewStage {

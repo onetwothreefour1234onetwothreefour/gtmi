@@ -255,6 +255,25 @@ export function ProvenanceDrawer({
               </div>
             </article>
 
+            {/* Phase 3.9 / W2 — translation banner */}
+            {p.translatedFrom && (
+              <aside
+                className="mt-4 border bg-paper-2 px-3 py-2 text-data-sm"
+                style={{ borderColor: 'var(--rule)' }}
+                data-testid="provenance-drawer-translation-banner"
+                role="note"
+              >
+                <p className="font-medium text-ink-3">
+                  Translated from {p.translatedFrom.toUpperCase()}
+                </p>
+                <p className="mt-1 text-ink-4">
+                  The source page was rendered in {p.translatedFrom.toUpperCase()} and
+                  auto-translated to English before extraction. Verify the source sentence against
+                  the original-language page when reviewing.
+                </p>
+              </aside>
+            )}
+
             {/* Tier 2 advisory note */}
             {p.sourceTier === 2 && (
               <aside

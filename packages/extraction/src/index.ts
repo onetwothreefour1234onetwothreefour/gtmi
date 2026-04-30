@@ -111,6 +111,14 @@ export {
   getCurrentPromptId,
 } from './utils/attempts';
 export type { RecordAttemptInput } from './utils/attempts';
+// Phase 3.9 / W2 — translation pipeline.
+export {
+  TRANSLATION_VERSION,
+  looksLikeNonEnglish,
+  getCountryDefaultLanguage,
+  translateIfNeeded,
+} from './utils/translate';
+export type { TranslateResult } from './utils/translate';
 export { scoreProgramFromDb } from './utils/score-program';
 export type { ScoreProgramOptions, ScoreProgramResult } from './utils/score-program';
 

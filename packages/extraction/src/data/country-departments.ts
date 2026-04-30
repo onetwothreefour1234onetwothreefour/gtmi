@@ -39,6 +39,15 @@ export interface CountryDepartments {
   educationAuthority?: string;
   /** Official gazette / legislation portal (the Act underlying the visa). */
   gazette?: string;
+  /**
+   * Phase 3.9 / W2 — ISO 639-1 default language for the country's
+   * non-English government pages. When a scrape returns >50% non-ASCII
+   * content, the translation pipeline uses this code to drive the
+   * Claude translation prompt. Omit for predominantly-English countries
+   * (AUS, GBR, USA, NZL, IRL, SGP, HKG, MYS — government English is
+   * the canonical version).
+   */
+  defaultLanguage?: string;
 }
 
 export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
@@ -81,6 +90,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'rijksoverheid.nl',
     educationAuthority: 'duo.nl',
     gazette: 'wetten.overheid.nl',
+    defaultLanguage: 'nl',
   },
   JPN: {
     iso3: 'JPN',
@@ -91,6 +101,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'mhlw.go.jp',
     educationAuthority: 'mext.go.jp',
     gazette: 'kanpou.npb.go.jp',
+    defaultLanguage: 'ja',
   },
   GBR: {
     iso3: 'GBR',
@@ -111,6 +122,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'bag.admin.ch',
     educationAuthority: 'sbfi.admin.ch',
     gazette: 'fedlex.admin.ch',
+    defaultLanguage: 'de',
   },
   IRL: {
     iso3: 'IRL',
@@ -131,6 +143,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'cns.lu',
     educationAuthority: 'men.public.lu',
     gazette: 'legilux.public.lu',
+    defaultLanguage: 'fr',
   },
   ISL: {
     iso3: 'ISL',
@@ -141,6 +154,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'sjukra.is',
     educationAuthority: 'mrn.is',
     gazette: 'althingi.is',
+    defaultLanguage: 'is',
   },
   DEU: {
     iso3: 'DEU',
@@ -151,6 +165,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'bundesgesundheitsministerium.de',
     educationAuthority: 'bmbf.de',
     gazette: 'gesetze-im-internet.de',
+    defaultLanguage: 'de',
   },
   SWE: {
     iso3: 'SWE',
@@ -161,6 +176,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'socialstyrelsen.se',
     educationAuthority: 'skolverket.se',
     gazette: 'riksdagen.se',
+    defaultLanguage: 'sv',
   },
   BEL: {
     iso3: 'BEL',
@@ -171,6 +187,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'inami.fgov.be',
     educationAuthority: 'enseignement.be',
     gazette: 'ejustice.just.fgov.be',
+    defaultLanguage: 'nl',
   },
   AUT: {
     iso3: 'AUT',
@@ -181,6 +198,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'sozialministerium.at',
     educationAuthority: 'bmbwf.gv.at',
     gazette: 'ris.bka.gv.at',
+    defaultLanguage: 'de',
   },
   ARE: {
     iso3: 'ARE',
@@ -201,6 +219,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'helsenorge.no',
     educationAuthority: 'udir.no',
     gazette: 'lovdata.no',
+    defaultLanguage: 'no',
   },
   TWN: {
     iso3: 'TWN',
@@ -211,6 +230,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'mohw.gov.tw',
     educationAuthority: 'edu.tw',
     gazette: 'law.moj.gov.tw',
+    defaultLanguage: 'zh',
   },
   LTU: {
     iso3: 'LTU',
@@ -221,6 +241,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'sam.lrv.lt',
     educationAuthority: 'smm.lrv.lt',
     gazette: 'e-tar.lt',
+    defaultLanguage: 'lt',
   },
   USA: {
     iso3: 'USA',
@@ -241,6 +262,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'kela.fi',
     educationAuthority: 'minedu.fi',
     gazette: 'finlex.fi',
+    defaultLanguage: 'fi',
   },
   HKG: {
     iso3: 'HKG',
@@ -271,6 +293,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'minsal.cl',
     educationAuthority: 'mineduc.cl',
     gazette: 'leychile.cl',
+    defaultLanguage: 'es',
   },
   SAU: {
     iso3: 'SAU',
@@ -281,6 +304,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'moh.gov.sa',
     educationAuthority: 'moe.gov.sa',
     gazette: 'laws.boe.gov.sa',
+    defaultLanguage: 'ar',
   },
   NAM: {
     iso3: 'NAM',
@@ -301,6 +325,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'ameli.fr',
     educationAuthority: 'education.gouv.fr',
     gazette: 'legifrance.gouv.fr',
+    defaultLanguage: 'fr',
   },
   EST: {
     iso3: 'EST',
@@ -311,6 +336,7 @@ export const COUNTRY_DEPARTMENTS: Record<string, CountryDepartments> = {
     healthAuthority: 'sm.ee',
     educationAuthority: 'hm.ee',
     gazette: 'riigiteataja.ee',
+    defaultLanguage: 'et',
   },
   NZL: {
     iso3: 'NZL',

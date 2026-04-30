@@ -5,6 +5,7 @@ import type { DiscoveredUrl, ScrapeResult } from '../types/extraction';
 import type { ScrapeStage } from '../types/pipeline';
 import { checkScrapeContent, MIN_VISIBLE_TEXT_LENGTH } from '../scrape-guards';
 import { archiveScrapeResult } from '../utils/archive';
+import { translateIfNeeded } from '../utils/translate';
 
 /**
  * Phase 3.9 / W0 — optional per-call context that enables archive
@@ -105,11 +106,42 @@ export class ScrapeStageImpl implements ScrapeStage {
       if (!first) await sleep(this.delayMs);
       first = false;
       const result = await this.scrapeOne(discovered, SCRAPER_URL);
+      // Phase 3.9 / W2 — translate non-English scrapes BEFORE archive
+      // so the archived markdown is the English version (extractable on
+      // re-runs without re-translating). Original is preserved on
+      // result.originalContentMarkdown for /review.
+      await this.maybeTranslate(result, context);
       await this.maybeArchive(result, context);
       results.push(result);
     }
 
     return results;
+  }
+
+  /**
+   * Phase 3.9 / W2 — best-effort translation. When ScrapeContext is
+   * provided AND the scrape's content looks non-English AND the
+   * country has a defaultLanguage in country-departments.ts, translate
+   * to English. Mutates the result so contentMarkdown becomes the
+   * translated text and originalContentMarkdown carries the source.
+   */
+  private async maybeTranslate(result: ScrapeResult, context?: ScrapeContext): Promise<void> {
+    if (!context || !context.countryIso) return;
+    if (result.contentMarkdown === '' || result.contentHash === '') return;
+    const translation = await translateIfNeeded({
+      content: result.contentMarkdown,
+      contentHash: result.contentHash,
+      countryIso3: context.countryIso,
+    });
+    if (translation.translated) {
+      console.log(
+        `  [Scrape] TRANSLATED ${result.url} from ${translation.sourceLanguage} (${result.contentMarkdown.length} → ${translation.text.length} chars)`
+      );
+      result.originalContentMarkdown = result.contentMarkdown;
+      result.contentMarkdown = translation.text;
+      result.translatedFrom = translation.sourceLanguage ?? undefined;
+      result.translationVersion = translation.translationVersion;
+    }
   }
 
   /**

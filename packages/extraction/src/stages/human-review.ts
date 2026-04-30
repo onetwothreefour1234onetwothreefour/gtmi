@@ -200,6 +200,14 @@ export class HumanReviewStageImpl implements HumanReviewStage {
       if (context.archivePath) {
         pendingProvenance.archivePath = context.archivePath;
       }
+      // Phase 3.9 / W2 — translation provenance lets /review render
+      // the "Translated from {lang}" banner.
+      if (context.translatedFrom) {
+        pendingProvenance.translatedFrom = context.translatedFrom;
+        if (context.translationVersion) {
+          pendingProvenance.translationVersion = context.translationVersion;
+        }
+      }
 
       // Insert or update pending_review row.
       const upserted = await db

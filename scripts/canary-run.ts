@@ -938,6 +938,15 @@ async function main() {
         // Phase 3.9 / W7 — let humanReview.enqueue propagate the
         // archive path through to field_values for queued rows.
         ...(winningScrape.archivePath ? { archivePath: winningScrape.archivePath } : {}),
+        // Phase 3.9 / W2 — translation provenance lets /review render
+        // the "Translated from {lang}" banner so the analyst knows to
+        // verify the source sentence against the original-language page.
+        ...(winningScrape.translatedFrom
+          ? {
+              translatedFrom: winningScrape.translatedFrom,
+              translationVersion: winningScrape.translationVersion,
+            }
+          : {}),
       };
 
       const isAutoApproved =
@@ -975,6 +984,13 @@ async function main() {
         // and the public detail drawer can fall back to a signed URL
         // when the live sourceUrl returns 404.
         ...(winningScrape.archivePath ? { archivePath: winningScrape.archivePath } : {}),
+        // Phase 3.9 / W2 — translation provenance.
+        ...(winningScrape.translatedFrom
+          ? {
+              translatedFrom: winningScrape.translatedFrom,
+              translationVersion: winningScrape.translationVersion,
+            }
+          : {}),
       };
 
       try {

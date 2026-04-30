@@ -40,6 +40,22 @@ export interface ScrapeResult {
    * of the re-check.
    */
   unchanged?: boolean;
+  /**
+   * Phase 3.9 / W2 — translation outputs. When the scrape was
+   * non-English and got translated:
+   *   - contentMarkdown is REPLACED with the translated English text
+   *     so the existing extract.ts windowing/matching path works
+   *     unchanged.
+   *   - originalContentMarkdown carries the source-language original
+   *     for /review verification.
+   *   - translatedFrom is the ISO 639-1 source code.
+   *   - translationVersion lets future re-extractions detect stale
+   *     translations and re-translate.
+   * Absent on English scrapes (the common case).
+   */
+  originalContentMarkdown?: string;
+  translatedFrom?: string;
+  translationVersion?: string;
 }
 
 export interface ExtractionInput {

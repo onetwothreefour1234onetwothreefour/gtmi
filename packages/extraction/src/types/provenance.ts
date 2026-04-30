@@ -37,4 +37,12 @@ export interface ProvenanceRecord {
    * derived-computation, world-bank-api-direct, v-dem-api-direct).
    */
   archivePath?: string;
+  /**
+   * Phase 3.9 / W2 — when the source page was translated before
+   * extraction, the ISO 639-1 source-language code (e.g. 'ja', 'nl').
+   * /review surfaces this so the analyst knows to verify the source
+   * sentence against the original-language page.
+   */
+  translatedFrom?: string;
+  translationVersion?: string;
 }

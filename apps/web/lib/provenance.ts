@@ -55,6 +55,15 @@ export interface ProvenanceOptionalFields {
    * sourceUrl returns 404. Null/undefined for legacy rows.
    */
   archivePath?: string;
+  /**
+   * Phase 3.9 / W2 — when the source page was translated to English
+   * before extraction, the ISO 639-1 source language code (e.g. 'ja',
+   * 'nl', 'de'). The provenance drawer renders a "Translated from
+   * {lang}" verification banner so analysts know to verify the source
+   * sentence against the original-language page.
+   */
+  translatedFrom?: string;
+  translationVersion?: string;
 }
 
 export type Provenance = ProvenanceCoreFields &
