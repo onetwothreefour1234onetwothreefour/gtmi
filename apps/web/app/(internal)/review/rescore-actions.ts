@@ -19,11 +19,31 @@
 // alongside `rescoreProgram` in the next commit.
 
 import { db, fieldDefinitions, fieldValues, programs } from '@gtmi/db';
+import { scoreProgramFromDb } from '@gtmi/extraction';
 import { PHASE2_PLACEHOLDER_PARAMS, scoreSingleIndicator } from '@gtmi/scoring';
 import type { FieldDefinitionRecord } from '@gtmi/scoring';
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
-import { scoreProgramFromDb } from '@gtmi/extraction';
+import { revalidatePath, revalidateTag } from 'next/cache';
+
+// Phase 3.8 — single-flight lock for the long-running cohort path.
+// Module-level Promise so concurrent invocations within the same
+// Cloud Run instance share one in-flight execution rather than
+// stacking. This prevents the failure mode that crashed rev
+// gtmi-web-00028-x7b: an analyst clicks "Re-score cohort" multiple
+// times while waiting; each click fires off a long async action; the
+// node process serves them concurrently and a stuck one starves the
+// instance of capacity for other routes (the `/` rankings page hit
+// the 60s Cloud Run timeout because the cohort rescore tied up the
+// event loop). Cross-instance protection (multiple Cloud Run replicas)
+// would require a DB-level advisory lock — out of scope today;
+// max-instances=5 makes simultaneous duplicate clicks unlikely
+// once each instance enforces single-flight.
+let inflightCohortRescore: Promise<{
+  programsRescored: number;
+  compositesRefreshed: number;
+  rowsRescored: number;
+  rowsSkipped: number;
+}> | null = null;
 
 interface FieldDefForRescore {
   id: string;
@@ -104,6 +124,11 @@ export async function rescoreFieldValue(id: string): Promise<{ score: number | n
     .set({ valueIndicatorScore: score === null ? null : String(score) })
     .where(eq(fieldValues.id, id));
 
+  // Phase 3.8 — invalidate the data cache (unstable_cache) in addition
+  // to the route cache. revalidatePath alone does NOT bust unstable_cache;
+  // without revalidateTag the public dashboard will keep serving stale
+  // composites for up to an hour after a rescore.
+  revalidateTag('programs:all');
   revalidatePath('/review');
   revalidatePath(`/review/${id}`);
   return { score };
@@ -249,6 +274,15 @@ export async function rescoreProgram(programId: string): Promise<RescoreProgramR
   );
 
   // Bust the cache on every public surface that reads from `scores`.
+  // Phase 3.8 — tag-based invalidation for the data cache. The query
+  // layer's unstable_cache wrappers carry these tags (programs:all on
+  // landing/rankings/cohort-stats/all-countries, program:<id> on the
+  // detail page, country:<iso> on the country page). revalidatePath
+  // alone busts only the route cache and leaves the data cache stale;
+  // without these calls the public dashboard sticks for up to 1h.
+  revalidateTag('programs:all');
+  revalidateTag(`program:${programId}`);
+  if (countryIso) revalidateTag(`country:${countryIso}`);
   revalidatePath('/review');
   revalidatePath(`/programs/${programId}`);
   revalidatePath('/');
@@ -273,6 +307,31 @@ export async function rescoreProgram(programId: string): Promise<RescoreProgramR
  * if cohort size grows past the Cloud Run request timeout.
  */
 export async function rescoreCohort(): Promise<{
+  programsRescored: number;
+  compositesRefreshed: number;
+  rowsRescored: number;
+  rowsSkipped: number;
+}> {
+  // Phase 3.8 — single-flight: if a cohort rescore is already running
+  // on this instance, the new caller awaits the SAME promise. The UI's
+  // confirm button has its own pending state but multiple browser
+  // tabs / page reloads can still re-trigger; this gate ensures only
+  // one execution per instance, regardless of how many clicks.
+  if (inflightCohortRescore) {
+    console.log('[rescoreCohort] joining in-flight execution (single-flight)');
+    return inflightCohortRescore;
+  }
+  inflightCohortRescore = (async () => {
+    try {
+      return await runRescoreCohort();
+    } finally {
+      inflightCohortRescore = null;
+    }
+  })();
+  return inflightCohortRescore;
+}
+
+async function runRescoreCohort(): Promise<{
   programsRescored: number;
   compositesRefreshed: number;
   rowsRescored: number;
@@ -312,6 +371,13 @@ export async function rescoreCohort(): Promise<{
   console.log(
     `[rescoreCohort] programmes=${programsRescored}/${allPrograms.length} composites=${compositesRefreshed} rescored=${rowsRescored} skipped=${rowsSkipped}`
   );
+  // Phase 3.8 — cohort-wide tag bust. rescoreProgram already busts each
+  // program/country tag during its inner loop; we re-issue the cohort
+  // tag here as a belt-and-braces in case any inner call threw before
+  // its revalidate ran (failures are caught and logged, the loop
+  // continues). 'programs:all' covers landing, rankings, cohort-stats,
+  // and all-countries.
+  revalidateTag('programs:all');
   revalidatePath('/review');
   revalidatePath('/');
   return { programsRescored, compositesRefreshed, rowsRescored, rowsSkipped };
