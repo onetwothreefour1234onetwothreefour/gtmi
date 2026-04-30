@@ -6,6 +6,13 @@
 # Triggers → `gtmi-web-main` (project gtmi-494008, region europe-west1).
 # Recreating the trigger? See docs/runbook.md.
 #
+# 2026-04-30 — webhook flake recovery: when Cloud Build's GitHub
+# fetcher caches a "Couldn't read commit" 503 on a fresh push, both
+# `gcloud builds triggers run` and `git push --force-with-lease` of an
+# empty commit fail to retrigger (empty commits don't match the
+# includedFiles filter; gcloud hits the same cached negative). The
+# reliable recovery is a one-character change to any file in scope.
+#
 # The trigger watches these globs only — a docs-only commit will NOT
 # fire a 6-minute Docker rebuild. Update both lists in lockstep when
 # adding a new build input:
