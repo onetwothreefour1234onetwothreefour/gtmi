@@ -9,6 +9,8 @@ export {
   PHASE_3_3_REWRITTEN_KEYS,
   PHASE_3_5_INDICATOR_RESTRUCTURES,
   PHASE_3_5_RESTRUCTURED_KEYS,
+  renderAllowedValues,
+  withRubricVocab,
 } from './seed/methodology-v2';
 export { RUBRIC_SCORES } from './seed/rubric-scores';
 export { TIER2_BACKFILL_ALLOWLIST } from './seed/tier2-allowlist';

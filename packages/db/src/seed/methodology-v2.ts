@@ -35,6 +35,52 @@ function withPreamble(extractionTask: string): string {
   return SHARED_PREAMBLE_PLUS_NEWLINES + extractionTask;
 }
 
+// ────────────────────────────────────────────────────────────────────
+// Phase 3.8 / P0.5 — generate the "Allowed values:" enumeration in the
+// extraction prompt directly from the field's rubric. Eliminates the
+// drift class where the prompt and the rubric disagree on vocabulary
+// (the C.3.2 / C.3.1 bug class). The generator is opt-in: existing
+// prompts that hand-roll the block keep working, but new prompts and
+// rewrites should use `renderAllowedValues` so the prompt and rubric
+// are mechanically tied.
+//
+// Usage:
+//   withRubricVocab('C.3.2', C32_REGIONAL_RUBRIC, `
+//     Extraction Task: C.3.2 — Public education access for children
+//     Question: ...
+//     {{ALLOWED_VALUES}}
+//     Edge cases: ...
+//   `)
+// ────────────────────────────────────────────────────────────────────
+
+interface CategoricalRubric {
+  categories: Array<{ value: string; score?: number; description?: string }>;
+}
+
+export function renderAllowedValues(rubric: CategoricalRubric): string {
+  const lines = rubric.categories.map((c) => {
+    const desc = c.description ? c.description : '';
+    return `"${c.value}": ${desc}`;
+  });
+  return ['Allowed values:', '', ...lines].join('\n');
+}
+
+const ALLOWED_VALUES_MARKER = '{{ALLOWED_VALUES}}';
+
+export function withRubricVocab(
+  key: string,
+  rubric: CategoricalRubric,
+  extractionTask: string
+): string {
+  if (!extractionTask.includes(ALLOWED_VALUES_MARKER)) {
+    throw new Error(
+      `withRubricVocab(${key}): prompt body is missing the ${ALLOWED_VALUES_MARKER} marker. Insert it where the "Allowed values:" block should render.`
+    );
+  }
+  const block = renderAllowedValues(rubric);
+  return SHARED_PREAMBLE_PLUS_NEWLINES + extractionTask.replace(ALLOWED_VALUES_MARKER, block);
+}
+
 /**
  * Phase 3.3 prompt overrides — keyed by indicator code. Only fields
  * classified LLM_MISS in baseline-gaps.csv with a clear, prompt-fixable
@@ -928,19 +974,17 @@ If the page mentions PR as a pathway endpoint but does NOT describe the retentio
     normalizationFn: 'country_substitute_regional',
     direction: 'higher_is_better',
     scoringRubricJsonb: C32_REGIONAL_RUBRIC,
-    // The prompt is unchanged from v1 — extraction still runs first; the
-    // country-substitute mechanism only fires at publish time IF
-    // extraction returns empty AND the country has a regional default.
-    extractionPromptMd: withPreamble(
+    // Phase 3.8 / P0.5 — first prompt rewritten to use the rubric-driven
+    // "Allowed values" generator. The {{ALLOWED_VALUES}} marker is
+    // replaced at build time with the C32_REGIONAL_RUBRIC categories,
+    // so prompt and rubric can never drift apart again.
+    extractionPromptMd: withRubricVocab(
+      'C.3.2',
+      C32_REGIONAL_RUBRIC,
       `Extraction Task: C.3.2 — Public education access for children of visa holders
 Question: Do children of this programme's visa holders have automatic access to the public education system (free schooling) on the same terms as citizen children?
 
-Allowed values:
-
-"automatic": yes, public-school enrolment available with no extra fees.
-"fee_paying": access available but fees apply (Gulf-style international school requirement).
-"restricted": case-by-case basis or local-authority approval.
-"none": children have no public-school access.
+{{ALLOWED_VALUES}}
 
 Edge cases:
 
