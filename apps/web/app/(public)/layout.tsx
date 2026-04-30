@@ -29,7 +29,7 @@ export default async function PublicLayout({ children }: { children: React.React
       >
         Skip to content
       </a>
-      <TopNav active="rankings" />
+      <TopNav />
       <main id="main" className="flex-1">
         {children}
       </main>

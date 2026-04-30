@@ -1,28 +1,76 @@
+'use client';
+
 import * as React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
+export type TopNavRoute =
+  | 'rankings'
+  | 'programs'
+  | 'countries'
+  | 'methodology'
+  | 'about'
+  | 'changes';
+
 export interface TopNavProps {
-  /** Active route id — drives the underline marker. */
-  active?: 'rankings' | 'programs' | 'countries' | 'methodology' | 'about' | 'changes';
+  /**
+   * Optional override for the active-route underline. When omitted (the
+   * default) the component derives the active route from the current
+   * pathname via `usePathname()` so every public page lights up the
+   * correct tab without the layout having to thread a prop down.
+   *
+   * Passing `active` explicitly is still supported for tests and any
+   * page that wants to force a specific tab (e.g. a 404 page that
+   * should keep "Rankings" highlighted).
+   */
+  active?: TopNavRoute;
   className?: string;
 }
 
-const ITEMS: { id: NonNullable<TopNavProps['active']>; label: string; href: string }[] = [
+const ITEMS: { id: TopNavRoute; label: string; href: string }[] = [
   { id: 'rankings', label: 'Rankings', href: '/' },
   { id: 'programs', label: 'Programmes', href: '/programs' },
-  { id: 'countries', label: 'Countries', href: '/programs' },
+  { id: 'countries', label: 'Countries', href: '/countries' },
   { id: 'methodology', label: 'Methodology', href: '/methodology' },
   { id: 'changes', label: 'Changes', href: '/changes' },
   { id: 'about', label: 'About', href: '/about' },
 ];
 
 /**
+ * Phase 3.8 / nav-highlight bug fix — derive the active route from
+ * the URL so every page underlines the correct tab without the
+ * layout having to pass an `active` prop. Returns null when the
+ * pathname is unknown / the user is on `/login`-style routes that
+ * shouldn't claim any nav tab.
+ */
+export function routeFromPathname(pathname: string | null): TopNavRoute | null {
+  if (!pathname) return null;
+  if (pathname === '/' || pathname === '') return 'rankings';
+  if (pathname === '/programs' || pathname.startsWith('/programs/')) return 'programs';
+  if (pathname === '/countries' || pathname.startsWith('/countries/')) return 'countries';
+  if (pathname === '/methodology' || pathname.startsWith('/methodology/')) return 'methodology';
+  if (pathname === '/changes' || pathname.startsWith('/changes/')) return 'changes';
+  if (pathname === '/about' || pathname.startsWith('/about/')) return 'about';
+  return null;
+}
+
+/**
  * Editorial top nav. Replaces the Phase 4.1 header in `(public)/layout.tsx`.
  * Translates docs/design/primitives.jsx:TopNav with the methodology
  * vocabulary (Q1 — pillar labels in copy, but the route names stay).
+ *
+ * Phase 3.8 / nav-highlight bug fix — `active` now defaults to
+ * deriving from `usePathname()` instead of always falling back to
+ * 'rankings'. Fixes the bug where every page under (public)/ kept
+ * Rankings underlined regardless of which tab the user was on.
+ *
+ * Also corrects the Countries link `href` from `/programs` (a
+ * pre-existing copy-paste typo) to `/countries`.
  */
-export function TopNav({ active = 'rankings', className }: TopNavProps) {
+export function TopNav({ active: activeOverride, className }: TopNavProps = {}) {
+  const pathname = usePathname();
+  const active = activeOverride ?? routeFromPathname(pathname);
   return (
     <nav
       aria-label="Primary"

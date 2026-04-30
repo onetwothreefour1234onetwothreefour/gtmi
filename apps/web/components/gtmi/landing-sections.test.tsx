@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { HeroLanding } from './hero-landing';
 import { ThisEdition } from './this-edition';
-import { TopNav } from './top-nav';
+import { TopNav, routeFromPathname } from './top-nav';
 import { GtmiFooter } from './gtmi-footer';
 import { PreviewBanner } from './preview-banner';
 import type { PolicyChangeRow } from '@/lib/queries/policy-changes';
@@ -101,14 +101,51 @@ describe('TopNav', () => {
     render(<TopNav />);
     expect(screen.getByText('Rankings')).toBeInTheDocument();
     expect(screen.getByText('Programmes')).toBeInTheDocument();
+    expect(screen.getByText('Countries')).toBeInTheDocument();
     expect(screen.getByText('Methodology')).toBeInTheDocument();
+    expect(screen.getByText('Changes')).toBeInTheDocument();
     expect(screen.getByText('About')).toBeInTheDocument();
   });
 
-  it('marks the active route with aria-current=page', () => {
+  it('Countries link points to /countries (not /programs — was a copy-paste typo)', () => {
+    render(<TopNav />);
+    const countriesLink = screen.getByText('Countries').closest('a');
+    expect(countriesLink).toHaveAttribute('href', '/countries');
+  });
+
+  it('marks the active route with aria-current=page when an explicit override is passed', () => {
     render(<TopNav active="methodology" />);
     expect(screen.getByText('Methodology')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText('Rankings')).not.toHaveAttribute('aria-current');
+  });
+});
+
+// Phase 3.8 / nav-highlight bug fix — pathname-based active detection.
+describe('routeFromPathname', () => {
+  it('maps the root pathname to rankings', () => {
+    expect(routeFromPathname('/')).toBe('rankings');
+  });
+
+  it('maps /programs and /programs/:id to programs', () => {
+    expect(routeFromPathname('/programs')).toBe('programs');
+    expect(routeFromPathname('/programs/abc-123')).toBe('programs');
+  });
+
+  it('maps /countries and /countries/:iso to countries', () => {
+    expect(routeFromPathname('/countries')).toBe('countries');
+    expect(routeFromPathname('/countries/CAN')).toBe('countries');
+  });
+
+  it('maps /methodology, /changes, /about to their tabs', () => {
+    expect(routeFromPathname('/methodology')).toBe('methodology');
+    expect(routeFromPathname('/changes')).toBe('changes');
+    expect(routeFromPathname('/about')).toBe('about');
+  });
+
+  it('returns null for unknown routes (e.g. /review on the public layout)', () => {
+    expect(routeFromPathname('/review')).toBeNull();
+    expect(routeFromPathname(null)).toBeNull();
+    expect(routeFromPathname('')).toBeNull();
   });
 });
 
