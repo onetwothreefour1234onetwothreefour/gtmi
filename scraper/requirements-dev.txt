@@ -1,0 +1,5 @@
+# Phase 3.9 / W17 — dev-only deps for the scraper test suite.
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+#
+# Production Cloud Run image installs requirements.txt only.
+pytest>=8.0,<9.0
