@@ -172,8 +172,15 @@ export const extractSingleProgram = task({
     );
 
     // --- Stage 1: Scrape discovered URLs + global country-level sources ---
+    // Phase 3.9 / W0 — pass programId/countryIso so successful scrapes
+    // are archived to GCS + scrape_history (mirrors canary-run.ts).
+    // Global / country-level scrapes (loop below) skip the archive
+    // because they aren't tied to a per-program sources row.
     const scrape = new ScrapeStageImpl();
-    const scrapeResults = await scrape.execute(mergedDiscoveredUrls);
+    const scrapeResults = await scrape.execute(mergedDiscoveredUrls, {
+      programId,
+      countryIso: country,
+    });
     console.log(`Stage 1 complete for ${programId}: ${scrapeResults.length} URLs scraped`);
 
     const applicableGlobalSources = COUNTRY_LEVEL_SOURCES.filter(

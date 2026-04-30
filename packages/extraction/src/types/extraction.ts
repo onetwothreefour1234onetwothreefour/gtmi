@@ -14,6 +14,16 @@ export interface ScrapeResult {
    * Not persisted — ephemeral observability only.
    */
   layer?: string;
+  /**
+   * Phase 3.9 / W0 — populated when the orchestrator passes a
+   * ScrapeContext with programId/countryIso. The archive write is
+   * non-fatal: if it fails (no GCS creds, source row missing, write
+   * collision), these stay undefined and downstream stages still run.
+   * Read by extract.ts to populate extraction_attempts.scrape_history_id
+   * and by publish.ts to populate field_values.archive_path.
+   */
+  scrapeHistoryId?: string;
+  archivePath?: string;
 }
 
 export interface ExtractionInput {

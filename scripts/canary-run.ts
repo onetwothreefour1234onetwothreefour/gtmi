@@ -359,10 +359,14 @@ async function main() {
     }
 
     // Phase 2: Stage 1 — scrape program-specific URLs
+    // Phase 3.9 / W0 — pass programId/countryIso so scrape.ts archives
+    // each successful scrape to GCS + scrape_history. Failures are
+    // non-fatal; result.scrapeHistoryId / result.archivePath are set
+    // when the archive write succeeds.
     const scrapeResults: ScrapeResult[] = [];
     for (const u of mergedDiscoveredUrls) {
       console.log(`  [Stage 1] Scraping: ${u.url}`);
-      const [result] = await scrape.execute([u]);
+      const [result] = await scrape.execute([u], { programId, countryIso });
       if (result) {
         scrapeResults.push(result);
         console.log(

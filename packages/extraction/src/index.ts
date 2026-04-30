@@ -88,7 +88,12 @@ export {
 } from './stages/extract';
 export { PublishStageImpl } from './stages/publish';
 export { ScrapeStageImpl } from './stages/scrape';
+export type { ScrapeContext } from './stages/scrape';
 export { ValidateStageImpl } from './stages/validate';
+// Phase 3.9 / W0 — archive helpers (used by scrape.ts; exported so
+// future callers can archive ad-hoc scrapes outside the canary loop).
+export { archiveScrapeResult, EXTRACTOR_VERSION } from './utils/archive';
+export type { ArchiveScrapeArgs, ArchiveScrapeResult } from './utils/archive';
 export { scoreProgramFromDb } from './utils/score-program';
 export type { ScoreProgramOptions, ScoreProgramResult } from './utils/score-program';
 

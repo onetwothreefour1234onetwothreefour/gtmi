@@ -4,6 +4,22 @@ import { and, eq, gt, sql } from 'drizzle-orm';
 import type { DiscoveredUrl, ScrapeResult } from '../types/extraction';
 import type { ScrapeStage } from '../types/pipeline';
 import { checkScrapeContent, MIN_VISIBLE_TEXT_LENGTH } from '../scrape-guards';
+import { archiveScrapeResult } from '../utils/archive';
+
+/**
+ * Phase 3.9 / W0 — optional per-call context that enables archive
+ * writes. When omitted, scrape.ts behaves exactly like Phase 3.8 (no
+ * archive write, no scrape_history row). When provided, every
+ * successful scrape is persisted to GCS + scrape_history; failures
+ * are non-fatal and only set scrapeHistoryId/archivePath when they
+ * succeed.
+ */
+export interface ScrapeContext {
+  programId?: string;
+  countryIso?: string;
+  /** Force-skip archive writes even when programId/countryIso are set. */
+  skipArchive?: boolean;
+}
 
 const MIN_VISIBLE_TEXT_LENGTH_LOG = MIN_VISIBLE_TEXT_LENGTH;
 
@@ -66,7 +82,7 @@ export class ScrapeStageImpl implements ScrapeStage {
     this.delayMs = options.delayMs ?? 1000;
   }
 
-  async execute(discoveredUrls: DiscoveredUrl[]): Promise<ScrapeResult[]> {
+  async execute(discoveredUrls: DiscoveredUrl[], context?: ScrapeContext): Promise<ScrapeResult[]> {
     const SCRAPER_URL = process.env['SCRAPER_URL'] ?? 'http://localhost:8765';
 
     try {
@@ -88,10 +104,32 @@ export class ScrapeStageImpl implements ScrapeStage {
     for (const discovered of discoveredUrls) {
       if (!first) await sleep(this.delayMs);
       first = false;
-      results.push(await this.scrapeOne(discovered, SCRAPER_URL));
+      const result = await this.scrapeOne(discovered, SCRAPER_URL);
+      await this.maybeArchive(result, context);
+      results.push(result);
     }
 
     return results;
+  }
+
+  /**
+   * Phase 3.9 / W0 — best-effort archive write. Mutates the result with
+   * scrapeHistoryId/archivePath on success; silent on failure (the
+   * archive helper logs its own warnings).
+   */
+  private async maybeArchive(result: ScrapeResult, context?: ScrapeContext): Promise<void> {
+    if (!context || context.skipArchive) return;
+    if (!context.programId || !context.countryIso) return;
+    if (result.contentMarkdown === '' || result.contentHash === '') return;
+    const archived = await archiveScrapeResult({
+      result,
+      programId: context.programId,
+      countryIso: context.countryIso,
+    });
+    if (archived) {
+      result.scrapeHistoryId = archived.scrapeHistoryId;
+      result.archivePath = archived.storagePath;
+    }
   }
 
   private async readScrapeCache(url: string): Promise<ScrapeResult | null> {
