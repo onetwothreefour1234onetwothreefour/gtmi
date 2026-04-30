@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "npx trigger.dev@latest dev",
-    "deploy": "npx trigger.dev@latest deploy",
+    "dev": "npx trigger.dev@3.3.17 dev",
+    "deploy": "npx trigger.dev@3.3.17 deploy",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
