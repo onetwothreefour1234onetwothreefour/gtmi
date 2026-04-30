@@ -7,6 +7,7 @@ import type { DiscoverStage } from '../types/pipeline';
 import { loadProgramSourcesAsDiscovered } from '../utils/url-merge';
 import { writeDiscoveryTelemetry } from '../utils/telemetry';
 import { getCountryDepartments, renderCountryDepartmentsHint } from '../data/country-departments';
+import { renderProgramDiscoveryHint } from '../data/program-discovery-hints';
 
 // Phase 3.9 / W4 — minimal ISO 639-1 → human-readable label map for the
 // cohort's non-English government languages. Used inline in the Stage 0
@@ -44,8 +45,21 @@ export function buildUserMessage(
   programName: string,
   country: string,
   existingUrls: string[] = [],
-  options: { excludeAllRegistry?: boolean; missingFieldLabels?: string[] } = {}
+  options: {
+    excludeAllRegistry?: boolean;
+    missingFieldLabels?: string[];
+    /**
+     * Phase 3.9 / W5 — when present, pulls a curated programme-specific
+     * hint from program-discovery-hints.ts and inlines it into the
+     * Stage 0 prompt. Empty string if no hint is registered.
+     */
+    programId?: string;
+  } = {}
 ): string {
+  // Phase 3.9 / W5 — programme-specific curated hint. Renders to the
+  // empty string for unmapped programmes (the common case), so this
+  // line is a no-op for the ~80% of the cohort that doesn't need one.
+  const programHintBlock = options.programId ? renderProgramDiscoveryHint(options.programId) : '';
   // Phase 3.9 / W3 — country-specific authority hostnames inlined so
   // Perplexity targets the right tax / citizenship / labour / stats
   // domains, not just immigration. Empty string when country is not
@@ -212,6 +226,7 @@ export function buildUserMessage(
     `program-specific information.` +
     countryDeptBlock +
     nativeLanguageBlock +
+    programHintBlock +
     exclusionBlock +
     precisionBrief
   );
@@ -439,7 +454,12 @@ export class DiscoverStageImpl implements DiscoverStage {
       existingUrls = [];
     }
 
-    const userMessage = buildUserMessage(programName, country, existingUrls, options);
+    // Phase 3.9 / W5 — pass programId so buildUserMessage can pull a
+    // curated programme-specific hint from program-discovery-hints.ts.
+    const userMessage = buildUserMessage(programName, country, existingUrls, {
+      ...options,
+      programId,
+    });
     const cacheKey = makeDiscoveryCacheKey(programId, SYSTEM_PROMPT, userMessage);
     const cachedUrls = await readDiscoveryCache(cacheKey);
     if (cachedUrls) {

@@ -146,5 +146,7 @@ export * from './data/country-pr-presence';
 export * from './data/country-pr-timeline';
 // Phase 3.9 / W3 — per-country cross-departmental authority registry.
 export * from './data/country-departments';
+// Phase 3.9 / W5 — per-program curated discovery hints.
+export * from './data/program-discovery-hints';
 // Phase 3.6.4 / FIX 1 — currency detection (with bare-$ country fallback).
 export { detectCurrency, BARE_DOLLAR_COUNTRY_FALLBACK } from './utils/currency';
