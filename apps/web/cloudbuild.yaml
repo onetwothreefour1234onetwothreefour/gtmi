@@ -68,7 +68,14 @@ steps:
       - '--port=8080'
       - '--memory=512Mi'
       - '--cpu=1'
-      - '--timeout=60'
+      # Phase 3.8 — bumped 60→300 so long-running cohort rescores
+      # (~30-60s steady state, occasional bursts to 2-3min when an
+      # entire cohort is recomputed) don't 504 the public landing
+      # page when they share an instance with a /review action.
+      # Combined with the rescore-actions.ts single-flight lock,
+      # this gives the engine enough headroom to drain without
+      # bricking other routes.
+      - '--timeout=300'
       - '--concurrency=80'
       - '--min-instances=0'
       - '--max-instances=5'
