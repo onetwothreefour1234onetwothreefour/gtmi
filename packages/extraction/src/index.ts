@@ -96,11 +96,14 @@ export { archiveScrapeResult, EXTRACTOR_VERSION } from './utils/archive';
 export type { ArchiveScrapeArgs, ArchiveScrapeResult } from './utils/archive';
 // Phase 3.9 / W9 — extraction_attempts history. Used by extract.ts for
 // per-batch recording and by publish.ts (commit 6) to flip wasPublished.
+// W13 — getCurrentPromptId surfaces the cached extraction_prompts.id
+// for callers that need to tag attempts explicitly.
 export {
   recordAttempt,
   recordAttempts,
   markAttemptPublished,
   clearFieldDefIdCache,
+  getCurrentPromptId,
 } from './utils/attempts';
 export type { RecordAttemptInput } from './utils/attempts';
 export { scoreProgramFromDb } from './utils/score-program';

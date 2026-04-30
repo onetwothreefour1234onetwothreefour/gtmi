@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { recordAttempts, recordAttempt, markAttemptPublished } from '../utils/attempts';
+import {
+  recordAttempts,
+  recordAttempt,
+  markAttemptPublished,
+  clearFieldDefIdCache,
+  getCurrentPromptId,
+} from '../utils/attempts';
+import * as barrel from '../index';
 
 // Pure surface-level tests: confirm the export shape + that empty-input
 // paths short-circuit cleanly without needing a DB. End-to-end behavior
@@ -12,18 +19,18 @@ describe('attempts API surface', () => {
     expect(n).toBe(0);
   });
 
-  it('recordAttempts is callable from the extraction package index', async () => {
-    // Import the same function via the package barrel to confirm the
-    // re-export from src/index.ts is wired up.
-    const mod = await import('../index');
-    expect(typeof mod.recordAttempts).toBe('function');
-    expect(typeof mod.recordAttempt).toBe('function');
-    expect(typeof mod.markAttemptPublished).toBe('function');
-    expect(typeof mod.clearFieldDefIdCache).toBe('function');
+  it('package barrel re-exports the attempts API', () => {
+    expect(typeof barrel.recordAttempts).toBe('function');
+    expect(typeof barrel.recordAttempt).toBe('function');
+    expect(typeof barrel.markAttemptPublished).toBe('function');
+    expect(typeof barrel.clearFieldDefIdCache).toBe('function');
+    expect(typeof barrel.getCurrentPromptId).toBe('function');
   });
 
   it('exposes the expected function shapes', () => {
     expect(typeof recordAttempt).toBe('function');
     expect(typeof markAttemptPublished).toBe('function');
+    expect(typeof clearFieldDefIdCache).toBe('function');
+    expect(typeof getCurrentPromptId).toBe('function');
   });
 });

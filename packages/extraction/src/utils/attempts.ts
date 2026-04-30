@@ -18,23 +18,56 @@ import type { ExtractionOutput } from '../types/extraction';
 /**
  * Per-process lookup cache. The 48 field_definitions rows fit comfortably
  * in memory; rebuilds on first miss. Cleared explicitly via clearFieldDefIdCache()
- * in tests.
+ * in tests. Phase 3.9 / W13 — also caches current_prompt_id so attempts
+ * recording can tag every row with the prompt version that produced it
+ * without an extra round-trip per attempt.
  */
-let _fieldDefIdCache: Map<string, string> | null = null;
+interface FieldDefCacheEntry {
+  fieldDefinitionId: string;
+  /** field_definitions.current_prompt_id — null if migration backfill hasn't run yet. */
+  currentPromptId: string | null;
+}
 
-async function getFieldDefIdCache(): Promise<Map<string, string>> {
+let _fieldDefIdCache: Map<string, FieldDefCacheEntry> | null = null;
+
+async function getFieldDefIdCache(): Promise<Map<string, FieldDefCacheEntry>> {
   if (_fieldDefIdCache !== null) return _fieldDefIdCache;
   const rows = await db
-    .select({ id: fieldDefinitions.id, key: fieldDefinitions.key })
+    .select({
+      id: fieldDefinitions.id,
+      key: fieldDefinitions.key,
+      currentPromptId: fieldDefinitions.currentPromptId,
+    })
     .from(fieldDefinitions);
-  const m = new Map<string, string>();
-  for (const r of rows) m.set(r.key, r.id);
+  const m = new Map<string, FieldDefCacheEntry>();
+  for (const r of rows) {
+    m.set(r.key, {
+      fieldDefinitionId: r.id,
+      currentPromptId: r.currentPromptId ?? null,
+    });
+  }
   _fieldDefIdCache = m;
   return m;
 }
 
 export function clearFieldDefIdCache(): void {
   _fieldDefIdCache = null;
+}
+
+/**
+ * Phase 3.9 / W13 — surface the cached promptId for a fieldKey, used
+ * by callers that want to tag attempts records explicitly (e.g.
+ * reextract-actions.ts which calls executeWithPrompt with a focused
+ * prompt and wants to record the BASE prompt id alongside the
+ * reextract reason).
+ */
+export async function getCurrentPromptId(fieldKey: string): Promise<string | null> {
+  try {
+    const cache = await getFieldDefIdCache();
+    return cache.get(fieldKey)?.currentPromptId ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export interface RecordAttemptInput {
@@ -68,26 +101,31 @@ export interface RecordAttemptInput {
  * null on any failure (logged at warn level; the caller continues).
  */
 export async function recordAttempt(input: RecordAttemptInput): Promise<string | null> {
-  let fieldDefinitionId: string | null = null;
+  let entry: FieldDefCacheEntry | null = null;
   try {
     const cache = await getFieldDefIdCache();
-    fieldDefinitionId = cache.get(input.fieldKey) ?? null;
+    entry = cache.get(input.fieldKey) ?? null;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[attempts] field_definitions lookup failed: ${msg}`);
     return null;
   }
-  if (fieldDefinitionId === null) {
+  if (entry === null) {
     console.warn(`[attempts] no field_definitions row for key=${input.fieldKey} — skipping`);
     return null;
   }
+
+  // W13 — when the caller supplies an explicit extractionPromptId
+  // (focused re-extraction with a one-off prompt), use it; otherwise
+  // default to the current prompt for the field.
+  const promptId = input.extractionPromptId ?? entry.currentPromptId;
 
   try {
     const inserted = await db
       .insert(extractionAttempts)
       .values({
         programId: input.programId,
-        fieldDefinitionId,
+        fieldDefinitionId: entry.fieldDefinitionId,
         sourceUrl: input.sourceUrl,
         scrapeHistoryId: input.scrapeHistoryId ?? null,
         contentHash: input.contentHash ?? null,
@@ -96,7 +134,7 @@ export async function recordAttempt(input: RecordAttemptInput): Promise<string |
         sourceSentence: input.output.sourceSentence === '' ? null : input.output.sourceSentence,
         characterOffsets: input.output.characterOffsets ?? null,
         extractionModel: input.output.extractionModel,
-        extractionPromptId: input.extractionPromptId ?? null,
+        extractionPromptId: promptId,
         extractionConfidence:
           typeof input.output.extractionConfidence === 'number'
             ? input.output.extractionConfidence.toFixed(2)
@@ -125,7 +163,7 @@ export async function recordAttempt(input: RecordAttemptInput): Promise<string |
 export async function recordAttempts(inputs: ReadonlyArray<RecordAttemptInput>): Promise<number> {
   if (inputs.length === 0) return 0;
 
-  let cache: Map<string, string>;
+  let cache: Map<string, FieldDefCacheEntry>;
   try {
     cache = await getFieldDefIdCache();
   } catch (err) {
@@ -136,14 +174,15 @@ export async function recordAttempts(inputs: ReadonlyArray<RecordAttemptInput>):
 
   const rows = inputs
     .map((input) => {
-      const fieldDefinitionId = cache.get(input.fieldKey);
-      if (!fieldDefinitionId) {
+      const entry = cache.get(input.fieldKey);
+      if (!entry) {
         console.warn(`[attempts] no field_definitions row for key=${input.fieldKey} — skipping`);
         return null;
       }
+      const promptId = input.extractionPromptId ?? entry.currentPromptId;
       return {
         programId: input.programId,
-        fieldDefinitionId,
+        fieldDefinitionId: entry.fieldDefinitionId,
         sourceUrl: input.sourceUrl,
         scrapeHistoryId: input.scrapeHistoryId ?? null,
         contentHash: input.contentHash ?? null,
@@ -152,7 +191,7 @@ export async function recordAttempts(inputs: ReadonlyArray<RecordAttemptInput>):
         sourceSentence: input.output.sourceSentence === '' ? null : input.output.sourceSentence,
         characterOffsets: input.output.characterOffsets ?? null,
         extractionModel: input.output.extractionModel,
-        extractionPromptId: input.extractionPromptId ?? null,
+        extractionPromptId: promptId,
         extractionConfidence:
           typeof input.output.extractionConfidence === 'number'
             ? input.output.extractionConfidence.toFixed(2)
@@ -199,7 +238,7 @@ export async function markAttemptPublished(args: {
   let fieldDefinitionId: string | null;
   try {
     const cache = await getFieldDefIdCache();
-    fieldDefinitionId = cache.get(args.fieldKey) ?? null;
+    fieldDefinitionId = cache.get(args.fieldKey)?.fieldDefinitionId ?? null;
   } catch {
     return null;
   }
