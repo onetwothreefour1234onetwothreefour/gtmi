@@ -141,6 +141,9 @@ export const fieldDefinitions = pgTable(
     // Phase 3.4 / ADR-013: gate Tier 2 backfill at the indicator level.
     // Default false; flipped true for the ADR-013 allowlist (B.3.3, C.2.4, D.2.3).
     tier2Allowed: boolean('tier2_allowed').notNull().default(false),
+    // Phase 3.9 — current active prompt version (from extraction_prompts).
+    // Backfilled to prompt-v1 by migration 00014.
+    currentPromptId: uuid('current_prompt_id'),
   },
   () => [
     pgPolicy('Team members can write field_definitions', {
@@ -212,6 +215,10 @@ export const fieldValues = pgTable(
     reviewedBy: uuid('reviewed_by'),
     reviewedAt: timestamp('reviewed_at'),
     methodologyVersionId: uuid('methodology_version_id').references(() => methodologyVersions.id),
+    // Phase 3.9 / W7 — GCS storage path for the source-page snapshot
+    // that produced the winning extraction. Provenance drawer falls back
+    // to a signed URL of this path when the live sourceUrl returns 404.
+    archivePath: text('archive_path'),
   },
   (table) => [
     uniqueIndex('idx_field_values_prog_def').on(table.programId, table.fieldDefinitionId),
@@ -272,6 +279,9 @@ export const scores = pgTable(
 );
 
 // 7. scrape_history
+// Phase 3.9 — extended with archive metadata. The scraper writes one row
+// per successful scrape; the storage_path points at the GCS bucket
+// (canonical), raw_markdown_storage_path is retained for backward compat.
 export const scrapeHistory = pgTable(
   'scrape_history',
   {
@@ -285,6 +295,18 @@ export const scrapeHistory = pgTable(
     rawMarkdownStoragePath: text('raw_markdown_storage_path'),
     extractionJobId: text('extraction_job_id'),
     status: varchar('status', { length: 50 }),
+    // Phase 3.9 additions
+    storagePath: text('storage_path'),
+    byteSize: integer('byte_size'),
+    contentType: varchar('content_type', { length: 100 }),
+    languageDetected: varchar('language_detected', { length: 8 }),
+    translationPath: text('translation_path'),
+    translationVersion: varchar('translation_version', { length: 32 }),
+    extractorVersion: varchar('extractor_version', { length: 32 }),
+    fieldsExtracted: jsonb('fields_extracted'),
+    needsReextraction: boolean('needs_reextraction').default(false).notNull(),
+    supersededBy: uuid('superseded_by'),
+    requestHeaders: jsonb('request_headers'),
   },
   (table) => [
     index('idx_scrape_history_source_scraped').on(table.sourceId, table.scrapedAt.desc()),
@@ -506,6 +528,127 @@ export const crosscheckCache = pgTable(
   },
   () => [
     pgPolicy('Team members can write crosscheck_cache', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+  ]
+);
+
+// ──────────────────────────────────────────────────────────────────────
+// Phase 3.9 — extraction history + prompt versioning + model registry.
+// Migration 00014 creates these tables and backfills prompt-v1 per
+// field_definition. The pipeline writes to extraction_attempts on every
+// extraction (including runner-up URLs); publish.ts flips was_published.
+// ──────────────────────────────────────────────────────────────────────
+
+// 19. extraction_models — registry of (model_id, version_tag) pairs that
+// produced extraction_attempts rows. Seeded with claude-sonnet-4-6 plus
+// the synthetic markers used by direct-API and derive paths.
+export const extractionModels = pgTable(
+  'extraction_models',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    modelId: text('model_id').notNull(),
+    versionTag: varchar('version_tag', { length: 50 }).notNull(),
+    registeredAt: timestamp('registered_at', { withTimezone: true }).defaultNow().notNull(),
+    retiredAt: timestamp('retired_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('uq_extraction_models_model_version').on(table.modelId, table.versionTag),
+    pgPolicy('Team members can write extraction_models', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+    pgPolicy('Public read extraction_models', {
+      as: 'permissive',
+      for: 'select',
+      to: 'public',
+      using: sql`true`,
+    }),
+  ]
+);
+
+// 20. extraction_prompts — versioned prompt content per field_definition.
+// Prompt rotations create new rows; field_definitions.current_prompt_id
+// points at the active row. extraction_attempts.extraction_prompt_id
+// records which version produced each attempt.
+export const extractionPrompts = pgTable(
+  'extraction_prompts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    fieldDefinitionId: uuid('field_definition_id')
+      .notNull()
+      .references(() => fieldDefinitions.id),
+    versionTag: varchar('version_tag', { length: 50 }).notNull(),
+    promptMd: text('prompt_md').notNull(),
+    promptHash: varchar('prompt_hash', { length: 64 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    replacedAt: timestamp('replaced_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('uq_extraction_prompts_field_hash').on(table.fieldDefinitionId, table.promptHash),
+    index('idx_extraction_prompts_field_created').on(
+      table.fieldDefinitionId,
+      table.createdAt.desc()
+    ),
+    pgPolicy('Team members can write extraction_prompts', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+    pgPolicy('Public read extraction_prompts', {
+      as: 'permissive',
+      for: 'select',
+      to: 'public',
+      using: sql`true`,
+    }),
+  ]
+);
+
+// 21. extraction_attempts — append-only history of every extraction
+// attempt across (program × field × URL × prompt × run). Never
+// overwritten by re-runs. Powers field_url_yield (W10) and surgical
+// re-runs (W12).
+export const extractionAttempts = pgTable(
+  'extraction_attempts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    programId: uuid('program_id')
+      .notNull()
+      .references(() => programs.id),
+    fieldDefinitionId: uuid('field_definition_id')
+      .notNull()
+      .references(() => fieldDefinitions.id),
+    sourceUrl: text('source_url').notNull(),
+    scrapeHistoryId: uuid('scrape_history_id').references(() => scrapeHistory.id),
+    contentHash: text('content_hash'),
+    attemptedAt: timestamp('attempted_at', { withTimezone: true }).defaultNow().notNull(),
+    valueRaw: text('value_raw'),
+    sourceSentence: text('source_sentence'),
+    characterOffsets: jsonb('character_offsets'),
+    extractionModel: text('extraction_model').notNull(),
+    extractionPromptId: uuid('extraction_prompt_id').references(() => extractionPrompts.id),
+    extractionConfidence: decimal('extraction_confidence', { precision: 3, scale: 2 }),
+    validationConfidence: decimal('validation_confidence', { precision: 3, scale: 2 }),
+    wasPublished: boolean('was_published').default(false).notNull(),
+    supersededBy: uuid('superseded_by'),
+    gateVerdict: varchar('gate_verdict', { length: 64 }),
+    reextractRejectReason: text('reextract_reject_reason'),
+    notes: jsonb('notes'),
+  },
+  (table) => [
+    index('idx_extraction_attempts_prog_field_attempted').on(
+      table.programId,
+      table.fieldDefinitionId,
+      table.attemptedAt.desc()
+    ),
+    index('idx_extraction_attempts_url_field').on(table.sourceUrl, table.fieldDefinitionId),
+    pgPolicy('Team members can write extraction_attempts', {
       as: 'permissive',
       for: 'all',
       to: 'authenticated',
