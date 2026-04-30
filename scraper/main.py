@@ -6,10 +6,18 @@ from curl_cffi import requests as curl_requests
 from bs4 import BeautifulSoup
 import asyncio
 import hashlib
+import io
 import re
 import time
 import urllib.parse
 from datetime import datetime, timezone
+
+# Phase 3.9 / W1 — PDF extraction. pypdf for plain-text pages,
+# pdfplumber for pages whose content is in table layouts (tax pages,
+# occupation lists). Both are pure-Python; no system tesseract/poppler
+# required.
+import pypdf  # type: ignore
+import pdfplumber  # type: ignore
 
 app = FastAPI()
 
@@ -67,9 +75,152 @@ def is_challenge_body(content: str) -> bool:
 # -----------------------------------------------------------------------------
 MIN_CONTENT_CHARS = 300
 
+# Phase 3.9 / W1 — PDFs (single-page memos, dense tables) frequently
+# fall below the HTML threshold legitimately. The PDF path uses a
+# lower bar so we don't drop a one-page tax-residency notice.
+MIN_PDF_CHARS = 100
+
 
 def is_usable_content(content: str) -> bool:
     return content is not None and len(content.strip()) >= MIN_CONTENT_CHARS
+
+
+def is_usable_pdf_content(content: str) -> bool:
+    return content is not None and len(content.strip()) >= MIN_PDF_CHARS
+
+
+# -----------------------------------------------------------------------------
+# Phase 3.9 / W1 — PDF detection + extraction.
+#
+# Government policy pages (ISA Japan, NTA Japan, KSA HRSD, OMN ROP)
+# routinely publish substantive eligibility content as PDFs. The HTML
+# layer cascade (Playwright → curl_cffi → Jina) returns thin or empty
+# markdown for these because Playwright renders PDFs in a viewer and
+# curl_cffi's html_to_text helper sees binary garbage. The PDF path
+# bypasses the cascade entirely:
+#
+#   1. _detect_is_pdf(url) — HEAD request first (cheap; 50ms typical),
+#      falls back to URL-suffix sniffing when HEAD is blocked.
+#   2. scrape_pdf(url) — downloads the bytes via curl_cffi (Chrome
+#      impersonation already in place; reuses the existing TLS posture),
+#      runs pypdf for native text + pdfplumber for table layouts, joins
+#      pages into a single markdown document with `## Page N` headers.
+#   3. Returns content_type='application/pdf' on the response so the
+#      TS-side archive write can tag the scrape_history row correctly.
+#
+# Skipped for now: OCR (tesseract). The cohort's PDFs are native text;
+# OCR is a Phase 4 concern when we hit scanned-only sources.
+# -----------------------------------------------------------------------------
+PDF_CONTENT_TYPES = {"application/pdf", "application/x-pdf"}
+
+
+def _looks_like_pdf_url(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    return parsed.path.lower().endswith(".pdf")
+
+
+def _detect_is_pdf(url: str) -> bool:
+    """Try HEAD first, fall back to URL suffix when HEAD is blocked or returns
+    something other than a content-type header. Returns True only when we are
+    confident the URL points at a PDF — false negatives downgrade to the HTML
+    cascade (existing behavior); false positives are filtered by scrape_pdf
+    (which logs an error and returns empty content)."""
+    try:
+        resp = curl_requests.head(
+            url,
+            impersonate="chrome124",
+            timeout=15,
+            allow_redirects=True,
+        )
+        ctype = (resp.headers.get("content-type") or "").lower().split(";")[0].strip()
+        if ctype in PDF_CONTENT_TYPES:
+            return True
+        # Some servers refuse HEAD (405) or return a generic content-type
+        # for a PDF behind a CDN. URL suffix is a reliable backstop for the
+        # cohort's manifested .pdf links.
+        if ctype.startswith("text/html") or ctype.startswith("application/json"):
+            return False
+    except Exception:
+        pass
+    return _looks_like_pdf_url(url)
+
+
+def _extract_pdf_text(pdf_bytes: bytes) -> str:
+    """Two-pass PDF extraction: pypdf for plain-text pages, pdfplumber to
+    recover content for pages where pypdf returned <50 chars (likely tables /
+    column layouts). Pages are joined with `## Page N` markdown headers so the
+    LLM windowing layer downstream can chunk on page boundaries."""
+    pages_out: list[str] = []
+    try:
+        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    except Exception as e:
+        return f"[pdf_read_error: {e}]"
+
+    page_count = len(reader.pages)
+    # Open pdfplumber lazily on first page that needs it; not every PDF
+    # has table pages and pdfplumber's startup is non-trivial.
+    plumber: "pdfplumber.PDF | None" = None
+    try:
+        for i, page in enumerate(reader.pages):
+            try:
+                text = page.extract_text() or ""
+            except Exception:
+                text = ""
+            if len(text.strip()) < 50:
+                # Try pdfplumber for this page only.
+                if plumber is None:
+                    try:
+                        plumber = pdfplumber.open(io.BytesIO(pdf_bytes))
+                    except Exception:
+                        plumber = None
+                if plumber is not None and i < len(plumber.pages):
+                    try:
+                        plumber_text = plumber.pages[i].extract_text() or ""
+                        if len(plumber_text.strip()) > len(text.strip()):
+                            text = plumber_text
+                        # Append any tables as pipe-delimited rows.
+                        for table in plumber.pages[i].extract_tables() or []:
+                            rows = [
+                                " | ".join(cell or "" for cell in row) for row in table
+                            ]
+                            if rows:
+                                text += "\n\n" + "\n".join(rows)
+                    except Exception:
+                        pass
+            pages_out.append(f"## Page {i + 1} of {page_count}\n\n{text.strip()}")
+    finally:
+        if plumber is not None:
+            try:
+                plumber.close()
+            except Exception:
+                pass
+
+    return re.sub(r"\n{3,}", "\n\n", "\n\n".join(pages_out)).strip()
+
+
+def scrape_pdf(url: str) -> tuple[int, str, str | None]:
+    """Download a PDF via curl_cffi (Chrome impersonation) and extract text.
+    Returns the same (status, content, error) tuple shape as the HTML scrapers
+    so the orchestrator can treat it uniformly."""
+    try:
+        resp = curl_requests.get(
+            url,
+            impersonate="chrome124",
+            timeout=60,
+            allow_redirects=True,
+            headers={"Accept": "application/pdf,*/*"},
+        )
+        if resp.status_code >= 400:
+            return resp.status_code, "", f"pdf_http_{resp.status_code}"
+        body = resp.content or b""
+        # Sanity check: PDFs start with the literal "%PDF-" header. If not,
+        # we got served HTML by a paywall / redirect and should fail loud.
+        if not body[:5] == b"%PDF-":
+            return resp.status_code, "", "pdf_not_a_pdf"
+        text = _extract_pdf_text(body)
+        return resp.status_code, text, None
+    except Exception as e:
+        return 0, "", f"pdf_exc:{e}"
 
 
 # -----------------------------------------------------------------------------
@@ -247,6 +398,11 @@ class ScrapeResponse(BaseModel):
     content_hash: str
     error: str | None = None
     layer: str | None = None
+    # Phase 3.9 / W1 — content_type lets the orchestrator tag the
+    # scrape_history row with the correct mime so future re-extraction
+    # can route through the right parser. Defaults to text/markdown for
+    # the HTML cascade; "application/pdf" for the PDF path.
+    content_type: str = "text/markdown"
 
 
 # -----------------------------------------------------------------------------
@@ -259,6 +415,28 @@ async def scrape(request: ScrapeRequest):
 
     now_iso = lambda: datetime.now(timezone.utc).isoformat()
     attempts: list[str] = []
+
+    # Phase 3.9 / W1 — PDF short-circuit. Detect via HEAD (fast) before
+    # committing to the HTML cascade. Skipped when force_layer is set
+    # (the caller is explicitly bypassing detection on a retry path).
+    if request.force_layer is None and await asyncio.to_thread(_detect_is_pdf, request.url):
+        pdf_status, pdf_content, pdf_err = await asyncio.to_thread(scrape_pdf, request.url)
+        if pdf_err is None and is_usable_pdf_content(pdf_content):
+            return ScrapeResponse(
+                url=request.url,
+                content_markdown=pdf_content,
+                http_status=pdf_status,
+                scraped_at=now_iso(),
+                content_hash=hashlib.sha256(pdf_content.encode()).hexdigest(),
+                layer="pdf",
+                content_type="application/pdf",
+            )
+        attempts.append(
+            f"pdf:http={pdf_status},err={pdf_err or 'thin'}"
+        )
+        # Fall through into the HTML cascade — some endpoints return PDF
+        # content-type but the Wayback or Jina layers can still surface
+        # an alternate HTML rendering. Better to try than hard-fail.
 
     # Phase 3.6 / Fix C — short-circuit to Jina when the caller forces it.
     # Used by scrape.ts on a `short_content` retry to escalate past

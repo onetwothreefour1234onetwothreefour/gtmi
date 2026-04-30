@@ -249,6 +249,9 @@ export class ScrapeStageImpl implements ScrapeStage {
       content_hash: string;
       error?: string | null;
       layer?: string | null;
+      // Phase 3.9 / W1 — scraper service tags the content_type so the
+      // archive write can pick the right file extension (.pdf vs .md).
+      content_type?: string | null;
     };
 
     if (data.error) {
@@ -278,6 +281,7 @@ export class ScrapeStageImpl implements ScrapeStage {
       scrapedAt: new Date(data.scraped_at),
       contentHash: data.content_hash,
       layer: data.layer ?? undefined,
+      contentType: data.content_type ?? undefined,
     };
     if (result.layer && result.layer !== 'playwright') {
       console.log(`  [Scrape] ${discovered.url} served via fallback layer: ${result.layer}`);

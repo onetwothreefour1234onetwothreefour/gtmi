@@ -24,6 +24,12 @@ export interface ScrapeResult {
    */
   scrapeHistoryId?: string;
   archivePath?: string;
+  /**
+   * Phase 3.9 / W1 — MIME from the scraper service. "application/pdf"
+   * for PDF-extracted scrapes, "text/markdown" otherwise. Drives the
+   * archive write's file extension (.pdf vs .md).
+   */
+  contentType?: string;
 }
 
 export interface ExtractionInput {

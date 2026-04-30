@@ -92,7 +92,11 @@ export async function archiveScrapeResult(
     return null;
   }
 
-  const ext = args.ext ?? 'md';
+  // Phase 3.9 / W1 — choose archive extension from result.contentType
+  // when caller didn't override. PDF scrapes archive as .pdf so future
+  // re-extraction can re-parse the source bytes.
+  const inferredExt = result.contentType === 'application/pdf' ? 'pdf' : 'md';
+  const ext = args.ext ?? inferredExt;
   let storagePath: string;
   try {
     storagePath = archivePathFor({

@@ -5,3 +5,8 @@ pydantic==2.9.2
 tf-playwright-stealth==1.1.2
 curl_cffi==0.7.3
 beautifulsoup4==4.12.3
+# Phase 3.9 / W1 — PDF extraction. pypdf does native text; pdfplumber
+# handles table layouts (used for tax / occupation list PDFs). Both
+# pure-Python — no system deps required for the Docker image.
+pypdf==5.1.0
+pdfplumber==0.11.4
