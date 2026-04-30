@@ -16,6 +16,7 @@ COPY packages/db/package.json packages/db/
 COPY packages/scoring/package.json packages/scoring/
 COPY packages/shared/package.json packages/shared/
 COPY packages/extraction/package.json packages/extraction/
+COPY packages/storage/package.json packages/storage/
 COPY jobs/package.json jobs/
 COPY scripts/package.json scripts/
 
@@ -36,6 +37,10 @@ COPY --from=deps /repo/packages/db/node_modules ./packages/db/node_modules
 COPY --from=deps /repo/packages/scoring/node_modules ./packages/scoring/node_modules
 COPY --from=deps /repo/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=deps /repo/packages/extraction/node_modules ./packages/extraction/node_modules
+# Phase 3.9 / W7 — @gtmi/storage workspace package depends on
+# @google-cloud/storage. Without this COPY, Next's typecheck can't
+# resolve the dynamic-import target inside @gtmi/storage's client.ts.
+COPY --from=deps /repo/packages/storage/node_modules ./packages/storage/node_modules
 
 # NEXT_PUBLIC_* are inlined into the client bundle at build time.
 ARG NEXT_PUBLIC_APP_URL
