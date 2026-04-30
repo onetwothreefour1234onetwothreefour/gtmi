@@ -17,6 +17,7 @@ import {
   loadProgramSourcesAsDiscovered,
   loadProvenUrlsForMissingFields,
   mergeDiscoveredUrls,
+  scoreProgramFromDb,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
   COUNTRY_NON_GOV_COSTS_POLICY,
   COUNTRY_PR_PRESENCE_POLICY,
@@ -977,6 +978,24 @@ async function main() {
       'Fields auto-approved': fieldsAutoApproved,
       'Fields queued for review': fieldsQueued,
     });
+
+    // Phase 3.8 / ADR-022 — auto-refresh the programme-level composite
+    // so the public dashboard reflects this canary's scrape +
+    // extraction without a manual /review click. Skipped silently if
+    // the programme has no approved rows yet (low-coverage canary; the
+    // next run will fix it once auto-approve produces approved rows).
+    try {
+      const r = await scoreProgramFromDb(programId);
+      console.log(
+        `\n[Auto-rescore] ${r.programName}: composite=${r.engine.compositeScore.toFixed(2)} ` +
+          `paq=${r.engine.paqScore.toFixed(2)} cme=${r.engine.cmeScore.toFixed(2)} ` +
+          `coverage=${r.engine.populatedFieldCount}/${r.engine.activeFieldCount} ` +
+          `flagged=${r.engine.flaggedInsufficientDisclosure}`
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`\n[Auto-rescore] skipped for ${programName}: ${msg}`);
+    }
   }
 }
 

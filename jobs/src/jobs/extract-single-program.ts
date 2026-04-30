@@ -19,6 +19,7 @@ import {
   loadProgramSourcesAsDiscovered,
   loadProvenUrlsForMissingFields,
   mergeDiscoveredUrls,
+  scoreProgramFromDb,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
   COUNTRY_NON_GOV_COSTS_POLICY,
   COUNTRY_PR_PRESENCE_POLICY,
@@ -69,6 +70,16 @@ interface PipelineResult {
   fieldsExtracted: number;
   fieldsAutoApproved: number;
   fieldsQueued: number;
+  /** Phase 3.8 / ADR-022 — auto-rescore output. Null when the programme
+   *  has no approved rows yet (low-coverage run; the composite refresh
+   *  is skipped, the per-row writes still complete). */
+  composite: {
+    compositeScore: number;
+    paqScore: number;
+    cmeScore: number;
+    coverage: string;
+    flagged: boolean;
+  } | null;
 }
 
 export const extractSingleProgram = task({
@@ -676,6 +687,37 @@ export const extractSingleProgram = task({
         `${fieldsQueued} queued for review`
     );
 
+    // Phase 3.8 / ADR-022 — auto-refresh the programme-level composite
+    // so the public dashboard reflects this run's scrape + extraction
+    // without a manual /review click. Wrapped in try/catch because the
+    // helper throws when the programme has no approved rows yet
+    // (low-coverage runs).
+    let composite: {
+      compositeScore: number;
+      paqScore: number;
+      cmeScore: number;
+      coverage: string;
+      flagged: boolean;
+    } | null = null;
+    try {
+      const r = await scoreProgramFromDb(programId);
+      composite = {
+        compositeScore: r.engine.compositeScore,
+        paqScore: r.engine.paqScore,
+        cmeScore: r.engine.cmeScore,
+        coverage: `${r.engine.populatedFieldCount}/${r.engine.activeFieldCount}`,
+        flagged: r.engine.flaggedInsufficientDisclosure,
+      };
+      console.log(
+        `[Auto-rescore] ${r.programName}: composite=${composite.compositeScore.toFixed(2)} ` +
+          `paq=${composite.paqScore.toFixed(2)} cme=${composite.cmeScore.toFixed(2)} ` +
+          `coverage=${composite.coverage} flagged=${composite.flagged}`
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[Auto-rescore] skipped for ${programId}: ${msg}`);
+    }
+
     return {
       programId,
       urlsDiscovered: discoveryResult.discoveredUrls.length,
@@ -683,6 +725,7 @@ export const extractSingleProgram = task({
       fieldsExtracted,
       fieldsAutoApproved,
       fieldsQueued,
+      composite,
     };
   },
 });
