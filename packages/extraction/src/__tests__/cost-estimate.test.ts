@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COST_MODEL, estimateCanaryCost, planCanaryCost } from '../utils/cost-estimate';
+import type { DiscoveredUrl } from '../types/extraction';
 
 describe('estimateCanaryCost', () => {
   it('returns zero total when nothing runs', () => {
@@ -64,10 +65,10 @@ describe('estimateCanaryCost', () => {
 });
 
 describe('planCanaryCost', () => {
-  const url = (u: string) => ({
+  const url = (u: string): DiscoveredUrl => ({
     url: u,
     tier: 1,
-    geographicLevel: 'national' as const,
+    geographicLevel: 'national',
     reason: '',
     isOfficial: true,
   });
