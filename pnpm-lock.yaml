@@ -40,6 +40,9 @@ importers:
       '@gtmi/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@gtmi/extraction':
+        specifier: workspace:^
+        version: link:../../packages/extraction
       '@gtmi/scoring':
         specifier: workspace:*
         version: link:../../packages/scoring

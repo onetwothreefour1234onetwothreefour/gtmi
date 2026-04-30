@@ -1,10 +1,20 @@
-import 'server-only';
-
-// Phase 3.7 / ADR-021 — server-side orchestrator that runs the full
+// Phase 3.8 / ADR-022 — server-side orchestrator that runs the full
 // scoring engine for one programme and upserts the result into the
-// `scores` table. Called by the /review re-score buttons
-// (rescoreProgram, rescoreCohort) and by scripts/run-paq-score.ts so
-// the CLI and the in-app button share one code path.
+// `scores` table. Three callers share this single source of truth:
+//
+//   - apps/web/app/(internal)/review/rescore-actions.ts — the manual
+//     re-score buttons on /review (per-row, per-programme, cohort).
+//   - scripts/run-paq-score.ts — the calibration CLI.
+//   - scripts/canary-run.ts (and the Trigger.dev twin
+//     jobs/src/jobs/extract-single-program.ts) — auto-rescore after a
+//     fresh scrape + extraction so the public dashboard is current
+//     without a manual click.
+//
+// Lives in @gtmi/extraction because the package already depends on
+// @gtmi/db AND @gtmi/scoring; placing the orchestrator here is purely
+// additive — no new dep direction. (ADR-021 originally proposed
+// duplicating into apps/web; ADR-022 closes that trade-off by
+// consolidating once a third caller surfaced.)
 //
 // What this does:
 //   1. Resolve the programme (by id) and load its country.
@@ -21,11 +31,13 @@ import 'server-only';
 //      (onConflictDoUpdate keyed on programId × methodologyVersionId).
 //
 // Returns the engine output plus the upserted row id. Caller is
-// responsible for revalidatePath / route revalidation.
+// responsible for any cache busting (revalidatePath in the web
+// caller; nothing in the script callers — the public dashboard
+// routes are `force-dynamic` and re-read on each request).
 
 import {
-  db,
   countries,
+  db,
   fieldDefinitions,
   fieldValues,
   methodologyVersions,

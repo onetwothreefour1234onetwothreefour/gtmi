@@ -85,6 +85,8 @@ export { ExtractStageImpl, computeExtractionCacheKey } from './stages/extract';
 export { PublishStageImpl } from './stages/publish';
 export { ScrapeStageImpl } from './stages/scrape';
 export { ValidateStageImpl } from './stages/validate';
+export { scoreProgramFromDb } from './utils/score-program';
+export type { ScoreProgramOptions, ScoreProgramResult } from './utils/score-program';
 
 // Phase 3.6 / ADR-016 — static lookup tables for the derive stage.
 // Re-exported from `packages/extraction/src/data/` (moved from `scripts/`

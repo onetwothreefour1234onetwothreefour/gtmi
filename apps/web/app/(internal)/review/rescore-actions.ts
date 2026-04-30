@@ -23,7 +23,7 @@ import { PHASE2_PLACEHOLDER_PARAMS, scoreSingleIndicator } from '@gtmi/scoring';
 import type { FieldDefinitionRecord } from '@gtmi/scoring';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { scoreProgramFromDb } from '@/lib/score-program';
+import { scoreProgramFromDb } from '@gtmi/extraction';
 
 interface FieldDefForRescore {
   id: string;
