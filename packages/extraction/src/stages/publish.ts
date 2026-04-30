@@ -14,6 +14,40 @@ import type { ExtractionOutput, ValidationResult } from '../types/extraction';
 import type { ProvenanceRecord } from '../types/provenance';
 import type { PublishStage } from '../types/pipeline';
 import { detectCurrency } from '../utils/currency';
+import { markAttemptPublished } from '../utils/attempts';
+
+/**
+ * Phase 3.9 / W9 — local thin wrapper over markAttemptPublished. Skips
+ * synthetic provenance markers (sourceUrl beginning with `derived:`,
+ * `internal:`, `world-bank-api`, etc.) where no extraction_attempts row
+ * exists. Best-effort: any failure is swallowed by the underlying
+ * helper, so callers can `await` without try/catch.
+ */
+async function markPublishedAttempt(args: {
+  programId: string;
+  fieldKey: string;
+  sourceUrl: string;
+  contentHash?: string | null;
+  gateVerdict?: string;
+}): Promise<void> {
+  if (
+    !args.sourceUrl ||
+    args.sourceUrl.startsWith('derived:') ||
+    args.sourceUrl.startsWith('derived-computation:') ||
+    args.sourceUrl.startsWith('internal:') ||
+    args.sourceUrl.startsWith('https://api.worldbank.org/') ||
+    args.sourceUrl.startsWith('country-substitute:')
+  ) {
+    return;
+  }
+  await markAttemptPublished({
+    programId: args.programId,
+    fieldKey: args.fieldKey,
+    sourceUrl: args.sourceUrl,
+    contentHash: args.contentHash ?? null,
+    gateVerdict: args.gateVerdict ?? null,
+  });
+}
 
 const COUNTRY_SUBSTITUTE_MODEL = 'country-substitute-regional';
 
@@ -309,6 +343,9 @@ export class PublishStageImpl implements PublishStage {
         extractedAt: new Date(),
         reviewedAt: provenance.reviewedAt,
         methodologyVersionId,
+        // Phase 3.9 / W7 — country-substitute writes carry no live URL
+        // archive (synthetic provenance), so archive_path stays null.
+        archivePath: null,
       })
       .onConflictDoUpdate({
         target: [fieldValues.programId, fieldValues.fieldDefinitionId],
@@ -321,6 +358,7 @@ export class PublishStageImpl implements PublishStage {
           extractedAt: new Date(),
           reviewedAt: provenance.reviewedAt,
           methodologyVersionId,
+          archivePath: null,
         },
       })
       .returning({ id: fieldValues.id });
@@ -429,6 +467,8 @@ export class PublishStageImpl implements PublishStage {
         status: 'pending_review',
         extractedAt: extraction.extractedAt,
         methodologyVersionId,
+        // Phase 3.9 / W7 — derived rows carry no live URL archive.
+        archivePath: null,
       })
       .onConflictDoUpdate({
         target: [fieldValues.programId, fieldValues.fieldDefinitionId],
@@ -439,6 +479,7 @@ export class PublishStageImpl implements PublishStage {
           status: 'pending_review',
           extractedAt: extraction.extractedAt,
           methodologyVersionId,
+          archivePath: null,
         },
       })
       .returning({ id: fieldValues.id });
@@ -545,6 +586,10 @@ export class PublishStageImpl implements PublishStage {
           extractedAt: extraction.extractedAt,
           reviewedAt: null,
           methodologyVersionId: methodologyVersionIdForProv,
+          // Phase 3.9 / W7 — preserve archive path through the
+          // missing-provenance gate so /review can still link to the
+          // snapshot even when the live page goes dark later.
+          archivePath: provForReview.archivePath ?? null,
         })
         .onConflictDoUpdate({
           target: [fieldValues.programId, fieldValues.fieldDefinitionId],
@@ -557,6 +602,7 @@ export class PublishStageImpl implements PublishStage {
             extractedAt: extraction.extractedAt,
             reviewedAt: null,
             methodologyVersionId: methodologyVersionIdForProv,
+            archivePath: provForReview.archivePath ?? null,
           },
         });
       return;
@@ -653,6 +699,7 @@ export class PublishStageImpl implements PublishStage {
           extractedAt: extraction.extractedAt,
           reviewedAt: null,
           methodologyVersionId,
+          archivePath: provenance.archivePath ?? null,
         })
         .onConflictDoUpdate({
           target: [fieldValues.programId, fieldValues.fieldDefinitionId],
@@ -665,9 +712,19 @@ export class PublishStageImpl implements PublishStage {
             extractedAt: extraction.extractedAt,
             reviewedAt: null,
             methodologyVersionId,
+            archivePath: provenance.archivePath ?? null,
           },
         })
         .returning({ id: fieldValues.id });
+      // Phase 3.9 / W9 — record the gate outcome on the corresponding
+      // attempt so W12 surgical re-runs can target gate-failed rows.
+      await markPublishedAttempt({
+        programId: extraction.programId,
+        fieldKey: extraction.fieldDefinitionKey,
+        sourceUrl: provenance.sourceUrl,
+        contentHash: provenance.contentHash,
+        gateVerdict: 'rubric_mismatch',
+      });
       console.log(
         `Published [${insertedRubric[0]?.id}] (rubric-mismatch, score=null) — program: ${extraction.programId}, field: ${extraction.fieldDefinitionKey}`
       );
@@ -711,6 +768,7 @@ export class PublishStageImpl implements PublishStage {
           extractedAt: extraction.extractedAt,
           reviewedAt: provenance.reviewedAt,
           methodologyVersionId,
+          archivePath: provenance.archivePath ?? null,
         })
         .onConflictDoUpdate({
           target: [fieldValues.programId, fieldValues.fieldDefinitionId],
@@ -723,10 +781,18 @@ export class PublishStageImpl implements PublishStage {
             extractedAt: extraction.extractedAt,
             reviewedAt: provenance.reviewedAt,
             methodologyVersionId,
+            archivePath: provenance.archivePath ?? null,
           },
         })
         .returning({ id: fieldValues.id });
       const insertedId = inserted[0]?.id;
+      await markPublishedAttempt({
+        programId: extraction.programId,
+        fieldKey: extraction.fieldDefinitionKey,
+        sourceUrl: provenance.sourceUrl,
+        contentHash: provenance.contentHash,
+        gateVerdict: 'not_stated',
+      });
       console.log(
         `Published [${insertedId}] (not_stated, score=null) — program: ${extraction.programId}, field: ${extraction.fieldDefinitionKey}`
       );
@@ -822,6 +888,7 @@ export class PublishStageImpl implements PublishStage {
           extractedAt: extraction.extractedAt,
           reviewedAt: null,
           methodologyVersionId: methodologyVersionIdForReview,
+          archivePath: provenanceForReview.archivePath ?? null,
         })
         .onConflictDoUpdate({
           target: [fieldValues.programId, fieldValues.fieldDefinitionId],
@@ -834,9 +901,17 @@ export class PublishStageImpl implements PublishStage {
             extractedAt: extraction.extractedAt,
             reviewedAt: null,
             methodologyVersionId: methodologyVersionIdForReview,
+            archivePath: provenanceForReview.archivePath ?? null,
           },
         })
         .returning({ id: fieldValues.id });
+      await markPublishedAttempt({
+        programId: extraction.programId,
+        fieldKey: extraction.fieldDefinitionKey,
+        sourceUrl: provenance.sourceUrl,
+        contentHash: provenance.contentHash,
+        gateVerdict: 'normalize_failed',
+      });
       console.log(
         `Published [${insertedReview[0]?.id}] (normalize/sanity failure, score=null) — program: ${extraction.programId}, field: ${extraction.fieldDefinitionKey}`
       );
@@ -895,6 +970,10 @@ export class PublishStageImpl implements PublishStage {
         extractedAt: extraction.extractedAt,
         reviewedAt: provenance.reviewedAt,
         methodologyVersionId,
+        // Phase 3.9 / W7 — propagate the GCS snapshot path from the
+        // winning scrape. /review and the public detail drawer fall
+        // back to a signed URL of this path when sourceUrl 404s.
+        archivePath: provenance.archivePath ?? null,
       })
       .onConflictDoUpdate({
         target: [fieldValues.programId, fieldValues.fieldDefinitionId],
@@ -907,6 +986,7 @@ export class PublishStageImpl implements PublishStage {
           extractedAt: extraction.extractedAt,
           reviewedAt: provenance.reviewedAt,
           methodologyVersionId,
+          archivePath: provenance.archivePath ?? null,
         },
       })
       .returning({ id: fieldValues.id });
@@ -917,6 +997,17 @@ export class PublishStageImpl implements PublishStage {
         `Publish failed: insert into field_values returned no ID for field ${extraction.fieldDefinitionKey} / program ${extraction.programId}`
       );
     }
+
+    // Phase 3.9 / W9 — flip the corresponding extraction_attempts row's
+    // was_published flag and chain superseded_by from the prior winner.
+    // Best-effort; log on failure.
+    await markPublishedAttempt({
+      programId: extraction.programId,
+      fieldKey: extraction.fieldDefinitionKey,
+      sourceUrl: provenance.sourceUrl,
+      contentHash: provenance.contentHash,
+      gateVerdict: 'passed',
+    });
 
     console.log(
       `Published [${insertedId}] — program: ${extraction.programId}, field: ${extraction.fieldDefinitionKey}, methodology: ${provenance.methodologyVersion}`

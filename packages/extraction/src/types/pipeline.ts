@@ -71,6 +71,13 @@ export interface PendingProvenanceContext {
   crossCheckResult: import('./provenance').CrossCheckOutcome;
   crossCheckUrl: string | null;
   methodologyVersion: string;
+  /**
+   * Phase 3.9 / W7 — GCS snapshot path from the winning scrape.
+   * Optional; when present, propagated into pending_review provenance
+   * + field_values.archive_path so the row's source-page archive
+   * survives independent of the live URL.
+   */
+  archivePath?: string;
 }
 
 export interface HumanReviewStage {

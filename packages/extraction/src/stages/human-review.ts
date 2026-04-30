@@ -194,6 +194,12 @@ export class HumanReviewStageImpl implements HumanReviewStage {
       if (normalizationError) {
         pendingProvenance.normalizationError = normalizationError;
       }
+      // Phase 3.9 / W7 — preserve the archive path on pending_review
+      // rows so /review can render the GCS snapshot link beside the
+      // (possibly broken) live sourceUrl.
+      if (context.archivePath) {
+        pendingProvenance.archivePath = context.archivePath;
+      }
 
       // Insert or update pending_review row.
       const upserted = await db
@@ -207,6 +213,7 @@ export class HumanReviewStageImpl implements HumanReviewStage {
           status: 'pending_review',
           extractedAt: extraction.extractedAt,
           provenance: pendingProvenance,
+          archivePath: context.archivePath ?? null,
         })
         .onConflictDoUpdate({
           target: [fieldValues.programId, fieldValues.fieldDefinitionId],
@@ -216,6 +223,7 @@ export class HumanReviewStageImpl implements HumanReviewStage {
             status: 'pending_review',
             extractedAt: extraction.extractedAt,
             provenance: pendingProvenance,
+            archivePath: context.archivePath ?? null,
           },
         })
         .returning({ id: fieldValues.id });

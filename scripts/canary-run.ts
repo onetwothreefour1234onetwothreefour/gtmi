@@ -926,6 +926,9 @@ async function main() {
         crossCheckResult: crossCheckOutcome,
         crossCheckUrl: null,
         methodologyVersion: METHODOLOGY_VERSION,
+        // Phase 3.9 / W7 — let humanReview.enqueue propagate the
+        // archive path through to field_values for queued rows.
+        ...(winningScrape.archivePath ? { archivePath: winningScrape.archivePath } : {}),
       };
 
       const isAutoApproved =
@@ -959,6 +962,10 @@ async function main() {
         reviewedAt: new Date(),
         methodologyVersion: METHODOLOGY_VERSION,
         reviewDecision: 'approve',
+        // Phase 3.9 / W7 — propagate the GCS snapshot path so /review
+        // and the public detail drawer can fall back to a signed URL
+        // when the live sourceUrl returns 404.
+        ...(winningScrape.archivePath ? { archivePath: winningScrape.archivePath } : {}),
       };
 
       try {

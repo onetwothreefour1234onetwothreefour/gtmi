@@ -27,4 +27,14 @@ export interface ProvenanceRecord {
   reviewDecision: ReviewDecision;
   /** ISO 4217 currency code detected in valueRaw before normalization (e.g. "AUD", "SGD"). */
   valueCurrency?: string;
+  /**
+   * Phase 3.9 / W7 — GCS storage path for the source-page snapshot
+   * that produced this winning extraction. Read by publish.ts and
+   * mirrored into field_values.archive_path so /review and the
+   * public detail drawer can fall back to a signed URL when the live
+   * sourceUrl returns 404. Absent for legacy rows (pre-W0) and for
+   * synthetic rows (country-substitute, derived-knowledge,
+   * derived-computation, world-bank-api-direct, v-dem-api-direct).
+   */
+  archivePath?: string;
 }

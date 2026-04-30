@@ -234,6 +234,8 @@ export async function markAttemptPublished(args: {
   fieldKey: string;
   sourceUrl: string;
   contentHash?: string | null;
+  /** Phase 3.9 / W9 — record the publish-time universal-gate outcome on the new winner. */
+  gateVerdict?: string | null;
 }): Promise<string | null> {
   let fieldDefinitionId: string | null;
   try {
@@ -280,9 +282,13 @@ export async function markAttemptPublished(args: {
         .where(eq(extractionAttempts.id, prior[0].id));
     }
 
+    const winnerSet: { wasPublished: boolean; gateVerdict?: string } = { wasPublished: true };
+    if (args.gateVerdict !== undefined && args.gateVerdict !== null) {
+      winnerSet.gateVerdict = args.gateVerdict;
+    }
     await db
       .update(extractionAttempts)
-      .set({ wasPublished: true })
+      .set(winnerSet)
       .where(eq(extractionAttempts.id, newWinnerId));
 
     return newWinnerId;
