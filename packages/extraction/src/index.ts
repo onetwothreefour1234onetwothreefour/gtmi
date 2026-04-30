@@ -94,6 +94,10 @@ export { ValidateStageImpl } from './stages/validate';
 // future callers can archive ad-hoc scrapes outside the canary loop).
 export { archiveScrapeResult, EXTRACTOR_VERSION } from './utils/archive';
 export type { ArchiveScrapeArgs, ArchiveScrapeResult } from './utils/archive';
+// Re-export the storage API so consumers (apps/web reextract action)
+// can access it without taking a direct workspace dep on @gtmi/storage.
+export { getStorage, archivePathFor, contentTypeForExt } from '@gtmi/storage';
+export type { StorageImpl, ArchiveDownloadResult, SignedUrlOptions } from '@gtmi/storage';
 // Phase 3.9 / W9 — extraction_attempts history. Used by extract.ts for
 // per-batch recording and by publish.ts (commit 6) to flip wasPublished.
 // W13 — getCurrentPromptId surfaces the cached extraction_prompts.id
