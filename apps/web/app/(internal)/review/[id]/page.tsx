@@ -9,6 +9,7 @@ import {
   rejectFieldValue,
   unapproveFieldValue,
 } from '@/app/(internal)/review/actions';
+import { rescoreFieldValue } from '@/app/(internal)/review/rescore-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +83,15 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     const fvId = (fd.get('id') as string | null) ?? '';
     if (!fvId) throw new Error('unapprove: missing field_value id');
     await unapproveFieldValue(fvId);
+  }
+
+  // Phase 3.8 / ADR-020 — recompute value_indicator_score for this row
+  // from the stored value_normalized + current PHASE2_PLACEHOLDER_PARAMS.
+  async function rescore(fd: FormData): Promise<void> {
+    'use server';
+    const fvId = (fd.get('id') as string | null) ?? '';
+    if (!fvId) throw new Error('rescore: missing field_value id');
+    await rescoreFieldValue(fvId);
   }
 
   const isPending = row.status === 'pending_review';
@@ -356,6 +366,28 @@ export default async function ReviewDetailPage({ params }: PageProps) {
               data-testid="reject-button"
             >
               Reject
+            </button>
+          </form>
+        </section>
+
+        <section
+          className="mb-6 flex flex-wrap items-center gap-3 border bg-paper-2 p-4"
+          style={{ borderColor: 'var(--rule)' }}
+          data-testid="review-detail-rescore"
+        >
+          <div className="grow text-data-sm text-ink-3">
+            <p className="eyebrow mb-1">Re-score this row</p>
+            <p>
+              Recompute <span className="num">value_indicator_score</span> from the stored
+              normalised value using the current{' '}
+              <span className="num">PHASE2_PLACEHOLDER_PARAMS</span>. Use after a calibration
+              commit, or when the displayed score looks stale.
+            </p>
+          </div>
+          <form action={rescore}>
+            <input type="hidden" name="id" value={id} />
+            <button type="submit" className="btn" data-testid="rescore-button">
+              Re-score
             </button>
           </form>
         </section>
