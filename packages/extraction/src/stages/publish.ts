@@ -484,6 +484,84 @@ export class PublishStageImpl implements PublishStage {
       );
     }
 
+    // Phase 3.8 / P2.5 — provenance binding gate. A non-empty valueRaw
+    // MUST be backed by a non-empty sourceSentence on provenance. The
+    // extract-stage validator already enforces this for LLM responses,
+    // but defensive checks here cover derived rows, manual edits, and
+    // any future writer that bypasses extract.ts. Out-of-contract rows
+    // are routed to pending_review with a missing_provenance reason
+    // rather than auto-approving without a verifiable source.
+    const rawIsPresent =
+      typeof extraction.valueRaw === 'string' && extraction.valueRaw.trim() !== '';
+    const sentenceMissing = !provenance.sourceSentence || provenance.sourceSentence.trim() === '';
+    // Country-substitute and derived-knowledge rows write synthetic
+    // sentinel sentences explicitly — the substitute writer in this
+    // file builds one in `buildCountrySubstituteProvenance`, derive.ts
+    // does the same. The `extractionModel` discriminator is the cleanest
+    // way to spot those paths and skip the gate.
+    const SYNTHETIC_MODELS = new Set([
+      COUNTRY_SUBSTITUTE_MODEL,
+      'derived-computation',
+      'derived-knowledge',
+    ]);
+    if (rawIsPresent && sentenceMissing && !SYNTHETIC_MODELS.has(provenance.extractionModel)) {
+      console.log(
+        `  [${extraction.fieldDefinitionKey}] valueRaw="${extraction.valueRaw}" has no sourceSentence — forcing pending_review (missing_provenance)`
+      );
+      const methodologyRowsForProv = await db
+        .select({ id: methodologyVersions.id })
+        .from(methodologyVersions)
+        .where(eq(methodologyVersions.versionTag, provenance.methodologyVersion))
+        .limit(1);
+      if (methodologyRowsForProv.length === 0) {
+        throw new Error(
+          `Publish failed: no methodology_version found with version_tag "${provenance.methodologyVersion}"`
+        );
+      }
+      const methodologyVersionIdForProv = methodologyRowsForProv[0]!.id;
+      // Look up fieldDefinitionId here — the standard lookup further
+      // down in execute() runs after this gate, so we resolve it once.
+      const fieldDefRowsForProv = await db
+        .select({ id: fieldDefinitions.id })
+        .from(fieldDefinitions)
+        .where(eq(fieldDefinitions.key, extraction.fieldDefinitionKey))
+        .limit(1);
+      if (fieldDefRowsForProv.length === 0) {
+        throw new Error(
+          `Publish failed: no field_definition found with key "${extraction.fieldDefinitionKey}"`
+        );
+      }
+      const provForReview = { ...provenance, normalizationError: 'missing_provenance' };
+      await db
+        .insert(fieldValues)
+        .values({
+          programId: extraction.programId,
+          fieldDefinitionId: fieldDefRowsForProv[0]!.id,
+          valueRaw: extraction.valueRaw,
+          valueNormalized: null,
+          valueIndicatorScore: null,
+          provenance: provForReview,
+          status: 'pending_review',
+          extractedAt: extraction.extractedAt,
+          reviewedAt: null,
+          methodologyVersionId: methodologyVersionIdForProv,
+        })
+        .onConflictDoUpdate({
+          target: [fieldValues.programId, fieldValues.fieldDefinitionId],
+          set: {
+            valueRaw: extraction.valueRaw,
+            valueNormalized: null,
+            valueIndicatorScore: null,
+            provenance: provForReview,
+            status: 'pending_review',
+            extractedAt: extraction.extractedAt,
+            reviewedAt: null,
+            methodologyVersionId: methodologyVersionIdForProv,
+          },
+        });
+      return;
+    }
+
     const fieldDefRows = await db
       .select({
         id: fieldDefinitions.id,

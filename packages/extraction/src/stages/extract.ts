@@ -180,7 +180,7 @@ interface RawLlmSingle {
   extractionConfidence: number;
 }
 
-function assertSingleResponse(parsed: unknown, fieldKey: string): RawLlmSingle {
+export function assertSingleResponse(parsed: unknown, fieldKey: string): RawLlmSingle {
   if (typeof parsed !== 'object' || parsed === null)
     throw new Error(`Extraction response is not an object for field ${fieldKey}`);
   const obj = parsed as Record<string, unknown>;
@@ -200,6 +200,41 @@ function assertSingleResponse(parsed: unknown, fieldKey: string): RawLlmSingle {
   const conf = obj['extractionConfidence'];
   if (typeof conf !== 'number' || !isFinite(conf) || conf < 0 || conf > 1)
     errors.push('extractionConfidence must be a number between 0 and 1');
+
+  // Phase 3.8 / P2.5 — provenance binding. If the model returned a
+  // non-empty valueRaw with a non-zero confidence, it MUST be backed by
+  // a non-empty sourceSentence and a non-degenerate offset span.
+  // Empty valueRaw + zero confidence is the legitimate "not found"
+  // response and is left untouched.
+  if (
+    typeof obj['valueRaw'] === 'string' &&
+    obj['valueRaw'].trim() !== '' &&
+    typeof conf === 'number' &&
+    conf > 0
+  ) {
+    if (typeof obj['sourceSentence'] !== 'string' || obj['sourceSentence'].trim() === '') {
+      errors.push('non-empty valueRaw requires a non-empty sourceSentence (provenance binding)');
+    }
+    if (offsets && typeof offsets === 'object') {
+      const o = offsets as Record<string, unknown>;
+      if (
+        typeof o['start'] === 'number' &&
+        typeof o['end'] === 'number' &&
+        o['start'] === 0 &&
+        o['end'] === 0
+      ) {
+        errors.push('non-empty valueRaw requires non-zero characterOffsets (provenance binding)');
+      }
+      if (
+        typeof o['start'] === 'number' &&
+        typeof o['end'] === 'number' &&
+        (o['end'] as number) < (o['start'] as number)
+      ) {
+        errors.push('characterOffsets.end must be >= characterOffsets.start');
+      }
+    }
+  }
+
   if (errors.length > 0)
     throw new Error(`Extraction response invalid for field ${fieldKey}: ${errors.join('; ')}`);
   const o = offsets as Record<string, unknown>;

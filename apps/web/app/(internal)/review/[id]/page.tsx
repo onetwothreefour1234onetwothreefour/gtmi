@@ -38,6 +38,17 @@ function readScrapedAt(raw: unknown): string | null {
   return typeof v === 'string' ? v : null;
 }
 
+// Phase 3.8 / P2.5 — surface the publish-time gate reason. publish.ts
+// stamps provenance.normalizationError with `missing_provenance`,
+// `out_of_sanity_range: ...`, or `normalize_failed: ...` when a row is
+// forced to pending_review; show that to the analyst so the reason is
+// obvious without expanding the provenance JSON block.
+function readNormalizationError(raw: unknown): string | null {
+  if (raw === null || raw === undefined || typeof raw !== 'object') return null;
+  const v = (raw as Record<string, unknown>).normalizationError;
+  return typeof v === 'string' && v.trim() !== '' ? v : null;
+}
+
 export default async function ReviewDetailPage({ params }: PageProps) {
   const { id } = await params;
   const [row, pendingRows] = await Promise.all([getReviewDetail(id), listPendingReview()]);
@@ -100,6 +111,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   const charOffsets = readCharOffsets(row.provenance);
   const sourceTier = row.sourceTier ?? readSourceTier(row.provenance);
   const scrapedAt = readScrapedAt(row.provenance);
+  const normalizationError = readNormalizationError(row.provenance);
 
   return (
     <main className="px-8 pb-16 pt-8" style={{ background: 'var(--paper)' }}>
@@ -162,6 +174,40 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           </div>
           <StatusBanner status={row.status} />
         </header>
+
+        {normalizationError && (
+          <section
+            className="mb-6 border bg-paper p-4"
+            style={{ borderColor: 'var(--warning)' }}
+            data-testid="review-gate-reason"
+          >
+            <p className="eyebrow" style={{ color: 'var(--warning)' }}>
+              Why this is in review
+            </p>
+            <p className="serif mt-1" style={{ fontSize: 14, lineHeight: 1.45 }}>
+              {normalizationError.startsWith('missing_provenance') ? (
+                <>
+                  The extractor returned a value but no source sentence to back it up. Verify the
+                  value against the source URL below before approving.
+                </>
+              ) : normalizationError.startsWith('out_of_sanity_range') ? (
+                <>
+                  The extracted numeric is outside the field&apos;s sanity range —{' '}
+                  <span className="num">{normalizationError}</span>. Likely an LLM unit / format
+                  error; correct the raw value before approving.
+                </>
+              ) : normalizationError.startsWith('normalize_failed') ? (
+                <>
+                  Normalisation rejected the raw value:{' '}
+                  <span className="num">{normalizationError}</span>. Edit the raw to match the
+                  field&apos;s expected shape, or reject.
+                </>
+              ) : (
+                <span className="num">{normalizationError}</span>
+              )}
+            </p>
+          </section>
+        )}
 
         <section
           className="mb-6 border bg-paper-2 p-5"
