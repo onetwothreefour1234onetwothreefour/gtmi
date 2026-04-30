@@ -6,6 +6,7 @@ import { ReviewQueueStats } from './review-queue-stats';
 import { ReviewQueueTable } from './review-queue-table';
 import { BulkApproveDialog } from './bulk-approve-dialog';
 import { BulkApproveAllDialog } from './bulk-approve-all-dialog';
+import { RescoreCohortDialog } from './rescore-cohort-dialog';
 import { ChangesAudit } from './changes-audit';
 import type { ReviewListRow } from '@/lib/review-queries';
 import type { PolicyChangeRow } from '@/lib/queries/policy-changes';
@@ -232,6 +233,37 @@ describe('BulkApproveAllDialog', () => {
     render(<BulkApproveAllDialog pendingCount={3} onConfirm={onConfirm} />);
     await userEvent.click(screen.getByTestId('bulk-approve-all-trigger'));
     await userEvent.click(await screen.findByTestId('bulk-approve-all-confirm'));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Phase 3.8 / ADR-020 — cohort re-score confirmation dialog.
+describe('RescoreCohortDialog', () => {
+  it('renders the trigger and opens the confirmation dialog', async () => {
+    render(<RescoreCohortDialog onConfirm={vi.fn()} />);
+    const trigger = screen.getByTestId('rescore-cohort-trigger');
+    expect(trigger).toHaveTextContent('Re-score cohort');
+    await userEvent.click(trigger);
+    const dialog = await screen.findByTestId('rescore-cohort-dialog');
+    expect(dialog).toHaveTextContent(/Recompute every row score/);
+    expect(dialog).toHaveTextContent(/PHASE2_PLACEHOLDER_PARAMS/);
+  });
+
+  it('Cancel closes without invoking onConfirm', async () => {
+    const onConfirm = vi.fn();
+    render(<RescoreCohortDialog onConfirm={onConfirm} />);
+    await userEvent.click(screen.getByTestId('rescore-cohort-trigger'));
+    await screen.findByTestId('rescore-cohort-dialog');
+    await userEvent.click(screen.getByTestId('rescore-cohort-cancel'));
+    expect(screen.queryByTestId('rescore-cohort-dialog')).not.toBeInTheDocument();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('Confirm triggers onConfirm', async () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+    render(<RescoreCohortDialog onConfirm={onConfirm} />);
+    await userEvent.click(screen.getByTestId('rescore-cohort-trigger'));
+    await userEvent.click(await screen.findByTestId('rescore-cohort-confirm'));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 });

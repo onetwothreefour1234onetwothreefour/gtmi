@@ -4,6 +4,7 @@ import {
   ReviewFilterTabs,
   BulkApproveDialog,
   BulkApproveAllDialog,
+  RescoreCohortDialog,
   DataTableNote,
 } from '@/components/gtmi';
 import { listPendingReview, listRecentlyReviewed } from '@/lib/review-queries';
@@ -15,6 +16,7 @@ import {
 } from '@/lib/review-queue-helpers';
 import type { ReviewListRow } from '@/lib/review-queries';
 import { bulkApproveAllPending, bulkApproveHighConfidence } from './actions';
+import { rescoreCohort } from './rescore-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -107,6 +109,7 @@ export default async function ReviewPage({
               onConfirm={bulkApproveHighConfidence}
             />
             <BulkApproveAllDialog pendingCount={stats.inQueue} onConfirm={bulkApproveAllPending} />
+            <RescoreCohortDialog onConfirm={rescoreCohort} />
           </div>
         </div>
 

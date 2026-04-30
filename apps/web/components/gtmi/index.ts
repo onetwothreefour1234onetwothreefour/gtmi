@@ -59,4 +59,5 @@ export { ReviewQueueTable } from './review-queue-table';
 export { ReviewFilterTabs } from './review-filter-tabs';
 export { BulkApproveDialog } from './bulk-approve-dialog';
 export { BulkApproveAllDialog } from './bulk-approve-all-dialog';
+export { RescoreCohortDialog } from './rescore-cohort-dialog';
 export { ChangesAudit, type ChangesFilterTab } from './changes-audit';

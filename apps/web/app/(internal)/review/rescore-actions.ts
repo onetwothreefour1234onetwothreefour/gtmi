@@ -18,10 +18,10 @@
 // `field_values.value_indicator_score`. The composite re-write lands
 // alongside `rescoreProgram` in the next commit.
 
-import { db, fieldDefinitions, fieldValues } from '@gtmi/db';
+import { db, fieldDefinitions, fieldValues, programs } from '@gtmi/db';
 import { PHASE2_PLACEHOLDER_PARAMS, scoreSingleIndicator } from '@gtmi/scoring';
 import type { FieldDefinitionRecord } from '@gtmi/scoring';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
 interface FieldDefForRescore {
@@ -106,4 +106,151 @@ export async function rescoreFieldValue(id: string): Promise<{ score: number | n
   revalidatePath('/review');
   revalidatePath(`/review/${id}`);
   return { score };
+}
+
+/**
+ * Recompute `value_indicator_score` for every approved + pending row in
+ * one programme. Mirrors the standalone backfill script but scoped to
+ * a single program_id and runnable from the /review queue header
+ * dropdown.
+ *
+ * Returns { rowsRescored, rowsSkipped } — skipped rows are those with
+ * `value_normalized IS NULL` (legitimately unscored, e.g. the FIX-1
+ * not-applicable derive markers).
+ */
+export async function rescoreProgram(
+  programId: string
+): Promise<{ rowsRescored: number; rowsSkipped: number; programName: string }> {
+  if (!programId) throw new Error('rescoreProgram: missing programId');
+
+  const programRows = await db
+    .select({ id: programs.id, name: programs.name })
+    .from(programs)
+    .where(eq(programs.id, programId))
+    .limit(1);
+  if (programRows.length === 0) {
+    throw new Error(`rescoreProgram: no programme with id=${programId}`);
+  }
+  const programName = programRows[0]!.name;
+
+  const rows = await db
+    .select({
+      id: fieldValues.id,
+      valueNormalized: fieldValues.valueNormalized,
+      def: {
+        id: fieldDefinitions.id,
+        key: fieldDefinitions.key,
+        pillar: fieldDefinitions.pillar,
+        subFactor: fieldDefinitions.subFactor,
+        weightWithinSubFactor: fieldDefinitions.weightWithinSubFactor,
+        normalizationFn: fieldDefinitions.normalizationFn,
+        direction: fieldDefinitions.direction,
+        scoringRubricJsonb: fieldDefinitions.scoringRubricJsonb,
+      },
+    })
+    .from(fieldValues)
+    .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
+    .where(
+      and(
+        eq(fieldValues.programId, programId),
+        inArray(fieldValues.status, ['approved', 'pending_review'])
+      )
+    );
+
+  let rowsRescored = 0;
+  let rowsSkipped = 0;
+  const updates: Array<{ id: string; score: string | null }> = [];
+
+  for (const r of rows) {
+    if (r.valueNormalized === null || r.valueNormalized === undefined) {
+      rowsSkipped++;
+      continue;
+    }
+    let score: number | null = null;
+    try {
+      score = scoreSingleIndicator({
+        fieldDefinition: buildFieldDefinitionRecord(r.def as FieldDefForRescore),
+        valueNormalized: r.valueNormalized,
+        normalizationParams: PHASE2_PLACEHOLDER_PARAMS,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[rescoreProgram] scoreSingleIndicator failed for ${r.id}: ${msg}`);
+    }
+    if (score === null) {
+      rowsSkipped++;
+      continue;
+    }
+    updates.push({ id: r.id, score: String(score) });
+    rowsRescored++;
+  }
+
+  if (updates.length > 0) {
+    await db.transaction(async (tx) => {
+      for (const u of updates) {
+        await tx
+          .update(fieldValues)
+          .set({ valueIndicatorScore: u.score })
+          .where(eq(fieldValues.id, u.id));
+      }
+    });
+  }
+
+  console.log(
+    `[rescoreProgram] ${programName} (${programId}): rescored=${rowsRescored} skipped=${rowsSkipped}`
+  );
+  revalidatePath('/review');
+  revalidatePath(`/programs/${programId}`);
+  return { rowsRescored, rowsSkipped, programName };
+}
+
+/**
+ * Recompute `value_indicator_score` for every approved + pending row
+ * across the entire cohort. Iterates rescoreProgram per programme so
+ * each programme commits independently — a failure on one doesn't
+ * roll back the rest.
+ *
+ * Used after a calibration commit replaces PHASE2_PLACEHOLDER_PARAMS.
+ * Single-pass; ~30-60s in steady state. Promote to a Trigger.dev job
+ * if cohort size grows past the Cloud Run request timeout.
+ */
+export async function rescoreCohort(): Promise<{
+  programsRescored: number;
+  rowsRescored: number;
+  rowsSkipped: number;
+}> {
+  // Programmes with at least one approved + pending row.
+  const progRows = await db.execute<{ id: string; name: string }>(sql`
+    SELECT DISTINCT p.id, p.name
+    FROM field_values fv
+    JOIN programs p ON p.id = fv.program_id
+    WHERE fv.status IN ('approved', 'pending_review')
+    ORDER BY p.name
+  `);
+  const iter = Array.isArray(progRows)
+    ? progRows
+    : ((progRows as unknown as { rows?: Array<{ id: string }> }).rows ?? []);
+  const allPrograms = iter as Array<{ id: string; name: string }>;
+
+  let programsRescored = 0;
+  let rowsRescored = 0;
+  let rowsSkipped = 0;
+
+  for (const p of allPrograms) {
+    try {
+      const r = await rescoreProgram(p.id);
+      programsRescored++;
+      rowsRescored += r.rowsRescored;
+      rowsSkipped += r.rowsSkipped;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[rescoreCohort] ${p.name} (${p.id}) failed: ${msg}`);
+    }
+  }
+
+  console.log(
+    `[rescoreCohort] programmes=${programsRescored}/${allPrograms.length} rescored=${rowsRescored} skipped=${rowsSkipped}`
+  );
+  revalidatePath('/review');
+  return { programsRescored, rowsRescored, rowsSkipped };
 }
