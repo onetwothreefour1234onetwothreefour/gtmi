@@ -37,6 +37,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@google-cloud/storage':
+        specifier: ^7.14.0
+        version: 7.19.0
       '@gtmi/db':
         specifier: workspace:*
         version: link:../../packages/db
