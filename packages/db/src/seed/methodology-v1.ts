@@ -1137,7 +1137,7 @@ Allowed values:
 
 "automatic": public schooling available on the same basis as citizens/PRs (no extra fees).
 "fee_paying": access available but foreign-student or fee-paying levy applies.
-"restricted": case-by-case basis or local-authority approval; not guaranteed.
+"restricted": case-by-case basis or local-authority approval, not guaranteed.
 "none": no access to public education.
 
 Edge cases:
@@ -1156,7 +1156,7 @@ Higher-education access is separate and not required here.`,
           },
           {
             value: 'restricted',
-            description: 'case-by-case basis or local-authority approval; not guaranteed.',
+            description: 'case-by-case basis or local-authority approval, not guaranteed.',
           },
           { value: 'none', description: 'no access to public education.' },
         ],

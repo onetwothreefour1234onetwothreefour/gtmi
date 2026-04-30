@@ -36,7 +36,7 @@ SET "scoring_rubric_jsonb" = jsonb_build_object(
     jsonb_build_object(
       'value', 'restricted',
       'score', 20,
-      'description', 'case-by-case basis or local-authority approval; not guaranteed.'
+      'description', 'case-by-case basis or local-authority approval, not guaranteed.'
     ),
     jsonb_build_object(
       'value', 'none',
@@ -76,7 +76,7 @@ UPDATE "field_definitions"
 SET "extraction_prompt_md" = regexp_replace(
   "extraction_prompt_md",
   E'Allowed values:\\s*\\n\\s*\\n"full_access".*?"no_access":[^\\n]*\\n',
-  E'Allowed values:\n\n"automatic": public schooling available on the same basis as citizens/PRs (no extra fees).\n"fee_paying": access available but foreign-student or fee-paying levy applies.\n"restricted": case-by-case basis or local-authority approval; not guaranteed.\n"none": no access to public education.\n',
+  E'Allowed values:\n\n"automatic": public schooling available on the same basis as citizens/PRs (no extra fees).\n"fee_paying": access available but foreign-student or fee-paying levy applies.\n"restricted": case-by-case basis or local-authority approval, not guaranteed.\n"none": no access to public education.\n',
   'sn'
 )
 WHERE "key" = 'C.3.2';

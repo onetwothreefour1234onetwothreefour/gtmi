@@ -855,7 +855,7 @@ const C32_REGIONAL_RUBRIC = {
     {
       value: 'restricted',
       score: 20,
-      description: 'case-by-case basis or local-authority approval; not guaranteed.',
+      description: 'case-by-case basis or local-authority approval, not guaranteed.',
     },
     {
       value: 'none',
