@@ -517,6 +517,46 @@ export const validationCache = pgTable(
   ]
 );
 
+// Phase 3.9 / W8 — Stage 0 discovery telemetry.
+// One row per discovery invocation. Powers the "when can we stop paying
+// Perplexity" decision: when marginal_yield_pct trends toward 0%, the
+// cohort archive has saturated and Stage 0 can shift to archive-only
+// re-runs (W6) for mature countries. Migration 00016.
+export const discoveryTelemetry = pgTable(
+  'discovery_telemetry',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    programId: uuid('program_id')
+      .notNull()
+      .references(() => programs.id),
+    countryIso: varchar('country_iso', { length: 3 }).notNull(),
+    discoveredAt: timestamp('discovered_at', { withTimezone: true }).defaultNow().notNull(),
+    urlsDiscovered: integer('urls_discovered').notNull(),
+    urlsAlreadyInRegistry: integer('urls_already_in_registry').notNull(),
+    urlsAlreadyInArchiveForCountry: integer('urls_already_in_archive_for_country').notNull(),
+    urlsNewToArchive: integer('urls_new_to_archive').notNull(),
+    marginalYieldPct: decimal('marginal_yield_pct', { precision: 5, scale: 2 }).notNull(),
+    cacheHit: boolean('cache_hit').default(false).notNull(),
+    notes: jsonb('notes'),
+  },
+  (table) => [
+    index('idx_discovery_telemetry_program_at').on(table.programId, table.discoveredAt.desc()),
+    index('idx_discovery_telemetry_country_at').on(table.countryIso, table.discoveredAt.desc()),
+    pgPolicy('Team members can write discovery_telemetry', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+    pgPolicy('Public read discovery_telemetry', {
+      as: 'permissive',
+      for: 'select',
+      to: 'public',
+      using: sql`true`,
+    }),
+  ]
+);
+
 // Phase 3.9 / W2 — translation cache.
 // Memoises non-English-to-English translations of scrape markdown so
 // re-running the same scrape (or re-extracting from archive) does not

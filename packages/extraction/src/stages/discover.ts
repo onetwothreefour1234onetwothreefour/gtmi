@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm';
 import type { DiscoveredUrl, DiscoveryResult } from '../types/extraction';
 import type { DiscoverStage } from '../types/pipeline';
 import { loadProgramSourcesAsDiscovered } from '../utils/url-merge';
+import { writeDiscoveryTelemetry } from '../utils/telemetry';
 import { getCountryDepartments, renderCountryDepartmentsHint } from '../data/country-departments';
 
 // Phase 3.9 / W4 — minimal ISO 639-1 → human-readable label map for the
@@ -450,6 +451,16 @@ export class DiscoverStageImpl implements DiscoverStage {
         // Phase 3.6 / ADR-015 — write-back runs on cache-hit too so
         // last_seen_at bumps for cached URLs (registry stays warm).
         await writeToSourcesTable(programId, verified);
+        // Phase 3.9 / W8 — telemetry writes on cache hits too, so the
+        // dashboard sees a complete record of every discovery
+        // invocation (yield should trend high on cache hits because
+        // these URLs are already in the registry).
+        await writeDiscoveryTelemetry({
+          programId,
+          countryIso: country,
+          discoveredUrls: verified,
+          cacheHit: true,
+        });
         return {
           programId,
           programName,
@@ -504,6 +515,17 @@ export class DiscoverStageImpl implements DiscoverStage {
     await writeDiscoveryCache(cacheKey, programId, discoveredUrls);
     // Phase 3.6 / ADR-015 — persist verified URLs to sources registry.
     await writeToSourcesTable(programId, discoveredUrls);
+
+    // Phase 3.9 / W8 — telemetry. Records the marginal-yield delta
+    // between fresh Perplexity output and the country's existing
+    // archive coverage. Drives the "when can we cut Perplexity
+    // budget" decision.
+    await writeDiscoveryTelemetry({
+      programId,
+      countryIso: country,
+      discoveredUrls,
+      cacheHit: false,
+    });
 
     return {
       programId,

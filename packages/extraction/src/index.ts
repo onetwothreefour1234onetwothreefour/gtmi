@@ -119,6 +119,9 @@ export {
   translateIfNeeded,
 } from './utils/translate';
 export type { TranslateResult } from './utils/translate';
+// Phase 3.9 / W8 — discovery telemetry writer.
+export { writeDiscoveryTelemetry } from './utils/telemetry';
+export type { WriteDiscoveryTelemetryArgs } from './utils/telemetry';
 export { scoreProgramFromDb } from './utils/score-program';
 export type { ScoreProgramOptions, ScoreProgramResult } from './utils/score-program';
 
