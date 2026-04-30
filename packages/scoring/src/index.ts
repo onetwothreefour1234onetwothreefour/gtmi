@@ -1,6 +1,13 @@
 export { runScoringEngine, scoreSingleIndicator } from './engine';
 export { PHASE2_PLACEHOLDER_PARAMS } from './placeholder-params';
 export {
+  ACTIVE_FIELD_CODES,
+  WAVE_1_ENABLED,
+  WAVE_1_FIELD_CODES,
+  WAVE_2_ENABLED,
+  WAVE_2_FIELD_CODES,
+} from './wave-config';
+export {
   BOOLEAN_WITH_ANNOTATION_KEYS,
   COUNTRY_REGIONS,
   REGIONAL_SUBSTITUTES,
