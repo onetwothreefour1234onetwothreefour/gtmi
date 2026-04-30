@@ -10,6 +10,7 @@ import {
   unapproveFieldValue,
 } from '@/app/(internal)/review/actions';
 import { rescoreFieldValue } from '@/app/(internal)/review/rescore-actions';
+import { reextractFieldValue } from '@/app/(internal)/review/reextract-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -148,6 +149,18 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     const fvId = (fd.get('id') as string | null) ?? '';
     if (!fvId) throw new Error('rescore: missing field_value id');
     await rescoreFieldValue(fvId);
+  }
+
+  // Phase 3.8 / P3.5 — re-run extraction against the cached scrape with
+  // a rubric-grounded focused prompt that includes the previous valueRaw
+  // and the analyst's reject reason. Routes the new value back through
+  // pending_review.
+  async function reextract(fd: FormData): Promise<void> {
+    'use server';
+    const fvId = (fd.get('id') as string | null) ?? '';
+    if (!fvId) throw new Error('reextract: missing field_value id');
+    const reason = (fd.get('reason') as string | null)?.trim() || undefined;
+    await reextractFieldValue(fvId, reason);
   }
 
   const isPending = row.status === 'pending_review';
@@ -497,6 +510,36 @@ export default async function ReviewDetailPage({ params }: PageProps) {
             <input type="hidden" name="id" value={id} />
             <button type="submit" className="btn" data-testid="rescore-button">
               Re-score
+            </button>
+          </form>
+        </section>
+
+        <section
+          className="mb-6 flex flex-wrap items-center gap-3 border bg-paper-2 p-4"
+          style={{ borderColor: 'var(--rule)' }}
+          data-testid="review-detail-reextract"
+        >
+          <div className="grow text-data-sm text-ink-3">
+            <p className="eyebrow mb-1">Re-extract from source</p>
+            <p>
+              Re-runs the LLM against the cached scrape with a focused prompt that includes the
+              rubric vocabulary, the previous <span className="num">value_raw</span>, and any reason
+              you supply below. The new value comes back as{' '}
+              <span className="num">pending_review</span>.
+            </p>
+          </div>
+          <form action={reextract} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="id" value={id} />
+            <input
+              name="reason"
+              type="text"
+              maxLength={300}
+              placeholder="Why was the previous value wrong? (optional)"
+              className="num border bg-paper p-2 text-data-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              style={{ borderColor: 'var(--rule)', fontSize: 12, minWidth: 280 }}
+            />
+            <button type="submit" className="btn" data-testid="reextract-button">
+              Re-extract
             </button>
           </form>
         </section>

@@ -81,7 +81,11 @@ export {
 } from './utils/url-merge';
 export type { DbClient } from './utils/url-merge';
 export { HumanReviewStageImpl } from './stages/human-review';
-export { ExtractStageImpl, computeExtractionCacheKey } from './stages/extract';
+export {
+  ExtractStageImpl,
+  computeExtractionCacheKey,
+  buildFocusedReextractionPrompt,
+} from './stages/extract';
 export { PublishStageImpl } from './stages/publish';
 export { ScrapeStageImpl } from './stages/scrape';
 export { ValidateStageImpl } from './stages/validate';

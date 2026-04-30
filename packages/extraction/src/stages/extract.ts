@@ -276,11 +276,95 @@ function makeOutput(raw: RawLlmSingle, fieldKey: string, programId: string): Ext
   };
 }
 
+// ────────────────────────────────────────────────────────────────────
+// Phase 3.8 / P3.5 — focused re-extraction. Append a "REVIEW CONTEXT"
+// block to the original prompt so the LLM knows it's re-running on a
+// row the analyst already saw and rejected. The block carries:
+//   - the previous valueRaw (so the model can correct rather than
+//     repeat itself)
+//   - the analyst's rejection reason (free-text; passed through)
+//   - an explicit reminder of the rubric vocabulary when applicable
+//
+// The caller (server action) is responsible for assembling the rubric
+// vocabulary; this helper just templates the block into the existing
+// per-field prompt.
+// ────────────────────────────────────────────────────────────────────
+export function buildFocusedReextractionPrompt(args: {
+  basePromptMd: string;
+  previousValueRaw: string | null;
+  rejectReason: string | null;
+  rubricVocabBlock: string | null;
+}): string {
+  const lines: string[] = [];
+  lines.push('REVIEW CONTEXT (previous attempt failed analyst review — be precise):');
+  lines.push('');
+  if (args.previousValueRaw) {
+    lines.push(`- Previous valueRaw was: "${args.previousValueRaw}"`);
+  }
+  if (args.rejectReason) {
+    lines.push(`- Reviewer notes: ${args.rejectReason}`);
+  }
+  if (args.rubricVocabBlock) {
+    lines.push(`- The valueRaw MUST be one of the rubric values listed below.`);
+  }
+  lines.push('- Reread the source content carefully; do not return the same incorrect value.');
+  lines.push(
+    '- If you cannot find a verifiable answer in the supplied content, return an empty valueRaw with confidence 0.0 (per the no-inference directive).'
+  );
+  if (args.rubricVocabBlock) {
+    lines.push('');
+    lines.push(args.rubricVocabBlock);
+  }
+  return `${args.basePromptMd}\n\n${lines.join('\n')}`;
+}
+
 export class ExtractStageImpl implements ExtractStage {
   private readonly fieldPrompts: ReadonlyMap<string, string>;
 
   constructor(fieldPrompts: ReadonlyMap<string, string>) {
     this.fieldPrompts = fieldPrompts;
+  }
+
+  // Phase 3.8 / P3.5 — bypass the fieldPrompts constructor map and
+  // run the LLM with a one-off (focused) prompt. Used by the
+  // /review re-extract action; intentionally skips the cache write
+  // because a focused prompt is unique to its (programId, fieldKey,
+  // rejectReason, previousValueRaw) tuple and would pollute the cache
+  // for normal extractions.
+  async executeWithPrompt(
+    scrape: ScrapeResult,
+    fieldKey: string,
+    programId: string,
+    programName: string,
+    countryIso: string,
+    promptMd: string
+  ): Promise<ExtractionOutput> {
+    const client = createAnthropicClient();
+    const content = selectContentWindow(
+      scrape.contentMarkdown,
+      [{ key: fieldKey, label: '' }],
+      MAX_CONTENT_CHARS
+    );
+    const response = await client.messages.create({
+      model: MODEL_EXTRACTION,
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: buildSingleUserMessage(fieldKey, promptMd, programName, countryIso, content),
+        },
+      ],
+    });
+    type ContentItem = (typeof response.content)[number];
+    const lastTextBlock = response.content
+      .filter((b): b is Extract<ContentItem, { type: 'text' }> => b.type === 'text')
+      .at(-1);
+    if (!lastTextBlock)
+      throw new Error(`Re-extraction returned no text content for field ${fieldKey}`);
+    const parsed = JSON.parse(stripJsonFences(lastTextBlock.text));
+    const validated = assertSingleResponse(parsed, fieldKey);
+    return makeOutput(validated, fieldKey, programId);
   }
 
   // ── Single-field extraction (kept for backwards compatibility) ──────────
