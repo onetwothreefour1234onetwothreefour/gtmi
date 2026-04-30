@@ -13,6 +13,8 @@ import {
   normalizeMinMax,
   normalizeZScore,
   parseIndicatorValue,
+  REGIONAL_SUBSTITUTES,
+  type Region,
 } from './normalize';
 import { isNoLimitMarker, isNotApplicableMarker } from './sentinels';
 import {
@@ -83,19 +85,74 @@ export function scoreSingleIndicator(args: {
         return def.direction === 'higher_is_better' ? 100 : 0;
       }
       return normalizeZScore(parsed as number, params, def.direction);
-    case 'categorical':
-    case 'country_substitute_regional': {
-      // country_substitute_regional reuses the categorical scoring path —
-      // the substituted string in valueNormalized maps to a rubric score
-      // exactly like a normal categorical extraction. The "country
-      // substitute" provenance lives on the field_values row's
-      // provenance.extractionModel, not in scoring.
+    case 'categorical': {
       if (!def.scoringRubricJsonb) {
         throw new ScoringError(
-          `Field "${def.key}" uses ${def.normalizationFn} normalization but has no scoringRubricJsonb`
+          `Field "${def.key}" uses categorical normalization but has no scoringRubricJsonb`
         );
       }
       return normalizeCategorical(parsed as string, def.scoringRubricJsonb);
+    }
+    case 'country_substitute_regional': {
+      // Phase 3.8 — substituted rows score from REGIONAL_SUBSTITUTES,
+      // NOT the field rubric. The substitute vocabulary (e.g.
+      // 'automatic', 'fee_paying') diverges from the rubric vocabulary
+      // (e.g. 'full_access', 'fee_based') by design (ADR-014):
+      // PublishStageImpl.executeCountrySubstitute writes the row with
+      // value_normalized = {substituted, value, region} AND a
+      // pre-computed value_indicator_score, so the engine never had to
+      // touch this path until Phase 3.8 wired runScoringEngine into the
+      // /review re-score buttons + the canary auto-rescore. The score
+      // we produce here MUST equal the substitute map's score for the
+      // row's region — that's the analyst's calibration of "what does
+      // OECD-high-income access mean for this indicator".
+      //
+      // Three input shapes accepted:
+      //   1. {substituted: true, value: string, region: 'OECD_HIGH_INCOME' | 'GCC' | 'OTHER'}
+      //      — the canonical write shape. region drives the score.
+      //   2. bare string in the substitute vocabulary ('automatic' / 'fee_paying')
+      //      — legacy fallback when the engine was given parseIndicatorValue's
+      //      extracted value rather than the original object. Reverse-look-up
+      //      against REGIONAL_SUBSTITUTES[def.key] to find the matching region.
+      //   3. anything else — ScoringError.
+      const fieldMap = REGIONAL_SUBSTITUTES[def.key];
+      if (!fieldMap) {
+        throw new ScoringError(
+          `country_substitute_regional row for "${def.key}" has no entry in REGIONAL_SUBSTITUTES`
+        );
+      }
+      // Shape 1: substituted-object with `region`.
+      if (
+        typeof valueNormalized === 'object' &&
+        valueNormalized !== null &&
+        !Array.isArray(valueNormalized) &&
+        typeof (valueNormalized as { region?: unknown }).region === 'string'
+      ) {
+        const region = (valueNormalized as { region: string }).region as Region;
+        const sub = fieldMap[region];
+        if (sub && typeof sub.score === 'number') return sub.score;
+        // Region falls outside the substitute map (e.g. OTHER for a
+        // field with no OTHER fallback). The substitute should not have
+        // been written at all in that case; surface the inconsistency
+        // loudly rather than silently returning a wrong score.
+        throw new ScoringError(
+          `country_substitute_regional row for "${def.key}" has region "${region}" but REGIONAL_SUBSTITUTES has no entry for that region`
+        );
+      }
+      // Shape 2: bare string — reverse-lookup the substitute map.
+      if (typeof parsed === 'string') {
+        for (const sub of Object.values(fieldMap)) {
+          if (sub && sub.value === parsed && typeof sub.score === 'number') {
+            return sub.score;
+          }
+        }
+        throw new ScoringError(
+          `country_substitute_regional row for "${def.key}" has value "${parsed}" but no matching region in REGIONAL_SUBSTITUTES (substitute vocabulary diverges from the field rubric by design — ADR-014)`
+        );
+      }
+      throw new ScoringError(
+        `country_substitute_regional row for "${def.key}" has unrecognised value_normalized shape: ${typeof valueNormalized}`
+      );
     }
     case 'boolean':
       return normalizeBoolean(parsed as boolean, def.direction);

@@ -134,14 +134,67 @@ describe('runScoringEngine — country_substitute_regional (Phase 3.5)', () => {
     expect(out.subFactorScores['B.2']).toBe(40);
   });
 
-  it('country_substitute_regional without rubric throws', () => {
+  // Phase 3.8 — substitute scoring uses REGIONAL_SUBSTITUTES (region →
+  // score) directly, NOT the field rubric. The rubric and substitute
+  // vocabularies diverge by design (ADR-014), so the engine no longer
+  // requires a rubric for country_substitute_regional rows.
+  it('country_substitute_regional scores from REGIONAL_SUBSTITUTES even without a rubric', () => {
+    const input = buildInput({
+      defKey: 'C.3.2',
+      fn: 'country_substitute_regional',
+      direction: 'higher_is_better',
+      rubric: null, // rubric ignored for substitutes
+      valueNormalized: 'automatic', // bare-string form; reverse-looks-up to OECD → 100
+    });
+    const out = runScoringEngine(input);
+    expect(out.subFactorScores['B.2']).toBe(100);
+  });
+
+  it('country_substitute_regional throws when the field has no REGIONAL_SUBSTITUTES entry', () => {
+    const input = buildInput({
+      defKey: 'X.0.0', // no entry in REGIONAL_SUBSTITUTES
+      fn: 'country_substitute_regional',
+      direction: 'higher_is_better',
+      rubric: null,
+      valueNormalized: 'whatever',
+    });
+    expect(() => runScoringEngine(input)).toThrow(/REGIONAL_SUBSTITUTES/);
+  });
+
+  // Phase 3.8 — production write shape regression test. Locks the
+  // contract that runScoringEngine accepts the exact object that
+  // PublishStageImpl.executeCountrySubstitute persists to
+  // field_values.value_normalized:
+  //   {substituted: true, value: <string>, region: <Region>}
+  //
+  // This is the integration smoke that, had it existed before Phase 3.8,
+  // would have caught the cohort-rescore crash (deployed rev
+  // gtmi-web-00028-x7b spent 30-60s per cohort run catching ScoringError
+  // on every substitute row, starving the Cloud Run instance and
+  // 504'ing the rankings landing page).
+  it('runScoringEngine accepts the production object shape from executeCountrySubstitute', () => {
+    const objectShape = {
+      substituted: true,
+      value: 'automatic',
+      region: 'OECD_HIGH_INCOME',
+    };
     const input = buildInput({
       defKey: 'C.3.2',
       fn: 'country_substitute_regional',
       direction: 'higher_is_better',
       rubric: null,
-      valueNormalized: 'automatic',
+      valueNormalized: objectShape,
     });
-    expect(() => runScoringEngine(input)).toThrow(/no scoringRubricJsonb/);
+    const out = runScoringEngine(input);
+    expect(out.subFactorScores['B.2']).toBe(100);
+    // GCC mirror.
+    const gccInput = buildInput({
+      defKey: 'C.3.2',
+      fn: 'country_substitute_regional',
+      direction: 'higher_is_better',
+      rubric: null,
+      valueNormalized: { substituted: true, value: 'fee_paying', region: 'GCC' },
+    });
+    expect(runScoringEngine(gccInput).subFactorScores['B.2']).toBe(40);
   });
 });

@@ -156,22 +156,100 @@ describe('scoreSingleIndicator — categorical', () => {
 });
 
 describe('scoreSingleIndicator — country_substitute_regional', () => {
-  it('reads the same rubric path as categorical', () => {
+  // Phase 3.8 — substitute scoring uses REGIONAL_SUBSTITUTES (region →
+  // score), NOT the field rubric. The substitute vocabulary diverges
+  // from the rubric vocabulary by design (ADR-014). C.3.2 is the only
+  // such field today; OECD_HIGH_INCOME → 100, GCC → 40.
+  it('scores the {substituted, value, region} object via REGIONAL_SUBSTITUTES (OECD)', () => {
     const r = scoreSingleIndicator({
       fieldDefinition: defOf({
         key: 'C.3.2',
         normalizationFn: 'country_substitute_regional',
+        // Note the rubric below uses the FIELD vocabulary (full_access,
+        // fee_based) — the substitute path bypasses it entirely.
         scoringRubricJsonb: {
           categories: [
-            { value: 'automatic', score: 100, description: '' },
-            { value: 'fee_paying', score: 40, description: '' },
+            { value: 'full_access', score: 100, description: '' },
+            { value: 'fee_based', score: 60, description: '' },
+            { value: 'limited', score: 30, description: '' },
+            { value: 'no_access', score: 0, description: '' },
           ],
         },
+      }),
+      valueNormalized: { substituted: true, value: 'automatic', region: 'OECD_HIGH_INCOME' },
+      normalizationParams: NO_PARAMS,
+    });
+    expect(r).toBe(100);
+  });
+
+  it('scores the {substituted, value, region} object via REGIONAL_SUBSTITUTES (GCC)', () => {
+    const r = scoreSingleIndicator({
+      fieldDefinition: defOf({
+        key: 'C.3.2',
+        normalizationFn: 'country_substitute_regional',
+        scoringRubricJsonb: { categories: [{ value: 'full_access', score: 100, description: '' }] },
+      }),
+      valueNormalized: { substituted: true, value: 'fee_paying', region: 'GCC' },
+      normalizationParams: NO_PARAMS,
+    });
+    expect(r).toBe(40);
+  });
+
+  it('reverse-looks-up the substitute map when given a bare string in the substitute vocabulary', () => {
+    // Legacy fallback: parseIndicatorValue extracts `.value` in some
+    // older code paths, leaving the engine with the bare string.
+    const r = scoreSingleIndicator({
+      fieldDefinition: defOf({
+        key: 'C.3.2',
+        normalizationFn: 'country_substitute_regional',
+        scoringRubricJsonb: { categories: [{ value: 'full_access', score: 100, description: '' }] },
       }),
       valueNormalized: 'automatic',
       normalizationParams: NO_PARAMS,
     });
     expect(r).toBe(100);
+  });
+
+  it('throws when the field has no entry in REGIONAL_SUBSTITUTES', () => {
+    expect(() =>
+      scoreSingleIndicator({
+        fieldDefinition: defOf({
+          key: 'X.0.0',
+          normalizationFn: 'country_substitute_regional',
+          scoringRubricJsonb: null,
+        }),
+        valueNormalized: { substituted: true, value: 'automatic', region: 'OECD_HIGH_INCOME' },
+        normalizationParams: NO_PARAMS,
+      })
+    ).toThrow(/no entry in REGIONAL_SUBSTITUTES/);
+  });
+
+  it('throws when the row carries a region not registered for the field (e.g. OTHER for C.3.2)', () => {
+    expect(() =>
+      scoreSingleIndicator({
+        fieldDefinition: defOf({
+          key: 'C.3.2',
+          normalizationFn: 'country_substitute_regional',
+          scoringRubricJsonb: null,
+        }),
+        valueNormalized: { substituted: true, value: 'something', region: 'OTHER' },
+        normalizationParams: NO_PARAMS,
+      })
+    ).toThrow(/region "OTHER"/);
+  });
+
+  it('throws when the bare-string value is not in any substitute entry for the field', () => {
+    expect(() =>
+      scoreSingleIndicator({
+        fieldDefinition: defOf({
+          key: 'C.3.2',
+          normalizationFn: 'country_substitute_regional',
+          scoringRubricJsonb: null,
+        }),
+        valueNormalized: 'full_access', // rubric vocabulary, not substitute vocabulary
+        normalizationParams: NO_PARAMS,
+      })
+    ).toThrow(/no matching region in REGIONAL_SUBSTITUTES/);
   });
 });
 

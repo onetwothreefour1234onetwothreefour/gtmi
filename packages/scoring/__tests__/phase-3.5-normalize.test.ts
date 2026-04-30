@@ -194,14 +194,14 @@ describe('Phase 3.5 — parseIndicatorValue type-narrowing', () => {
   // `.value` field from the object so cohort scoring can read C.3.2 rows
   // without throwing.
   describe('country_substitute_regional accepts the substituted-object shape', () => {
-    it('extracts `.value` from the {substituted, value, region} write shape', () => {
+    it('returns the {substituted, value, region} object verbatim so the engine can read region', () => {
       const obj = { substituted: true, value: 'automatic', region: 'OECD_HIGH_INCOME' };
-      expect(parseIndicatorValue(obj, 'country_substitute_regional')).toBe('automatic');
+      expect(parseIndicatorValue(obj, 'country_substitute_regional')).toEqual(obj);
     });
 
-    it('extracts `.value` even when other keys are missing', () => {
+    it('returns the object verbatim even when only `.value` is set', () => {
       const obj = { value: 'fee_paying' };
-      expect(parseIndicatorValue(obj, 'country_substitute_regional')).toBe('fee_paying');
+      expect(parseIndicatorValue(obj, 'country_substitute_regional')).toEqual(obj);
     });
 
     it('still throws when the object has no string `.value` field', () => {
