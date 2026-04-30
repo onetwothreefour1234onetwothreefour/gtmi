@@ -126,5 +126,7 @@ export * from './data/country-non-gov-costs';
 export * from './data/country-pr-presence';
 // Phase 3.6.4 / FIX 2 — country-level D.1.2 PR timeline lookup.
 export * from './data/country-pr-timeline';
+// Phase 3.9 / W3 — per-country cross-departmental authority registry.
+export * from './data/country-departments';
 // Phase 3.6.4 / FIX 1 — currency detection (with bare-$ country fallback).
 export { detectCurrency, BARE_DOLLAR_COUNTRY_FALLBACK } from './utils/currency';

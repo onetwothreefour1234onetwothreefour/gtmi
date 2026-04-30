@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm';
 import type { DiscoveredUrl, DiscoveryResult } from '../types/extraction';
 import type { DiscoverStage } from '../types/pipeline';
 import { loadProgramSourcesAsDiscovered } from '../utils/url-merge';
+import { renderCountryDepartmentsHint } from '../data/country-departments';
 
 const DISCOVERY_CACHE_TTL_DAYS = 7;
 
@@ -24,6 +25,12 @@ export function buildUserMessage(
   existingUrls: string[] = [],
   options: { excludeAllRegistry?: boolean; missingFieldLabels?: string[] } = {}
 ): string {
+  // Phase 3.9 / W3 — country-specific authority hostnames inlined so
+  // Perplexity targets the right tax / citizenship / labour / stats
+  // domains, not just immigration. Empty string when country is not
+  // in COUNTRY_DEPARTMENTS (graceful fall-through).
+  const countryDeptHint = renderCountryDepartmentsHint(country);
+  const countryDeptBlock = countryDeptHint ? `\n\n${countryDeptHint}\n\n` : '';
   // Phase 3.6.1 / FIX 5 — exclusion block. Only emitted when the program
   // has registry entries from prior runs. Capped at 20 URLs by default;
   // Phase 3.6.2 / ITEM 3 lifts the cap when `excludeAllRegistry: true`
@@ -163,6 +170,7 @@ export function buildUserMessage(
     `occupation lists, fees, processing times) this page is expected to contain. ` +
     `(8) Do not include duplicate URLs, redirects, or pages that do not contain ` +
     `program-specific information.` +
+    countryDeptBlock +
     exclusionBlock +
     precisionBrief
   );
