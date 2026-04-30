@@ -81,6 +81,10 @@ steps:
       - '--max-instances=5'
       - '--allow-unauthenticated'
       - '--set-secrets=DATABASE_URL=gtmi-web-database-url:latest'
+      # Phase 3.9 / W7 — GCS bucket for the permanent scrape archive.
+      # Used by /review provenance drawer to mint signed URLs for the
+      # source-page snapshot when the live URL 404s.
+      - '--set-env-vars=GCS_ARCHIVE_BUCKET=gtmi-scrape-archive'
 
 availableSecrets:
   secretManager:
