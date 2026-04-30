@@ -187,4 +187,45 @@ describe('Phase 3.5 — parseIndicatorValue type-narrowing', () => {
     expect(() => parseIndicatorValue(true, 'country_substitute_regional')).toThrow(ScoringError);
     expect(() => parseIndicatorValue(42, 'country_substitute_regional')).toThrow(ScoringError);
   });
+
+  // Phase 3.8 / shape-mismatch fix — `executeCountrySubstitute` writes
+  // value_normalized as `{substituted, value, region}` (an OBJECT). The
+  // engine path historically expected a bare string; we now extract the
+  // `.value` field from the object so cohort scoring can read C.3.2 rows
+  // without throwing.
+  describe('country_substitute_regional accepts the substituted-object shape', () => {
+    it('extracts `.value` from the {substituted, value, region} write shape', () => {
+      const obj = { substituted: true, value: 'automatic', region: 'OECD_HIGH_INCOME' };
+      expect(parseIndicatorValue(obj, 'country_substitute_regional')).toBe('automatic');
+    });
+
+    it('extracts `.value` even when other keys are missing', () => {
+      const obj = { value: 'fee_paying' };
+      expect(parseIndicatorValue(obj, 'country_substitute_regional')).toBe('fee_paying');
+    });
+
+    it('still throws when the object has no string `.value` field', () => {
+      expect(() => parseIndicatorValue({}, 'country_substitute_regional')).toThrow(ScoringError);
+      expect(() => parseIndicatorValue({ value: 42 }, 'country_substitute_regional')).toThrow(
+        ScoringError
+      );
+      expect(() => parseIndicatorValue({ value: null }, 'country_substitute_regional')).toThrow(
+        ScoringError
+      );
+    });
+
+    it('arrays are still rejected (sentinel guard)', () => {
+      expect(() => parseIndicatorValue([], 'country_substitute_regional')).toThrow(ScoringError);
+      expect(() =>
+        parseIndicatorValue([{ value: 'automatic' }], 'country_substitute_regional')
+      ).toThrow(ScoringError);
+    });
+
+    it('the legacy "categorical" branch is unchanged — still string-only', () => {
+      expect(parseIndicatorValue('full_access', 'categorical')).toBe('full_access');
+      expect(() => parseIndicatorValue({ value: 'full_access' }, 'categorical')).toThrow(
+        ScoringError
+      );
+    });
+  });
 });

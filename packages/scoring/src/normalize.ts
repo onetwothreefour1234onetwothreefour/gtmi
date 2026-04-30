@@ -238,12 +238,28 @@ export function parseIndicatorValue(
     return valueNormalized;
   }
   if (fn === 'categorical' || fn === 'country_substitute_regional') {
-    if (typeof valueNormalized !== 'string') {
-      throw new ScoringError(
-        `Expected JSON string for normalizationFn "${fn}", got ${typeof valueNormalized}`
-      );
+    if (typeof valueNormalized === 'string') return valueNormalized;
+    // Phase 3.8 / shape-mismatch fix — `executeCountrySubstitute` in
+    // PublishStageImpl writes value_normalized as the structured object
+    // `{substituted: true, value: 'automatic'|'fee_paying', region}`.
+    // The scoring path historically expected the bare categorical string,
+    // so cohort scoring threw "Expected JSON string... got object" on
+    // every C.3.2 row and starved the Cloud Run instance with retried
+    // rescore-cohort runs. Accepting the substituted-object shape here
+    // (extract `.value`) lets both shapes round-trip; the bare-string
+    // path stays untouched for any other categorical fields.
+    if (
+      fn === 'country_substitute_regional' &&
+      typeof valueNormalized === 'object' &&
+      valueNormalized !== null &&
+      !Array.isArray(valueNormalized) &&
+      typeof (valueNormalized as { value?: unknown }).value === 'string'
+    ) {
+      return (valueNormalized as { value: string }).value;
     }
-    return valueNormalized;
+    throw new ScoringError(
+      `Expected JSON string for normalizationFn "${fn}", got ${typeof valueNormalized}`
+    );
   }
   if (fn === 'boolean') {
     if (typeof valueNormalized !== 'boolean') {
