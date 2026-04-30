@@ -6,6 +6,11 @@ import type { ScrapeStage } from '../types/pipeline';
 import { checkScrapeContent, MIN_VISIBLE_TEXT_LENGTH } from '../scrape-guards';
 import { archiveScrapeResult } from '../utils/archive';
 import { translateIfNeeded } from '../utils/translate';
+import {
+  BLOCKER_THIN_THRESHOLD,
+  RunBlockerState,
+  recordBlockerDomain,
+} from '../utils/blocker-detect';
 
 /**
  * Phase 3.9 / W0 — optional per-call context that enables archive
@@ -78,6 +83,9 @@ function sleep(ms: number): Promise<void> {
 
 export class ScrapeStageImpl implements ScrapeStage {
   private readonly delayMs: number;
+  // Phase 3.9 / W15 — per-instance blocker observation state. One
+  // instance per canary run; observations don't leak across runs.
+  private readonly blockerState = new RunBlockerState();
 
   constructor(options: ScrapeStageOptions = {}) {
     this.delayMs = options.delayMs ?? 1000;
@@ -105,7 +113,24 @@ export class ScrapeStageImpl implements ScrapeStage {
     for (const discovered of discoveredUrls) {
       if (!first) await sleep(this.delayMs);
       first = false;
-      const result = await this.scrapeOne(discovered, SCRAPER_URL);
+      // Phase 3.9 / W16 — pre-flight Wayback-first routing for
+      // already-known blocker domains. Skips the standard layer
+      // cascade entirely; Wayback returns the archived snapshot
+      // bypassing the live anti-bot wall. Fail-soft: when Wayback
+      // also misses, fall through to the normal cascade so we still
+      // try (the blocker may have been transient).
+      const knownBlocker = await this.blockerState.isKnownBlocker(discovered.url);
+      const result = knownBlocker
+        ? await this.scrapeWaybackFirst(discovered, SCRAPER_URL)
+        : await this.scrapeOne(discovered, SCRAPER_URL);
+
+      // Phase 3.9 / W15 — observe the result and flag the domain on
+      // detection. Idempotent within a run; first-detection writes
+      // to blocker_domains and the rest of this run's same-domain
+      // URLs already-routed via knownBlocker (or are about to be on
+      // the next iteration).
+      await this.observeForBlocker(discovered.url, result, context);
+
       // Phase 3.9 / W2 — translate non-English scrapes BEFORE archive
       // so the archived markdown is the English version (extractable on
       // re-runs without re-translating). Original is preserved on
@@ -116,6 +141,69 @@ export class ScrapeStageImpl implements ScrapeStage {
     }
 
     return results;
+  }
+
+  /**
+   * Phase 3.9 / W16 — try Wayback first; if it misses (no snapshot,
+   * or returns thin content), fall through to the standard cascade
+   * so a stale registry blocker entry doesn't permanently lose a
+   * URL that's since become reachable again.
+   */
+  private async scrapeWaybackFirst(
+    discovered: DiscoveredUrl,
+    scraperUrl: string
+  ): Promise<ScrapeResult> {
+    console.log(`  [Scrape] Known blocker domain — routing ${discovered.url} to Wayback first`);
+    // Use the existing forceLayer mechanism; the scraper service's
+    // 'jina' layer already does what we need for known-blockers
+    // (Jina's CDN posture often slips past anti-bot walls). For
+    // ISA-class blockers Jina was insufficient; the scraper service
+    // needs to support a 'wayback' force layer too. Until that ships
+    // server-side, fall back to Jina here — it's the closest hop.
+    // TODO(W16-followup): scraper service force_layer='wayback'.
+    const viaJina = await this.scrapeOne(discovered, scraperUrl, { forceLayer: 'jina' });
+    if (viaJina.contentMarkdown !== '') return viaJina;
+    console.log(
+      `  [Scrape] Wayback-first attempt empty for ${discovered.url} — falling through to cascade`
+    );
+    return this.scrapeOne(discovered, scraperUrl);
+  }
+
+  /**
+   * Phase 3.9 / W15 — feed the just-fetched result into the per-run
+   * detector. When the detector fires, persist to blocker_domains so
+   * subsequent canaries (this one's later URLs + any future run on
+   * any program) route via Wayback first.
+   */
+  private async observeForBlocker(
+    url: string,
+    result: ScrapeResult,
+    context?: ScrapeContext
+  ): Promise<void> {
+    const wasThin =
+      result.contentMarkdown !== '' && result.contentMarkdown.length < BLOCKER_THIN_THRESHOLD;
+    // The scraper-service signal we have today is content_markdown=''
+    // when the cascade collectively rejected the page (challenge
+    // body, all_layers_failed). Treat empty content from a known
+    // 200-status response as "challenge fanout" — distinguishable
+    // from a genuine 4xx/5xx because httpStatus stays 200 in the
+    // anti-bot path.
+    const wasChallenge =
+      result.contentMarkdown === '' && result.httpStatus >= 200 && result.httpStatus < 400;
+    const signal = this.blockerState.observe({
+      url,
+      result,
+      wasThin,
+      wasChallenge,
+    });
+    if (signal === null) return;
+    const domain = RunBlockerState.domainOf(url);
+    await recordBlockerDomain({
+      domain,
+      signal,
+      programId: context?.programId,
+      notes: { firstDetectedUrl: url },
+    });
   }
 
   /**

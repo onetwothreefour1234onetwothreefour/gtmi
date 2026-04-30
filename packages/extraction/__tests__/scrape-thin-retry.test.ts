@@ -88,8 +88,9 @@ describe('scrape.ts thin-content retry via Jina (Phase 3.6 / Fix C)', () => {
       return {
         db: chain,
         scrapeCache: placeholder,
-        // Phase 3.9 / W0 + W2 + W8 + W9 + W11 — additional table
-        // exports referenced by transitive imports from scrape.ts.
+        // Phase 3.9 / W0 + W2 + W8 + W9 + W11 + W15 — additional
+        // table exports referenced by transitive imports from
+        // scrape.ts.
         scrapeHistory: placeholder,
         sources: placeholder,
         translationCache: placeholder,
@@ -98,6 +99,7 @@ describe('scrape.ts thin-content retry via Jina (Phase 3.6 / Fix C)', () => {
         extractionPrompts: placeholder,
         fieldDefinitions: placeholder,
         programs: placeholder,
+        blockerDomains: placeholder,
         renderAllowedValues: () => '',
       };
     });

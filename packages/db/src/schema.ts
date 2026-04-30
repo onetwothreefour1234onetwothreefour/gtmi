@@ -517,6 +517,40 @@ export const validationCache = pgTable(
   ]
 );
 
+// Phase 3.9 / W15+W16 — domain-level blocker registry.
+// Empty by default; auto-populated by scrape.ts when it observes
+// hash-equality, thin-fanout, or challenge-fanout signals across
+// multiple paths from one domain in a single canary run. Country-
+// agnostic: any domain matching the heuristic gets in, regardless of
+// which program / country triggered the detection. Subsequent runs
+// route matching domains directly to the Wayback layer. Migration 00017.
+export const blockerDomains = pgTable(
+  'blocker_domains',
+  {
+    domain: text('domain').primaryKey(),
+    firstDetectedAt: timestamp('first_detected_at', { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    detectionSignal: varchar('detection_signal', { length: 40 }).notNull(),
+    detectedForProgramId: uuid('detected_for_program_id').references(() => programs.id),
+    notes: jsonb('notes'),
+  },
+  (table) => [
+    index('idx_blocker_domains_last_seen').on(table.lastSeenAt.desc()),
+    pgPolicy('Team members can write blocker_domains', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+    pgPolicy('Public read blocker_domains', {
+      as: 'permissive',
+      for: 'select',
+      to: 'public',
+      using: sql`true`,
+    }),
+  ]
+);
+
 // Phase 3.9 / W8 — Stage 0 discovery telemetry.
 // One row per discovery invocation. Powers the "when can we stop paying
 // Perplexity" decision: when marginal_yield_pct trends toward 0%, the

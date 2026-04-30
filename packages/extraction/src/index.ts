@@ -128,6 +128,14 @@ export type { TranslateResult } from './utils/translate';
 // Phase 3.9 / W8 — discovery telemetry writer.
 export { writeDiscoveryTelemetry } from './utils/telemetry';
 export type { WriteDiscoveryTelemetryArgs } from './utils/telemetry';
+// Phase 3.9 / W15+W16 — blocker detector + Wayback-first routing.
+export {
+  BLOCKER_THIN_THRESHOLD,
+  RunBlockerState,
+  recordBlockerDomain,
+  clearBlockerStateForTest,
+} from './utils/blocker-detect';
+export type { BlockerSignal } from './utils/blocker-detect';
 export { scoreProgramFromDb } from './utils/score-program';
 export type { ScoreProgramOptions, ScoreProgramResult } from './utils/score-program';
 
