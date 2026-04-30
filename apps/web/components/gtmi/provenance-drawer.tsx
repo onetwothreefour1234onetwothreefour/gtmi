@@ -5,6 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
 import { ProvenanceHighlight } from './provenance-highlight';
 import type { Provenance, FieldValueStatus } from '@/lib/provenance';
+import { getArchiveSignedUrl } from '@/lib/archive-actions';
 
 export interface ProvenanceDrawerProps {
   open: boolean;
@@ -250,14 +251,7 @@ export function ProvenanceDrawer({
                 >
                   View at source ↗
                 </a>
-                <span
-                  title="Historical archival ships in Phase 5 per ADR-008"
-                  aria-disabled="true"
-                  className="num cursor-not-allowed text-ink-4 line-through"
-                  data-testid="provenance-drawer-wayback"
-                >
-                  View archived version
-                </span>
+                <ArchiveSnapshotLink archivePath={p.archivePath ?? null} />
               </div>
             </article>
 
@@ -453,6 +447,90 @@ function ConfidenceBar({ value }: { value: number }) {
         {pct}%
       </span>
     </span>
+  );
+}
+
+/**
+ * Phase 3.9 / W7 — archive snapshot link. When provenance.archivePath is
+ * present, fetches a 15-min signed URL on first interaction (lazy: avoids
+ * burning a signed-URL quota on every drawer open). Falls back to a
+ * disabled label with an explanatory tooltip when:
+ *   - archivePath is null (legacy row, pre-W0 archive),
+ *   - the signed-URL action returns null (GCS misconfigured / path
+ *     validation rejected the path).
+ */
+function ArchiveSnapshotLink({ archivePath }: { archivePath: string | null }) {
+  const [signedUrl, setSignedUrl] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const handleFetch = React.useCallback(async () => {
+    if (loading || signedUrl || !archivePath) return;
+    setLoading(true);
+    try {
+      const result = await getArchiveSignedUrl(archivePath);
+      if (result) {
+        setSignedUrl(result.url);
+      } else {
+        setError('Snapshot unavailable');
+      }
+    } catch {
+      setError('Snapshot unavailable');
+    } finally {
+      setLoading(false);
+    }
+  }, [archivePath, loading, signedUrl]);
+
+  if (!archivePath) {
+    return (
+      <span
+        title="No archived snapshot for this row (created before Phase 3.9 archive went live)."
+        aria-disabled="true"
+        className="num cursor-not-allowed text-ink-4 line-through"
+        data-testid="provenance-drawer-archive-disabled"
+      >
+        No archived snapshot
+      </span>
+    );
+  }
+
+  if (signedUrl) {
+    return (
+      <a
+        href={signedUrl}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="text-accent underline-offset-4 hover:underline"
+        data-testid="provenance-drawer-archive-link"
+      >
+        View archived snapshot ↗
+      </a>
+    );
+  }
+
+  if (error) {
+    return (
+      <span
+        title={error}
+        aria-disabled="true"
+        className="num cursor-not-allowed text-ink-4"
+        data-testid="provenance-drawer-archive-error"
+      >
+        {error}
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleFetch}
+      disabled={loading}
+      className="text-accent underline-offset-4 hover:underline disabled:cursor-wait disabled:text-ink-4"
+      data-testid="provenance-drawer-archive-trigger"
+    >
+      {loading ? 'Fetching…' : 'View archived snapshot ↗'}
+    </button>
   );
 }
 

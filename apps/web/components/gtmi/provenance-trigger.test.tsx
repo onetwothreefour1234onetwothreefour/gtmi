@@ -396,10 +396,12 @@ describe('ProvenanceTrigger — drawer migration (Phase 4-C)', () => {
     const sourceCards = screen.getAllByTestId('provenance-drawer-source-card');
     expect(sourceCards).toHaveLength(1);
 
-    // Wayback link is disabled with the Phase 5 tooltip per ADR-008.
-    const wayback = screen.getByTestId('provenance-drawer-wayback');
-    expect(wayback).toHaveAttribute('aria-disabled', 'true');
-    expect(wayback.title).toMatch(/Phase 5/);
+    // Phase 3.9 / W7 — when archivePath is absent (legacy row), the
+    // archive link renders the disabled "No archived snapshot" label
+    // instead of the Phase 5 Wayback placeholder.
+    const archiveDisabled = screen.getByTestId('provenance-drawer-archive-disabled');
+    expect(archiveDisabled).toHaveAttribute('aria-disabled', 'true');
+    expect(archiveDisabled.title).toMatch(/before Phase 3\.9/);
 
     // Provenance metadata grid renders extractionModel, validationModel,
     // crossCheckResult, methodologyVersion, reviewer.
@@ -407,5 +409,30 @@ describe('ProvenanceTrigger — drawer migration (Phase 4-C)', () => {
     expect(drawer).toHaveTextContent('Agrees');
     expect(drawer).toHaveTextContent('1.0.0');
     expect(screen.getByTestId('provenance-drawer-reviewer')).toBeInTheDocument();
+  });
+
+  it('renders the archive snapshot trigger when provenance.archivePath is present (W7)', async () => {
+    render(
+      <ProvenanceTrigger
+        provenance={{
+          ...APPROVED_PROVENANCE,
+          archivePath:
+            'NLD/668cec08-4b78-4cd2-b215-3047c551ce6e/2026-04-30/' + 'a'.repeat(64) + '.md',
+        }}
+        status="approved"
+        fieldKey="A.1.1"
+        fieldLabel="Minimum salary"
+        weightWithinSubFactor={0.03}
+        valueRaw="EUR 5,331"
+        valueIndicatorScore={50}
+      />
+    );
+    await userEvent.click(screen.getByTestId('provenance-trigger'));
+    await screen.findByTestId('provenance-drawer');
+    const trigger = screen.getByTestId('provenance-drawer-archive-trigger');
+    expect(trigger).toHaveTextContent(/archived snapshot/i);
+    // The signed-URL fetch is lazy; it only fires on click. Verify the
+    // disabled-fallback testid is NOT rendered when archivePath is set.
+    expect(screen.queryByTestId('provenance-drawer-archive-disabled')).toBeNull();
   });
 });

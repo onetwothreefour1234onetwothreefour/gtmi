@@ -47,6 +47,14 @@ export interface ProvenanceOptionalFields {
   valueCurrency?: string;
   /** True for E.1.1 mean-substitution per METHODOLOGY §7.5. */
   stabilityEdgeCase?: boolean;
+  /**
+   * Phase 3.9 / W7 — GCS storage path for the source-page snapshot
+   * archived by the scrape pipeline. When present, the provenance
+   * drawer renders a "View archived snapshot" link (signed URL,
+   * 15-min TTL) so the source remains viewable even if the live
+   * sourceUrl returns 404. Null/undefined for legacy rows.
+   */
+  archivePath?: string;
 }
 
 export type Provenance = ProvenanceCoreFields &
