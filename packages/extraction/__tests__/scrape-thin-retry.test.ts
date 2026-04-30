@@ -63,16 +63,43 @@ describe('scrape.ts thin-content retry via Jina (Phase 3.6 / Fix C)', () => {
     process.env['SCRAPER_URL'] = 'http://test-scraper:8765';
     vi.resetModules();
     vi.doMock('@gtmi/db', () => {
+      // Phase 3.9 — extended chain with the methods scrape.ts +
+      // archive.ts + translate.ts + telemetry.ts + attempts.ts call
+      // through @gtmi/db. Empty/no-op responses everywhere; the test
+      // exercises the scrape cascade, not the DB writes.
       const chain = {
         select: () => chain,
         from: () => chain,
         where: () => chain,
+        innerJoin: () => chain,
+        leftJoin: () => chain,
+        orderBy: () => chain,
         limit: () => Promise.resolve([]),
         insert: () => chain,
-        values: () => chain,
+        values: () => Promise.resolve(),
         onConflictDoUpdate: () => Promise.resolve(),
+        onConflictDoNothing: () => Promise.resolve(),
+        returning: () => Promise.resolve([]),
+        update: () => chain,
+        set: () => chain,
+        execute: () => Promise.resolve([]),
       };
-      return { db: chain, scrapeCache: { url: 'url' } };
+      const placeholder = { url: 'url' };
+      return {
+        db: chain,
+        scrapeCache: placeholder,
+        // Phase 3.9 / W0 + W2 + W8 + W9 + W11 — additional table
+        // exports referenced by transitive imports from scrape.ts.
+        scrapeHistory: placeholder,
+        sources: placeholder,
+        translationCache: placeholder,
+        discoveryTelemetry: placeholder,
+        extractionAttempts: placeholder,
+        extractionPrompts: placeholder,
+        fieldDefinitions: placeholder,
+        programs: placeholder,
+        renderAllowedValues: () => '',
+      };
     });
   });
 
