@@ -49,6 +49,51 @@ function readNormalizationError(raw: unknown): string | null {
   return typeof v === 'string' && v.trim() !== '' ? v : null;
 }
 
+// Phase 3.8 / P2 — extract the rubric vocabulary for rubric-aware
+// editor rendering. Returns an array of {value, description} when the
+// rubric is the canonical {categories: [...]} shape, else null.
+interface RubricCategory {
+  value: string;
+  description?: string;
+  score?: number;
+}
+function readRubricCategories(rubric: unknown): RubricCategory[] | null {
+  if (!rubric || typeof rubric !== 'object') return null;
+  const cats = (rubric as { categories?: unknown }).categories;
+  if (!Array.isArray(cats)) return null;
+  return cats
+    .filter(
+      (c): c is RubricCategory =>
+        typeof c === 'object' && c !== null && typeof (c as RubricCategory).value === 'string'
+    )
+    .map((c) => ({ value: c.value, description: c.description, score: c.score }));
+}
+
+// Phase 3.8 / P2 — sanity-range hints for numeric editor inputs.
+// Mirrors NUMERIC_SANITY_RANGES in @gtmi/extraction; duplicated here to
+// avoid pulling the extraction package into the web bundle. If these
+// drift, the publish-time gate is still authoritative — the UI hints
+// are advisory only.
+const NUMERIC_HINTS: Record<string, { min: number; max: number; unit?: string }> = {
+  'A.1.1': { min: 0, max: 1_000_000, unit: 'local currency' },
+  'A.1.2': { min: 0, max: 1000, unit: '% of median' },
+  'A.2.2': { min: 0, max: 30, unit: 'years' },
+  'A.3.3': { min: 0, max: 999, unit: 'years (999 = no cap)' },
+  'B.1.1': { min: 0, max: 3650, unit: 'days' },
+  'B.1.3': { min: 0, max: 50, unit: 'steps' },
+  'B.2.1': { min: 0, max: 100_000, unit: 'fee (currency)' },
+  'B.2.2': { min: 0, max: 100_000, unit: 'fee (currency)' },
+  'B.3.2': { min: 0, max: 20, unit: 'visits' },
+  'C.2.2': { min: 0, max: 999, unit: 'years (999 = no cap)' },
+  'D.1.2': { min: 0, max: 50, unit: 'years' },
+  'D.2.2': { min: 0, max: 99, unit: 'years' },
+  'D.3.1': { min: 0, max: 366, unit: 'days/year' },
+  'E.1.1': { min: 0, max: 1000, unit: 'severity-weighted count' },
+  'E.1.3': { min: 0, max: 200, unit: 'years' },
+  'E.3.1': { min: -5, max: 5, unit: 'WGI score' },
+  'E.3.2': { min: -5, max: 5, unit: 'WGI score' },
+};
+
 export default async function ReviewDetailPage({ params }: PageProps) {
   const { id } = await params;
   const [row, pendingRows] = await Promise.all([getReviewDetail(id), listPendingReview()]);
@@ -296,6 +341,27 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           )}
         </section>
 
+        {readRubricCategories(row.scoringRubricJsonb) && (
+          <section
+            className="mb-6 border bg-paper-2 p-4"
+            style={{ borderColor: 'var(--rule)' }}
+            data-testid="review-rubric-pinned"
+          >
+            <p className="eyebrow mb-2">Allowed values</p>
+            <ul className="text-data-sm" style={{ lineHeight: 1.5 }}>
+              {readRubricCategories(row.scoringRubricJsonb)!.map((c) => (
+                <li key={c.value} className="flex gap-3">
+                  <span className="num text-ink" style={{ minWidth: 140 }}>
+                    {c.value}
+                    {typeof c.score === 'number' ? ` (${c.score})` : ''}
+                  </span>
+                  <span className="text-ink-3">{c.description ?? ''}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section
           className="mb-6 grid items-start gap-4 border bg-paper p-5 md:grid-cols-[1.6fr_1fr]"
           style={{ borderColor: 'var(--rule)' }}
@@ -313,14 +379,11 @@ export default async function ReviewDetailPage({ params }: PageProps) {
                     : '(edit before approving if needed)'}
               </span>
             </label>
-            <textarea
-              id="editedRaw"
-              name="editedRaw"
-              form="primary-action-form"
-              defaultValue={row.valueRaw ?? ''}
-              rows={3}
-              className="num border bg-paper p-2 text-data-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              style={{ borderColor: 'var(--rule)', fontSize: 13 }}
+            <RubricAwareEditor
+              normalizationFn={row.normalizationFn}
+              fieldKey={row.fieldKey}
+              currentRaw={row.valueRaw ?? ''}
+              rubric={readRubricCategories(row.scoringRubricJsonb)}
             />
 
             {isPending && (
@@ -528,6 +591,128 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         </div>
       </div>
     </main>
+  );
+}
+
+// Phase 3.8 / P2 — rubric-aware editor. Switches the input shape based
+// on the field's normalizationFn so the analyst always sees the legal
+// vocabulary (or the legal numeric range) without having to expand the
+// rubric block. All shapes still post `editedRaw` so the existing
+// approveFieldValue / editApprovedFieldValue server actions accept the
+// payload unchanged. boolean_with_annotation falls back to a textarea
+// for now (structured form is a follow-up).
+function RubricAwareEditor({
+  normalizationFn,
+  fieldKey,
+  currentRaw,
+  rubric,
+}: {
+  normalizationFn: string;
+  fieldKey: string;
+  currentRaw: string;
+  rubric: RubricCategory[] | null;
+}) {
+  const isCategoricalLike =
+    normalizationFn === 'categorical' || normalizationFn === 'country_substitute_regional';
+
+  if (isCategoricalLike && rubric && rubric.length > 0) {
+    const inRubric = rubric.some((c) => c.value === currentRaw);
+    return (
+      <div className="flex flex-col gap-2">
+        <select
+          id="editedRaw"
+          name="editedRaw"
+          form="primary-action-form"
+          defaultValue={inRubric ? currentRaw : ''}
+          className="num border bg-paper p-2 text-data-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          style={{ borderColor: 'var(--rule)', fontSize: 13 }}
+          data-testid="rubric-select"
+        >
+          {!inRubric && (
+            <option value="" disabled>
+              {currentRaw ? `Off-rubric: "${currentRaw}" — pick a valid value` : 'Pick a value'}
+            </option>
+          )}
+          {rubric.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.value}
+              {typeof c.score === 'number' ? ` — ${c.score}` : ''}
+              {c.description ? ` · ${c.description}` : ''}
+            </option>
+          ))}
+        </select>
+        {!inRubric && currentRaw && (
+          <p className="text-data-sm text-warning">
+            Stored raw <span className="num">&quot;{currentRaw}&quot;</span> is not in the rubric.
+            Pick the correct value above; the form will overwrite it on save.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (normalizationFn === 'boolean') {
+    const truthy = currentRaw === 'true' || currentRaw.toLowerCase() === 'permitted';
+    const falsy = currentRaw === 'false' || currentRaw.toLowerCase() === 'not_permitted';
+    return (
+      <select
+        id="editedRaw"
+        name="editedRaw"
+        form="primary-action-form"
+        defaultValue={truthy ? 'true' : falsy ? 'false' : ''}
+        className="num border bg-paper p-2 text-data-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        style={{ borderColor: 'var(--rule)', fontSize: 13 }}
+        data-testid="boolean-select"
+      >
+        <option value="" disabled>
+          Pick true / false
+        </option>
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    );
+  }
+
+  if (normalizationFn === 'min_max' || normalizationFn === 'z_score') {
+    const hint = NUMERIC_HINTS[fieldKey];
+    return (
+      <div className="flex flex-col gap-1">
+        <input
+          id="editedRaw"
+          name="editedRaw"
+          form="primary-action-form"
+          type="text"
+          inputMode="decimal"
+          defaultValue={currentRaw}
+          className="num border bg-paper p-2 text-data-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          style={{ borderColor: 'var(--rule)', fontSize: 13 }}
+          data-testid="numeric-input"
+        />
+        {hint && (
+          <p className="text-data-sm text-ink-4">
+            Range: <span className="num">{hint.min}</span> – <span className="num">{hint.max}</span>
+            {hint.unit ? ` (${hint.unit})` : ''}. Values outside this range route the row back to
+            review with score=null.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // boolean_with_annotation and any unknown shape — keep the textarea
+  // so the analyst can paste the structured JSON. A structured form
+  // editor is a follow-up.
+  return (
+    <textarea
+      id="editedRaw"
+      name="editedRaw"
+      form="primary-action-form"
+      defaultValue={currentRaw}
+      rows={3}
+      className="num border bg-paper p-2 text-data-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      style={{ borderColor: 'var(--rule)', fontSize: 13 }}
+      data-testid="textarea-fallback"
+    />
   );
 }
 

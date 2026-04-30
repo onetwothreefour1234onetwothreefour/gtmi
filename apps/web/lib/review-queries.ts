@@ -28,6 +28,12 @@ export type ReviewDetailRow = ReviewListRow & {
   sourceTier: number | null;
   extractionPromptMd: string;
   scoringRubricJsonb: unknown;
+  /**
+   * Phase 3.8 / P2 — drives the rubric-aware editor on /review/[id].
+   * One of: 'min_max' | 'z_score' | 'categorical' | 'boolean' |
+   * 'boolean_with_annotation' | 'country_substitute_regional'.
+   */
+  normalizationFn: string;
 };
 
 export async function listRecentlyReviewed(limit = 20): Promise<ReviewListRow[]> {
@@ -114,6 +120,7 @@ export async function getReviewDetail(id: string): Promise<ReviewDetailRow | nul
       sourceTier: sources.tier,
       extractionPromptMd: fieldDefinitions.extractionPromptMd,
       scoringRubricJsonb: fieldDefinitions.scoringRubricJsonb,
+      normalizationFn: fieldDefinitions.normalizationFn,
     })
     .from(fieldValues)
     .innerJoin(programs, eq(programs.id, fieldValues.programId))
