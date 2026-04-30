@@ -178,6 +178,51 @@ interface GcsBucket {
   file(name: string): GcsFile;
 }
 
+interface GcsStorageOptions {
+  credentials?: { client_email: string; private_key: string };
+  projectId?: string;
+}
+
+/**
+ * Phase 3.9 / W7 — parse GOOGLE_APPLICATION_CREDENTIALS_JSON into the
+ * shape @google-cloud/storage expects. Used in environments without
+ * Application Default Credentials (Trigger.dev, third-party CI). The
+ * env var holds the entire service-account JSON key as a string.
+ *
+ * Returns null when the env var is unset or invalid; the caller falls
+ * back to ADC (which works on GCP-hosted runtimes like Cloud Run).
+ */
+function readInlineCredentials(): GcsStorageOptions | null {
+  const raw = process.env['GOOGLE_APPLICATION_CREDENTIALS_JSON'];
+  if (!raw || raw.trim() === '') return null;
+  try {
+    const parsed = JSON.parse(raw) as {
+      client_email?: string;
+      private_key?: string;
+      project_id?: string;
+    };
+    if (!parsed.client_email || !parsed.private_key) {
+      console.warn(
+        '[storage] GOOGLE_APPLICATION_CREDENTIALS_JSON missing client_email/private_key — falling back to ADC'
+      );
+      return null;
+    }
+    return {
+      credentials: {
+        client_email: parsed.client_email,
+        // Some Trigger.dev / Vercel-style env-var pasters escape \n as
+        // literal "\n"; un-escape so the PEM parser sees real newlines.
+        private_key: parsed.private_key.replace(/\\n/g, '\n'),
+      },
+      projectId: parsed.project_id,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[storage] GOOGLE_APPLICATION_CREDENTIALS_JSON parse failed: ${msg}`);
+    return null;
+  }
+}
+
 class GcsStorage implements StorageImpl {
   readonly isReal = true;
   readonly bucketName: string;
@@ -190,9 +235,13 @@ class GcsStorage implements StorageImpl {
   private async ensureBucket(): Promise<GcsBucket> {
     if (this._bucket) return this._bucket;
     const mod = (await import('@google-cloud/storage')) as unknown as {
-      Storage: new () => { bucket(name: string): GcsBucket };
+      Storage: new (opts?: GcsStorageOptions) => { bucket(name: string): GcsBucket };
     };
-    const storage = new mod.Storage();
+    // Phase 3.9 / W7 — prefer inline credentials from
+    // GOOGLE_APPLICATION_CREDENTIALS_JSON (Trigger.dev path); fall back
+    // to ADC (Cloud Run / local gcloud auth path).
+    const inline = readInlineCredentials();
+    const storage = inline ? new mod.Storage(inline) : new mod.Storage();
     const bucket = storage.bucket(this.bucketName);
     this._bucket = bucket;
     return bucket;
