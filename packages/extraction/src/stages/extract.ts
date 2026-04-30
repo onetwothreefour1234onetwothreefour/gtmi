@@ -5,6 +5,7 @@ import { createAnthropicClient, MODEL_EXTRACTION } from '../clients/anthropic';
 import type { ExtractionOutput, FieldSpec, ScrapeResult } from '../types/extraction';
 import type { ExtractStage } from '../types/pipeline';
 import { selectContentWindow } from '../utils/window';
+import { recordAttempts } from '../utils/attempts';
 
 const SYSTEM_PROMPT =
   'You are a precise data extraction agent for immigration program research. Extract ' +
@@ -573,6 +574,23 @@ export class ExtractStageImpl implements ExtractStage {
       outputs.set(field.key, output);
     }
 
+    // Phase 3.9 / W9 — record one extraction_attempts row per batch
+    // result, including empty/zero-confidence ("tried + nothing found")
+    // attempts. Cache hits are NOT recorded — they were already recorded
+    // on first extraction. Best-effort; failures log a warning.
+    if (outputs.size > 0) {
+      await recordAttempts(
+        Array.from(outputs.values()).map((output) => ({
+          programId,
+          fieldKey: output.fieldDefinitionKey,
+          sourceUrl: scrape.url,
+          scrapeHistoryId: scrape.scrapeHistoryId ?? null,
+          contentHash: scrape.contentHash,
+          output,
+        }))
+      );
+    }
+
     return new Map([...cached, ...outputs]);
   }
 
@@ -617,10 +635,26 @@ export class ExtractStageImpl implements ExtractStage {
 
       for (const [fieldKey, output] of batchOutput) {
         if (output.valueRaw === '') continue;
-        const capped =
-          cap !== null && output.extractionConfidence > cap
-            ? { ...output, extractionConfidence: cap }
-            : output;
+        const wasCapped = cap !== null && output.extractionConfidence > cap;
+        const capped = wasCapped ? { ...output, extractionConfidence: cap as number } : output;
+        // Phase 3.9 / W9 — when the cap fires (tier-2 fallback path),
+        // record a follow-up attempt that captures the capped confidence
+        // + a tier2_capped tag. The original (uncapped) attempt was
+        // already written by executeBatch above; this row is the
+        // "decision-grade" attempt the publish layer will see.
+        if (wasCapped) {
+          await recordAttempts([
+            {
+              programId,
+              fieldKey,
+              sourceUrl: scrape.url,
+              scrapeHistoryId: scrape.scrapeHistoryId ?? null,
+              contentHash: scrape.contentHash,
+              output: capped,
+              notes: { tier2_capped: true, original_confidence: output.extractionConfidence },
+            },
+          ]);
+        }
         const existing = best.get(fieldKey);
         if (!existing || capped.extractionConfidence > existing.output.extractionConfidence) {
           best.set(fieldKey, { output: capped, sourceUrl: scrape.url });
