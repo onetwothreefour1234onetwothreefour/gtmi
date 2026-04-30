@@ -5,6 +5,7 @@ import { InternalBadge } from './internal-badge';
 import { ReviewQueueStats } from './review-queue-stats';
 import { ReviewQueueTable } from './review-queue-table';
 import { BulkApproveDialog } from './bulk-approve-dialog';
+import { BulkApproveAllDialog } from './bulk-approve-all-dialog';
 import { ChangesAudit } from './changes-audit';
 import type { ReviewListRow } from '@/lib/review-queries';
 import type { PolicyChangeRow } from '@/lib/queries/policy-changes';
@@ -189,6 +190,48 @@ describe('BulkApproveDialog', () => {
     render(<BulkApproveDialog candidateCount={5} onConfirm={onConfirm} />);
     await userEvent.click(screen.getByTestId('bulk-approve-trigger'));
     await userEvent.click(await screen.findByTestId('bulk-approve-confirm'));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Phase 3.8 / ADR-020 — bulk-approve-all (skips confidence gate, keeps
+// the categorical-rubric gate on).
+describe('BulkApproveAllDialog', () => {
+  it('renders the trigger with the pending count and the "skips confidence" eyebrow once open', async () => {
+    const onConfirm = vi.fn();
+    render(<BulkApproveAllDialog pendingCount={42} onConfirm={onConfirm} />);
+    const trigger = screen.getByTestId('bulk-approve-all-trigger');
+    expect(trigger).toHaveTextContent('Approve ALL pending');
+    expect(trigger).toHaveTextContent('42');
+    expect(trigger).not.toBeDisabled();
+    await userEvent.click(trigger);
+    const dialog = await screen.findByTestId('bulk-approve-all-dialog');
+    expect(dialog).toHaveTextContent(/skips confidence gate/i);
+    expect(dialog).toHaveTextContent(/categorical rubric gate \(ADR-019\) stays on/);
+  });
+
+  it('disables the trigger when the queue is empty', () => {
+    render(<BulkApproveAllDialog pendingCount={0} onConfirm={vi.fn()} />);
+    const trigger = screen.getByTestId('bulk-approve-all-trigger');
+    expect(trigger).toBeDisabled();
+    expect(trigger).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('Cancel closes without invoking onConfirm', async () => {
+    const onConfirm = vi.fn();
+    render(<BulkApproveAllDialog pendingCount={3} onConfirm={onConfirm} />);
+    await userEvent.click(screen.getByTestId('bulk-approve-all-trigger'));
+    await screen.findByTestId('bulk-approve-all-dialog');
+    await userEvent.click(screen.getByTestId('bulk-approve-all-cancel'));
+    expect(screen.queryByTestId('bulk-approve-all-dialog')).not.toBeInTheDocument();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('Confirm triggers onConfirm', async () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+    render(<BulkApproveAllDialog pendingCount={3} onConfirm={onConfirm} />);
+    await userEvent.click(screen.getByTestId('bulk-approve-all-trigger'));
+    await userEvent.click(await screen.findByTestId('bulk-approve-all-confirm'));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 });

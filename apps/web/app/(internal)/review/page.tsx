@@ -3,6 +3,7 @@ import {
   ReviewQueueTable,
   ReviewFilterTabs,
   BulkApproveDialog,
+  BulkApproveAllDialog,
   DataTableNote,
 } from '@/components/gtmi';
 import { listPendingReview, listRecentlyReviewed } from '@/lib/review-queries';
@@ -13,7 +14,7 @@ import {
   type ReviewFilterTab,
 } from '@/lib/review-queue-helpers';
 import type { ReviewListRow } from '@/lib/review-queries';
-import { bulkApproveHighConfidence } from './actions';
+import { bulkApproveAllPending, bulkApproveHighConfidence } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,6 +106,7 @@ export default async function ReviewPage({
               candidateCount={stats.highConfidence}
               onConfirm={bulkApproveHighConfidence}
             />
+            <BulkApproveAllDialog pendingCount={stats.inQueue} onConfirm={bulkApproveAllPending} />
           </div>
         </div>
 

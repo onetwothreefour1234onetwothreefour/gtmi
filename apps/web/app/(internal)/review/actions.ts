@@ -285,6 +285,68 @@ export async function unapproveFieldValue(id: string): Promise<void> {
 }
 
 /**
+ * Phase 3.8 / ADR-020 — bulk-approve EVERY pending row regardless of
+ * confidence. Distinct from the existing high-confidence path: this
+ * SKIPS the extractionConfidence ≥ 0.85 / validationConfidence ≥ 0.85
+ * gate so the analyst can clear borderline rows after eyeballing them.
+ *
+ * The ADR-019 categorical-rubric gate STAYS ON — out-of-rubric raws
+ * (e.g. C.3.1 'not_stated') still cannot one-click approve into the
+ * public score. Methodology integrity is non-negotiable; the only thing
+ * being relaxed is "is the LLM confident enough".
+ *
+ * Returns the count approved. Wrapped in a single transaction so a
+ * partial failure rolls every row back.
+ */
+export async function bulkApproveAllPending(): Promise<{ approved: number }> {
+  const candidates = await db
+    .select({ id: fieldValues.id })
+    .from(fieldValues)
+    .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
+    .where(
+      and(
+        eq(fieldValues.status, 'pending_review'),
+        sql`(
+          ${fieldDefinitions.normalizationFn} <> 'categorical'
+          OR EXISTS (
+            SELECT 1
+            FROM jsonb_array_elements(${fieldDefinitions.scoringRubricJsonb} -> 'categories') AS elem
+            WHERE elem ->> 'value' = ${fieldValues.valueRaw}
+          )
+        )`
+      )
+    );
+
+  if (candidates.length === 0) return { approved: 0 };
+
+  const ids = candidates.map((c) => c.id);
+  const reviewedAt = new Date();
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(fieldValues)
+        .set({ status: 'approved', reviewedAt, reviewedBy: null })
+        .where(inArray(fieldValues.id, ids));
+      await tx
+        .update(reviewQueue)
+        .set({ status: 'approved', resolvedAt: reviewedAt })
+        .where(inArray(reviewQueue.fieldValueId, ids));
+    });
+  } catch (err) {
+    console.error(
+      `[review/actions] bulkApproveAllPending transaction failed for ${ids.length} rows:`,
+      err
+    );
+    throw err;
+  }
+
+  console.log(`[review/actions] bulkApproveAllPending approved ${ids.length} rows`);
+  revalidatePath('/review');
+  return { approved: ids.length };
+}
+
+/**
  * Phase 4-E: bulk-approve every pending row that clears the auto-approve
  * gate (extractionConfidence ≥ 0.85, validationConfidence ≥ 0.85, and
  * provenance.isValid !== false). Triggered from the queue header after a
