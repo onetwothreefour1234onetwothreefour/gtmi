@@ -725,6 +725,17 @@ export const extractSingleProgram = task({
       console.warn(`[Auto-rescore] skipped for ${programId}: ${msg}`);
     }
 
+    // Phase 3.9 / W10 — refresh the field_url_yield materialized view
+    // so the next extract-single-program run sees this run's attempts.
+    // CONCURRENTLY allows readers to query during refresh (requires the
+    // unique index from migration 00014).
+    try {
+      await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY field_url_yield`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[field_url_yield] refresh failed: ${msg}`);
+    }
+
     return {
       programId,
       urlsDiscovered: discoveryResult.discoveredUrls.length,

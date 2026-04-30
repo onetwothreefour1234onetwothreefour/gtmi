@@ -1007,6 +1007,19 @@ async function main() {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`\n[Auto-rescore] skipped for ${programName}: ${msg}`);
     }
+
+    // Phase 3.9 / W10 — refresh the field_url_yield materialized view
+    // so the next run's URL-merge ranker sees this canary's attempts.
+    // CONCURRENTLY allows readers to query the view during the refresh
+    // (requires the unique index from migration 00014). Best-effort;
+    // failures log but do not crash the canary.
+    try {
+      await db.execute(sql`REFRESH MATERIALIZED VIEW CONCURRENTLY field_url_yield`);
+      console.log('[field_url_yield] refresh complete');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[field_url_yield] refresh failed: ${msg}`);
+    }
   }
 }
 
