@@ -19,6 +19,7 @@ import {
   loadProgramSourcesAsDiscovered,
   loadProvenUrlsForMissingFields,
   mergeDiscoveredUrls,
+  planCanaryCost,
   scoreProgramFromDb,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
   COUNTRY_NON_GOV_COSTS_POLICY,
@@ -161,8 +162,22 @@ async function main() {
     throw new Error('--mode field requires --field <comma-separated keys>');
   }
 
+  // Phase 3.9 / W6 — --estimate-only short-circuits before any LLM
+  // call. Computes projected cost from the resolved URL + field set
+  // and exits 0. --confirm-cost is the explicit override that
+  // bypasses the MAX_RERUN_COST_USD guard.
+  const estimateOnly = process.argv.includes('--estimate-only');
+  const confirmCost = process.argv.includes('--confirm-cost');
+  const maxRerunCostUsdRaw = process.env['MAX_RERUN_COST_USD'];
+  const maxRerunCostUsd =
+    maxRerunCostUsdRaw && Number.isFinite(Number(maxRerunCostUsdRaw))
+      ? Number(maxRerunCostUsdRaw)
+      : 5;
+
   console.log(
-    `[Canary mode] ${mode}${mode === 'field' ? ` (${explicitFieldKeys.join(',')})` : ''}`
+    `[Canary mode] ${mode}${mode === 'field' ? ` (${explicitFieldKeys.join(',')})` : ''}` +
+      (estimateOnly ? ' [ESTIMATE-ONLY]' : '') +
+      (confirmCost ? ' [COST-CONFIRMED]' : '')
   );
 
   // narrow + targeted_rerun share the same env-flag-based code path
@@ -517,6 +532,56 @@ async function main() {
       console.log(`  [Tier ${url.tier}][${url.geographicLevel}] ${url.url}`);
     }
 
+    // Phase 3.9 / W6 — pre-flight cost estimate. Counts URLs that
+    // would hit the LLM batch (excluding archive-loaded "unchanged"
+    // URLs in archive-first/only mode), then multiplies by per-call
+    // cost from cost-estimate.ts.
+    //
+    // For archive-first/only modes, we pre-load the archive results
+    // once into archivedByUrl and reuse them in the scrape loop below
+    // so the GCS download fires only once per URL.
+    const isArchiveMode = mode === 'archive-first' || mode === 'archive-only';
+    const archivedByUrl = new Map<string, ScrapeResult>();
+    if (isArchiveMode) {
+      for (const u of mergedDiscoveredUrls) {
+        const a = await loadArchivedScrape({ programId, url: u.url });
+        if (a) archivedByUrl.set(u.url, a);
+      }
+    }
+    const archiveHitsForEstimate = archivedByUrl.size;
+    const llmFieldCountForEstimate =
+      modeFieldSet === null ? allFieldDefs.length : modeFieldSet.size;
+    const estimate = planCanaryCost({
+      mode,
+      mergedUrls: mergedDiscoveredUrls,
+      archiveHitUrls: archiveHitsForEstimate,
+      llmFieldCount: llmFieldCountForEstimate,
+      tier2EligibleFields: PHASE3_TIER2_FALLBACK ? llmFieldCountForEstimate : 0,
+      translationCandidateUrls: 0, // unknown until scrape runs; defer
+    });
+    console.log(
+      `[Cost estimate] $${estimate.total.toFixed(2)} ` +
+        `(discovery=${estimate.breakdown.discovery.toFixed(2)} ` +
+        `extraction=${estimate.breakdown.batchExtraction.toFixed(2)} ` +
+        `tier2=${estimate.breakdown.tier2Fallback.toFixed(2)} ` +
+        `validation=${estimate.breakdown.validation.toFixed(2)})` +
+        (isArchiveMode
+          ? ` | archive hits ${archiveHitsForEstimate}/${mergedDiscoveredUrls.length}`
+          : '')
+    );
+    if (estimate.warning) console.warn(`[Cost estimate] WARNING: ${estimate.warning}`);
+
+    if (estimateOnly) {
+      console.log(`[--estimate-only] dry-run complete; exiting before any LLM call.`);
+      continue;
+    }
+    if (estimate.total > maxRerunCostUsd && !confirmCost) {
+      throw new Error(
+        `[Cost guard] estimated $${estimate.total.toFixed(2)} > MAX_RERUN_COST_USD=$${maxRerunCostUsd}. ` +
+          `Re-run with --confirm-cost to proceed, or raise the env var.`
+      );
+    }
+
     // Phase 2: Stage 1 — scrape program-specific URLs
     // Phase 3.9 / W0 — pass programId/countryIso so scrape.ts archives
     // each successful scrape to GCS + scrape_history. Failures are
@@ -527,13 +592,11 @@ async function main() {
     // the archive (no live fetch); archive-first falls back to live
     // when archive misses.
     const scrapeResults: ScrapeResult[] = [];
-    let archiveHits = 0;
     let archiveMissesSkipped = 0;
     for (const u of mergedDiscoveredUrls) {
-      if (mode === 'archive-first' || mode === 'archive-only') {
-        const archived = await loadArchivedScrape({ programId, url: u.url });
+      if (isArchiveMode) {
+        const archived = archivedByUrl.get(u.url);
         if (archived) {
-          archiveHits++;
           scrapeResults.push(archived);
           console.log(
             `  [Stage 1] Archive hit: ${u.url} (${archived.contentMarkdown.length} chars, hash ${archived.contentHash.slice(0, 8)}…)`
@@ -556,9 +619,9 @@ async function main() {
         );
       }
     }
-    if (mode === 'archive-first' || mode === 'archive-only') {
+    if (isArchiveMode) {
       console.log(
-        `[Mode ${mode}] archive hits: ${archiveHits}/${mergedDiscoveredUrls.length}` +
+        `[Mode ${mode}] archive hits: ${archivedByUrl.size}/${mergedDiscoveredUrls.length}` +
           (mode === 'archive-only' ? ` | skipped ${archiveMissesSkipped} archive misses` : '')
       );
     }

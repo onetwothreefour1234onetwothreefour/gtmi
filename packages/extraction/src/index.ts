@@ -98,6 +98,9 @@ export type { ArchiveScrapeArgs, ArchiveScrapeResult } from './utils/archive';
 // Phase 3.9 / W6 — archive-load (read GCS snapshot back into a ScrapeResult).
 export { loadArchivedScrape, loadArchivedScrapes } from './utils/archive-load';
 export type { LoadArchivedScrapeArgs } from './utils/archive-load';
+// Phase 3.9 / W6 — cost estimator for canary --estimate-only path.
+export { COST_MODEL, estimateCanaryCost, planCanaryCost } from './utils/cost-estimate';
+export type { CostEstimateInput, CostEstimate } from './utils/cost-estimate';
 // Re-export the storage API so consumers (apps/web reextract action)
 // can access it without taking a direct workspace dep on @gtmi/storage.
 export { getStorage, archivePathFor, contentTypeForExt } from '@gtmi/storage';
