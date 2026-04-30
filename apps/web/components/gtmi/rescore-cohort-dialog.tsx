@@ -83,9 +83,14 @@ export function RescoreCohortDialog({ onConfirm, className }: RescoreCohortDialo
                 commit changes the scoring parameters.
               </p>
               <p className="text-data-sm" style={{ fontFamily: 'inherit' }}>
-                Takes 30-60 seconds. The composite (programme-level) scores in the{' '}
-                <span className="num">scores</span> table are NOT touched; re-run{' '}
-                <span className="num">run-paq-score.ts</span> per-country to refresh those.
+                Composite + per-pillar scores in the <span className="num">scores</span> table are
+                also refreshed using the same <span className="num">runScoringEngine</span> path the
+                CLI uses (Phase 3.7 / ADR-021). The public dashboard reflects the new numbers on the
+                next request.
+              </p>
+              <p className="text-data-sm" style={{ fontFamily: 'inherit' }}>
+                Takes 30-60 seconds at 30-country scale; if the request times out, fall back to{' '}
+                <span className="num">scripts/run-paq-score.ts</span> per-country.
               </p>
             </div>
           </Dialog.Description>

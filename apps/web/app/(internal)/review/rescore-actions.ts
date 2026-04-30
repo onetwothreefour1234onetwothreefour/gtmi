@@ -23,6 +23,7 @@ import { PHASE2_PLACEHOLDER_PARAMS, scoreSingleIndicator } from '@gtmi/scoring';
 import type { FieldDefinitionRecord } from '@gtmi/scoring';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { scoreProgramFromDb } from '@/lib/score-program';
 
 interface FieldDefForRescore {
   id: string;
@@ -108,19 +109,38 @@ export async function rescoreFieldValue(id: string): Promise<{ score: number | n
   return { score };
 }
 
+export interface RescoreProgramResult {
+  rowsRescored: number;
+  rowsSkipped: number;
+  programName: string;
+  /**
+   * Phase 3.7 / ADR-021 — programme-level composite refresh result.
+   * Null when the programme has no approved field_values (the
+   * composite refresh is skipped; per-row writes still happen).
+   */
+  composite: {
+    compositeScore: number;
+    paqScore: number;
+    cmeScore: number;
+    populatedFields: number;
+    activeFields: number;
+    dataCoveragePct: number;
+    flaggedInsufficientDisclosure: boolean;
+    scoresRowId: string | null;
+  } | null;
+}
+
 /**
  * Recompute `value_indicator_score` for every approved + pending row in
- * one programme. Mirrors the standalone backfill script but scoped to
- * a single program_id and runnable from the /review queue header
- * dropdown.
+ * one programme, then refresh the programme-level composite in
+ * `scores` via `scoreProgramFromDb` so the public dashboard
+ * (composite, PAQ, CME, per-pillar) reflects the new per-row values.
  *
- * Returns { rowsRescored, rowsSkipped } — skipped rows are those with
- * `value_normalized IS NULL` (legitimately unscored, e.g. the FIX-1
- * not-applicable derive markers).
+ * Returns { rowsRescored, rowsSkipped, programName, composite } — the
+ * `composite` block is null when the programme has no approved rows
+ * (the engine has nothing to score; per-row writes still complete).
  */
-export async function rescoreProgram(
-  programId: string
-): Promise<{ rowsRescored: number; rowsSkipped: number; programName: string }> {
+export async function rescoreProgram(programId: string): Promise<RescoreProgramResult> {
   if (!programId) throw new Error('rescoreProgram: missing programId');
 
   const programRows = await db
@@ -196,19 +216,57 @@ export async function rescoreProgram(
     });
   }
 
+  // Phase 3.7 / ADR-021 — refresh the programme-level composite in
+  // `scores` after the per-row updates land. Wrapped in a try/catch
+  // because scoreProgramFromDb throws when the programme has no
+  // approved rows (engine has nothing to score); we still want the
+  // per-row refresh to succeed in that case.
+  let composite: RescoreProgramResult['composite'] = null;
+  let countryIso: string | null = null;
+  try {
+    const r = await scoreProgramFromDb(programId);
+    countryIso = r.countryIso;
+    composite = {
+      compositeScore: r.engine.compositeScore,
+      paqScore: r.engine.paqScore,
+      cmeScore: r.engine.cmeScore,
+      populatedFields: r.engine.populatedFieldCount,
+      activeFields: r.engine.activeFieldCount,
+      dataCoveragePct:
+        (r.engine.populatedFieldCount / Math.max(1, r.engine.activeFieldCount)) * 100,
+      flaggedInsufficientDisclosure: r.engine.flaggedInsufficientDisclosure,
+      scoresRowId: r.scoresRowId,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[rescoreProgram] composite refresh skipped for ${programName} (${programId}): ${msg}`
+    );
+  }
+
   console.log(
-    `[rescoreProgram] ${programName} (${programId}): rescored=${rowsRescored} skipped=${rowsSkipped}`
+    `[rescoreProgram] ${programName} (${programId}): rescored=${rowsRescored} skipped=${rowsSkipped} composite=${composite ? composite.compositeScore.toFixed(2) : 'skipped'}`
   );
+
+  // Bust the cache on every public surface that reads from `scores`.
   revalidatePath('/review');
   revalidatePath(`/programs/${programId}`);
-  return { rowsRescored, rowsSkipped, programName };
+  revalidatePath('/');
+  if (countryIso) revalidatePath(`/countries/${countryIso}`);
+
+  return { rowsRescored, rowsSkipped, programName, composite };
 }
 
 /**
  * Recompute `value_indicator_score` for every approved + pending row
- * across the entire cohort. Iterates rescoreProgram per programme so
- * each programme commits independently — a failure on one doesn't
- * roll back the rest.
+ * across the entire cohort, then refresh each programme's composite
+ * in `scores`. Iterates rescoreProgram per programme so each
+ * programme commits independently — a failure on one doesn't roll
+ * back the rest.
+ *
+ * Phase 3.7 / ADR-021 — also returns `compositesRefreshed` so the UI
+ * can confirm the public dashboard's composite + per-pillar scores
+ * are now in sync with the per-row values.
  *
  * Used after a calibration commit replaces PHASE2_PLACEHOLDER_PARAMS.
  * Single-pass; ~30-60s in steady state. Promote to a Trigger.dev job
@@ -216,6 +274,7 @@ export async function rescoreProgram(
  */
 export async function rescoreCohort(): Promise<{
   programsRescored: number;
+  compositesRefreshed: number;
   rowsRescored: number;
   rowsSkipped: number;
 }> {
@@ -233,6 +292,7 @@ export async function rescoreCohort(): Promise<{
   const allPrograms = iter as Array<{ id: string; name: string }>;
 
   let programsRescored = 0;
+  let compositesRefreshed = 0;
   let rowsRescored = 0;
   let rowsSkipped = 0;
 
@@ -242,6 +302,7 @@ export async function rescoreCohort(): Promise<{
       programsRescored++;
       rowsRescored += r.rowsRescored;
       rowsSkipped += r.rowsSkipped;
+      if (r.composite) compositesRefreshed++;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[rescoreCohort] ${p.name} (${p.id}) failed: ${msg}`);
@@ -249,8 +310,9 @@ export async function rescoreCohort(): Promise<{
   }
 
   console.log(
-    `[rescoreCohort] programmes=${programsRescored}/${allPrograms.length} rescored=${rowsRescored} skipped=${rowsSkipped}`
+    `[rescoreCohort] programmes=${programsRescored}/${allPrograms.length} composites=${compositesRefreshed} rescored=${rowsRescored} skipped=${rowsSkipped}`
   );
   revalidatePath('/review');
-  return { programsRescored, rowsRescored, rowsSkipped };
+  revalidatePath('/');
+  return { programsRescored, compositesRefreshed, rowsRescored, rowsSkipped };
 }
