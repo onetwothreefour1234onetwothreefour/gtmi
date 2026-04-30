@@ -429,9 +429,22 @@ After 3.1–3.5, expected per-programme coverage **42–44/48** (43 average). Ga
 
 **Out of scope (deferred):**
 
-- Programme-level composite refresh (the `scores` table). Today the re-score actions rewrite `field_values.value_indicator_score` only; the composite refresh still requires `scripts/run-paq-score.ts` per country.
+- ~~Programme-level composite refresh~~ — closed by ADR-021 below.
 - Trigger.dev fallback for `rescoreCohort`.
 - By-country / by-programme filters on bulk-approve-all.
+
+### Phase 3.8 follow-up — composite-score refresh in rescore button (ADR-021) — ✅ COMPLETE
+
+**Goal:** close the deferral that ADR-020 left in place. Live verification on 2026-04-30 surfaced that the public dashboard kept rendering pre-edit composites because the `scores` row wasn't touched by the rescore button. Analyst expectation was "one click refreshes everything."
+
+- ✅ Promote `ACTIVE_FIELD_CODES` + the wave-config constants from `scripts/wave-config.ts` to `packages/scoring/src/wave-config.ts` so `apps/web` can read them without depending on the scripts workspace. `scripts/wave-config.ts` becomes a thin re-export shim — every existing consumer (`scripts/canary-run.ts`, `scripts/run-paq-score.ts`, `scripts/audit-empty-fields-rollup.ts`, `scripts/diag-empty-fields.ts`, `jobs/src/jobs/extract-single-program.ts`) keeps working untouched.
+- ✅ New `apps/web/lib/score-program.ts` — server-only orchestrator `scoreProgramFromDb(programId, options?)` that runs the full scoring pipeline (methodology version → CME → approved field_values → field_definitions → ScoringInput → runScoringEngine → upsert into `scores`). Returns the engine output plus the upserted row id.
+- ✅ `rescoreProgram` calls `scoreProgramFromDb` after the per-row refresh. Returns a new `composite` block (compositeScore, paqScore, cmeScore, populated/active counts, coverage %, flagged-insufficient-disclosure, scoresRowId). Composite-call failure is non-fatal — per-row writes still complete.
+- ✅ `rescoreCohort` surfaces `compositesRefreshed` independently of `programsRescored` so the UI can confirm both planes refreshed.
+- ✅ `<RescoreCohortDialog>` copy updated. Composite-NOT-touched caveat removed; confirmation that composite + per-pillar are refreshed via the same `runScoringEngine` path the CLI uses.
+- ✅ `revalidatePath` calls cover `/`, `/programs/[id]`, `/countries/[iso]`, `/review`.
+
+**Trade-off accepted:** `scripts/run-paq-score.ts` is NOT refactored to delegate. Putting the helper in a place both the CLI and apps/web could import would either break `@gtmi/scoring`'s purity (by adding `@gtmi/db`) or require a new package for ~80 lines. Both worse than the duplication. The CLI and the web button share the actual scoring logic (`runScoringEngine` + `PHASE2_PLACEHOLDER_PARAMS`); the duplicated piece is the DB I/O around it.
 
 ---
 
