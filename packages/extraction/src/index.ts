@@ -95,6 +95,9 @@ export { ValidateStageImpl } from './stages/validate';
 // future callers can archive ad-hoc scrapes outside the canary loop).
 export { archiveScrapeResult, EXTRACTOR_VERSION } from './utils/archive';
 export type { ArchiveScrapeArgs, ArchiveScrapeResult } from './utils/archive';
+// Phase 3.9 / W6 — archive-load (read GCS snapshot back into a ScrapeResult).
+export { loadArchivedScrape, loadArchivedScrapes } from './utils/archive-load';
+export type { LoadArchivedScrapeArgs } from './utils/archive-load';
 // Re-export the storage API so consumers (apps/web reextract action)
 // can access it without taking a direct workspace dep on @gtmi/storage.
 export { getStorage, archivePathFor, contentTypeForExt } from '@gtmi/storage';

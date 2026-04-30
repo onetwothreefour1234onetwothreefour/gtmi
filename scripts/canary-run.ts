@@ -14,6 +14,7 @@ import {
   deriveD23,
   dynamicTierQuotas,
   dynamicUrlCap,
+  loadArchivedScrape,
   loadFieldUrlYield,
   loadProgramSourcesAsDiscovered,
   loadProvenUrlsForMissingFields,
@@ -73,7 +74,7 @@ const PHASE3_VDEM_ENABLED = process.env['PHASE3_VDEM_ENABLED'] !== 'false';
 // the env var is treated as an alias for narrow mode.
 const PHASE3_TARGETED_RERUN_ENV = process.env['PHASE3_TARGETED_RERUN'] === 'true';
 
-// Phase 3.9 / W12 — surgical re-run modes.
+// Phase 3.9 / W12 + W6 — surgical re-run modes.
 //
 //   full           = default. live Stage 0 + scrape every merged URL +
 //                    extract every active field.
@@ -90,7 +91,25 @@ const PHASE3_TARGETED_RERUN_ENV = process.env['PHASE3_TARGETED_RERUN'] === 'true
 //                    field_definitions row was modified after the row's
 //                    last extracted_at — the prompt vocabulary moved.
 //   field          = explicit --field A.1.1,B.2.1. Extract only those.
-type CanaryMode = 'full' | 'discover-only' | 'narrow' | 'gate-failed' | 'rubric-changed' | 'field';
+//   archive-first  = (W6) live Stage 0; for each merged URL, prefer
+//                    the GCS archive snapshot over a fresh scrape.
+//                    Falls back to live scrape when no archive entry
+//                    exists. Marks each archive-loaded scrape as
+//                    `unchanged: true` so the W11 short-circuit fires
+//                    and the LLM batch is skipped.
+//   archive-only   = (W6) live Stage 0; STRICT archive — URLs without
+//                    an archive entry are skipped (no live fetch,
+//                    no LLM cost). For re-extraction after a prompt /
+//                    derive change against a known-stable URL set.
+type CanaryMode =
+  | 'full'
+  | 'discover-only'
+  | 'narrow'
+  | 'gate-failed'
+  | 'rubric-changed'
+  | 'field'
+  | 'archive-first'
+  | 'archive-only';
 
 const VALID_MODES: ReadonlySet<CanaryMode> = new Set([
   'full',
@@ -99,6 +118,8 @@ const VALID_MODES: ReadonlySet<CanaryMode> = new Set([
   'gate-failed',
   'rubric-changed',
   'field',
+  'archive-first',
+  'archive-only',
 ]);
 
 async function main() {
@@ -501,8 +522,31 @@ async function main() {
     // each successful scrape to GCS + scrape_history. Failures are
     // non-fatal; result.scrapeHistoryId / result.archivePath are set
     // when the archive write succeeds.
+    // Phase 3.9 / W6 — archive-first / archive-only modes prefer the
+    // GCS snapshot over a live scrape. archive-only skips URLs not in
+    // the archive (no live fetch); archive-first falls back to live
+    // when archive misses.
     const scrapeResults: ScrapeResult[] = [];
+    let archiveHits = 0;
+    let archiveMissesSkipped = 0;
     for (const u of mergedDiscoveredUrls) {
+      if (mode === 'archive-first' || mode === 'archive-only') {
+        const archived = await loadArchivedScrape({ programId, url: u.url });
+        if (archived) {
+          archiveHits++;
+          scrapeResults.push(archived);
+          console.log(
+            `  [Stage 1] Archive hit: ${u.url} (${archived.contentMarkdown.length} chars, hash ${archived.contentHash.slice(0, 8)}…)`
+          );
+          continue;
+        }
+        if (mode === 'archive-only') {
+          archiveMissesSkipped++;
+          console.log(`  [Stage 1] Archive miss (skipped per --mode archive-only): ${u.url}`);
+          continue;
+        }
+        console.log(`  [Stage 1] Archive miss; falling back to live scrape: ${u.url}`);
+      }
       console.log(`  [Stage 1] Scraping: ${u.url}`);
       const [result] = await scrape.execute([u], { programId, countryIso });
       if (result) {
@@ -511,6 +555,12 @@ async function main() {
           `  [Stage 1] Done: ${u.url} (HTTP ${result.httpStatus}, ${result.contentMarkdown.length} chars)`
         );
       }
+    }
+    if (mode === 'archive-first' || mode === 'archive-only') {
+      console.log(
+        `[Mode ${mode}] archive hits: ${archiveHits}/${mergedDiscoveredUrls.length}` +
+          (mode === 'archive-only' ? ` | skipped ${archiveMissesSkipped} archive misses` : '')
+      );
     }
     console.log(`Stage 1 complete: ${scrapeResults.length} URLs scraped`);
 
