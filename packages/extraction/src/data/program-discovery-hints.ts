@@ -40,43 +40,58 @@ export interface ProgramDiscoveryHint {
 
 export const PROGRAM_DISCOVERY_HINTS: Record<string, ProgramDiscoveryHint> = {
   // NLD — Highly Skilled Migrant (HSM) Permit
-  // First-canary outcome (2026-04-30): coverage 38/48; A.1.1 / B.1.1 /
-  // B.2.2 missed because the IND main /residence-permits/work/highly-
-  // skilled-migrant page returned thin content (anti-bot or SPA shell).
-  // D.3.x missed because Belastingdienst was not surfaced.
+  // 2026-05-01 update: post PRs F-I the gap is 4/48 (A.1.1, A.1.2,
+  // B.2.2, D.3.1). D.3.1 is structurally null (NLD uses facts-and-
+  // circumstances residency, no day-count). The remaining three need
+  // sharper steering to specific IND sub-pages that DID load thin in
+  // the last run despite already being mentioned in the hint.
   '668cec08-4b78-4cd2-b215-3047c551ce6e': {
     programId: '668cec08-4b78-4cd2-b215-3047c551ce6e',
     programName: 'Highly Skilled Migrant (HSM) Permit',
     hint:
       "IND's main HSM landing page (ind.nl/en/residence-permits/work/highly-skilled-migrant) " +
-      'often loads thin under headless scraping. Prioritise IND sub-pages — fees ' +
-      '(ind.nl/en/forms), salary thresholds (ind.nl/en/normbedragen), and ' +
-      'kennismigrant policy at government.nl. For tax residency / 30%-ruling, ' +
+      'loads thin under headless scraping. The salary thresholds (A.1.1) live on the ' +
+      'normbedragen page — the canonical URL in 2026 is ' +
+      'ind.nl/en/required-amounts-income-requirement (English) which mirrors ' +
+      'ind.nl/nl/normbedragen-inkomenseis. Application fees (B.2.2) live on ' +
+      'ind.nl/en/fees, and the formal kennismigrant policy on ' +
+      'government.nl/topics/new-in-the-netherlands/highly-skilled-migrants. For ' +
+      'tax residency / 30%-ruling background, ' +
       'belastingdienst.nl/wps/wcm/connect/EN/Content_Areas/Individuals/30_facility ' +
-      'is the canonical English-language source. CBS publishes the median wage ' +
-      'data backing A.1.2 derivation.',
-    curatorNote: 'Added 2026-04-30 after first canary returned 38/48.',
+      'is canonical. CBS publishes the median wage data backing A.1.2 derivation.',
+    curatorNote: 'Updated 2026-05-01: split out the salary threshold + fees URLs.',
   },
 
   // JPN — Highly Skilled Professional Visa (HSP)
-  // First-canary outcome (2026-04-30): coverage 17/48; ISA English HSP
-  // pages are summary-only. Substantive points-system data is in a
-  // Japanese-language PDF on isa.go.jp; tax-residency rule is on NTA
-  // in Japanese; naturalisation rules are on MOJ in Japanese.
-  // Translation pipeline (W2) handles the Japanese pages once Stage 0
-  // surfaces them.
+  // 2026-04-30 first canary: 17/48. 2026-05-01 second canary post W15:
+  // 23/48 with www.isa.go.jp auto-flagged as a hash_equality blocker.
+  // Wayback also has no useful snapshots for ISA HSP pages. Pivot the
+  // hint AWAY from isa.go.jp entirely — substantive HSP content is
+  // also published on JETRO (English investor portal), the Cabinet
+  // Office HSP page, MOFA visa procedure pages, and METI talent-policy
+  // briefs. None of these are on isa.go.jp.
   'a9f779f7-4384-420d-affe-ba269c87108e': {
     programId: 'a9f779f7-4384-420d-affe-ba269c87108e',
     programName: 'Highly Skilled Professional Visa (HSP)',
     hint:
-      "ISA's English HSP pages are summary only — substantive content " +
-      'lives in Japanese-language PDFs on isa.go.jp/jp/publications and on the ' +
-      'isa.go.jp/jp/applications/procedures/16-1.html points-calculation table. ' +
-      'For tax residency (D.3.x), use nta.go.jp/taxes/shiraberu/taxanswer/gaikoku ' +
-      '(Japanese). For naturalisation (D.2.x), use moj.go.jp/MINJI/minji78.html ' +
-      '(Japanese). The downstream translation pipeline will translate any ' +
-      'Japanese-only pages to English.',
-    curatorNote: 'Added 2026-04-30 after first canary returned 17/48.',
+      'IMPORTANT: avoid isa.go.jp — all paths on that domain serve an anti-bot ' +
+      'interstitial that cannot be scraped (auto-flagged in blocker_domains). ' +
+      'Substantive HSP information is also published OFF the ISA domain. Use these ' +
+      'sources instead:\n' +
+      '  - jetro.go.jp/en/invest/setting_up/laws/section3/page9.html (JETRO, English) ' +
+      'covers the HSP points table, salary tiers, and PR fast-track tiers.\n' +
+      '  - mofa.go.jp/j_info/visit/visa/long/index.html (MOFA, Japanese) for visa ' +
+      'application procedures and required documents.\n' +
+      '  - cao.go.jp/keizai1/pdf/202304_hsp.pdf (Cabinet Office briefing) for the ' +
+      'J-Skip / J-Find supplementary tracks launched April 2023.\n' +
+      '  - meti.go.jp/policy/external_economy/trade_control/05_hsp/ (METI) for ' +
+      'talent-policy framework and recent reforms.\n' +
+      '  - For tax residency (D.3.x), nta.go.jp/english/taxes/individual/12005.htm ' +
+      '(English NTA page) is the canonical source.\n' +
+      '  - For naturalisation (D.2.x), moj.go.jp/EN/MINJI/minji78.html (English MOJ) ' +
+      'covers civic test burden and citizenship-residence years.\n' +
+      'The translation pipeline (W2) handles any Japanese-only pages.',
+    curatorNote: 'Updated 2026-05-01 after W15 flagged isa.go.jp; pivoted to non-ISA sources.',
   },
 };
 
