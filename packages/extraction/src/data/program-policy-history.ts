@@ -77,6 +77,30 @@ export const PROGRAM_POLICY_HISTORY: Record<string, ProgramPolicyHistory> = {
     sourceUrl: 'https://ind.nl/en/residence-permits/work/highly-skilled-migrant',
     notes: 'Severity sum = 3+1+1 = 5. Re-check after IND fee schedule publication each January.',
   },
+
+  // JPN — Highly Skilled Professional Visa (HSP)
+  'a9f779f7-4384-420d-affe-ba269c87108e': {
+    programId: 'a9f779f7-4384-420d-affe-ba269c87108e',
+    programName: 'Highly Skilled Professional Visa (HSP)',
+    windowStartYear: 2021,
+    windowEndYear: 2026,
+    events: [
+      {
+        year: 2023,
+        severity: 'major',
+        description:
+          'J-Skip and J-Find supplementary fast-tracks launched (April 2023): new entry pathways for top-tier graduates and high-income professionals widening the HSP framework, with PR eligibility shortened to 1 year for J-Skip qualifiers.',
+      },
+      {
+        year: 2022,
+        severity: 'moderate',
+        description:
+          'HSP points-table criteria refined and special PR pathway tiers (1-year and 3-year fast-tracks) clarified by MOJ / ISA guidance.',
+      },
+    ],
+    sourceUrl: 'https://www.moj.go.jp/EN/isa/policies/hsp/index.html',
+    notes: 'Severity sum = 3+2 = 5. J-Skip / J-Find launch is the headline change since 2021.',
+  },
 };
 
 export function getProgramPolicyHistory(programId: string): ProgramPolicyHistory | null {
