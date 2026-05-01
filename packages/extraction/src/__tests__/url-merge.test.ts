@@ -377,3 +377,82 @@ describe('mergeDiscoveredUrls — Phase 3.9 / W10 yield-ranked merge', () => {
     ]);
   });
 });
+
+describe('mergeDiscoveredUrls — Phase 3.9 / W22 blocker-domain filter', () => {
+  it('drops URLs whose hostname is in the blocker set (registry origin)', () => {
+    const registry = [
+      du('https://www.isa.go.jp/en/path1', 1, 'national', 'r1'),
+      du('https://www.isa.go.jp/en/path2', 1, 'national', 'r2'),
+      du('https://www.moj.go.jp/EN/MINJI/minji78.html', 1, 'national', 'r3'),
+    ];
+    const fresh = [du('https://www.jetro.go.jp/en/invest/x', 1, 'national', 'f1')];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: registry,
+      cap: 10,
+      blockerDomains: new Set(['www.isa.go.jp']),
+    });
+    const hosts = result.map((u) => new URL(u.url).hostname);
+    expect(hosts).not.toContain('www.isa.go.jp');
+    expect(result).toHaveLength(2);
+  });
+
+  it('drops blocker URLs from fresh origin too (Stage 0 may include them)', () => {
+    const fresh = [
+      du('https://www.isa.go.jp/jp/files/points_table_2023.pdf', 1, 'national', 'f1'),
+      du('https://www.mofa.go.jp/j_info/visit/visa/long/visa16.html', 1, 'national', 'f2'),
+    ];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: [],
+      cap: 10,
+      blockerDomains: new Set(['www.isa.go.jp']),
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.url).toBe('https://www.mofa.go.jp/j_info/visit/visa/long/visa16.html');
+  });
+
+  it('passes through unchanged when blockerDomains is absent', () => {
+    const fresh = [du('https://www.isa.go.jp/en/path1', 1, 'national', 'f1')];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: [],
+      cap: 10,
+    });
+    expect(result).toHaveLength(1);
+  });
+
+  it('passes through unchanged when blockerDomains is empty', () => {
+    const fresh = [du('https://www.isa.go.jp/en/path1', 1, 'national', 'f1')];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: [],
+      cap: 10,
+      blockerDomains: new Set(),
+    });
+    expect(result).toHaveLength(1);
+  });
+
+  it('matches hostname case-insensitively', () => {
+    const fresh = [du('https://WWW.ISA.go.jp/en/path1', 1, 'national', 'f1')];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: [],
+      cap: 10,
+      blockerDomains: new Set(['www.isa.go.jp']),
+    });
+    expect(result).toHaveLength(0);
+  });
+
+  it('does not match by substring (subdomain isolation)', () => {
+    // www.isa.go.jp blocked; isa.go.jp.example.com should still pass.
+    const fresh = [du('https://isa.go.jp.example.com/page', 1, 'national', 'f1')];
+    const result = mergeDiscoveredUrls({
+      freshFromStage0: fresh,
+      fromSourcesTable: [],
+      cap: 10,
+      blockerDomains: new Set(['www.isa.go.jp']),
+    });
+    expect(result).toHaveLength(1);
+  });
+});

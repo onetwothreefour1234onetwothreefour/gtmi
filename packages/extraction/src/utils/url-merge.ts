@@ -112,6 +112,22 @@ interface MergeArgs {
    * Phase 3.7 ranking unchanged).
    */
   yieldByUrl?: ReadonlyMap<string, number>;
+  /**
+   * Phase 3.9 / W22 — set of hostnames flagged in blocker_domains
+   * (lowercased). URLs matching one of these are dropped from the
+   * merged set so prior-run registry entries on a now-known blocker
+   * stop displacing fresh non-blocked URLs. Country-agnostic; the
+   * hostname is the only input. Optional for backwards compatibility.
+   */
+  blockerDomains?: ReadonlySet<string>;
+}
+
+function urlHostname(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -153,6 +169,18 @@ export function mergeDiscoveredUrls(args: MergeArgs): DiscoveredUrl[] {
   for (const u of args.fromFieldProven ?? []) {
     const n = normaliseUrl(u.url);
     seen.set(n, { url: u, origin: 'fieldProven', normalised: n });
+  }
+
+  // Phase 3.9 / W22 — drop entries whose hostname is in the blocker
+  // registry. Skip the filter when the set is empty/absent.
+  const blockers = args.blockerDomains ?? new Set<string>();
+  if (blockers.size > 0) {
+    for (const [n, tagged] of seen) {
+      const host = urlHostname(tagged.url.url);
+      if (host !== '' && blockers.has(host)) {
+        seen.delete(n);
+      }
+    }
   }
 
   // Bucket by tier.

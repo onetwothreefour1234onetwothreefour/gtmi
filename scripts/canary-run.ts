@@ -520,6 +520,13 @@ async function main() {
     // historically produced more values for the gap fields surface to
     // the front of the scrape order so early-exit kicks in sooner.
     const yieldByUrl = await loadFieldUrlYield(missingFieldKeys);
+    // Phase 3.9 / W22 — load the blocker-domains registry once and pass
+    // to the merger so prior-run registry entries on a now-known blocker
+    // stop displacing fresh non-blocked URLs.
+    const blockerRows = await db.execute<{ domain: string }>(
+      sql`SELECT domain FROM blocker_domains`
+    );
+    const blockerDomains = new Set<string>(blockerRows.map((r) => r.domain.toLowerCase()));
     const mergedDiscoveredUrls = mergeDiscoveredUrls({
       freshFromStage0: discoveryResult.discoveredUrls,
       fromFieldProven: fieldProvenUrls,
@@ -528,7 +535,13 @@ async function main() {
       cap,
       quotas,
       yieldByUrl,
+      blockerDomains,
     });
+    if (blockerDomains.size > 0) {
+      console.log(
+        `[Discovery merge] filtered against ${blockerDomains.size} blocker domain(s): ${[...blockerDomains].join(', ')}`
+      );
+    }
     console.log(
       `[Discovery merge] populated=${populatedFieldCount} → cap=${cap} (quotas T1=${quotas[1]} T2=${quotas[2]} T3=${quotas[3]})`
     );
