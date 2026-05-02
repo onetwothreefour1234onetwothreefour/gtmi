@@ -219,6 +219,14 @@ Exits 1 on any miss — suitable for CI gating once we choose to wire it.
 | `scripts/compute-normalization-params.ts`                                  | Calibration helper (Phase 5 prereq).                                                                                                                                                                                                                                             |
 | `apps/web/deploy.cmd`                                                      | Manual Cloud Run deploy fallback.                                                                                                                                                                                                                                                |
 
+### Phase 3.10 operational paths
+
+- **`/admin/blockers`** — internal-auth-gated route showing the live `blocker_domains` registry with manual-override insert + per-row clear. Requires Supabase magic-link login. Triggering programme links out to `/programs/[id]`.
+- **Inspect blocker registry from CLI:** `pnpm --filter @gtmi/scripts exec tsx check.ts scored` (covers programme state, not blockers); raw access via `SELECT domain, detection_signal, last_seen_at FROM blocker_domains ORDER BY last_seen_at DESC;`.
+- **Per-programme cost guard:** `MAX_COST_PER_PROGRAM_USD` (default 1.50). Aborts current programme on overrun without throwing; multi-programme batches keep moving. Override with `--confirm-cost`.
+- **Backfill `programs.launch_year`:** `pnpm tsx scripts/seed-launch-years.ts --execute` (idempotent; default dry-run).
+- **Manual `blocker-recheck` trigger:** Trigger.dev dashboard → tasks → `blocker-recheck` → "Test run". Dry-runs against the live registry; safety-net re-insert prevents registry loss on mid-run exception.
+
 ### Phase 3.9 operational paths
 
 - **Inspect the blocker registry:** `SELECT domain, detection_signal, last_seen_at FROM blocker_domains ORDER BY last_seen_at DESC;`

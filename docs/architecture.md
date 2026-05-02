@@ -214,6 +214,42 @@ Missing indicator data is not imputed. An absent indicator is excluded from its 
 **Total derive coverage post-3.9:** 12/48 (was 7).
 A.1.2, B.2.4, D.1.2, D.1.3, D.1.4, D.2.2, D.2.3, **D.2.4**, **D.3.1**, **D.3.3**, **E.1.1**, **E.1.3**.
 
+### Phase 3.10 close — readiness pass (Sessions 18–19, 2026-05-02; 15 commits)
+
+Wiring + cleanup + quality lifts ahead of the cohort scale. Documented end-to-end in [ADR-026](decisions/026-phase-3-10-readiness-pass.md).
+
+**Bucket 1 — Wiring:**
+
+- `a8136dd` data hygiene: `programs.launch_year` curated 91/91 via `scripts/seed-launch-years.ts` (idempotent, default dry-run, `--execute` writes).
+- `0f7da62` `/admin/blockers` route: server-rendered registry list + manual-override insert + per-row clear, mounted under the existing (internal) layout.
+- `8a5b9f4` Trigger.dev parity: `extract-single-program.ts` now exercises W22 + all twelve derives + `programs.launch_year` lookup + `PROGRAM_POLICY_HISTORY`, mirroring `canary-run.ts` exactly.
+- `99800ae` cost + observability: `costEstimate` field added to `PipelineResult`; structured `{"event":"blocker_detected",…}` JSON marker emitted alongside the human-readable log line.
+
+**Bucket 2 — Repository cleanup (4 commits):**
+
+- `1b955ab` deleted 18 phase-specific one-shot scripts.
+- `069caec` consolidated 9 `check-*.ts` / `verify-*.ts` scripts into `scripts/check.ts` with subcommands.
+- `e21fbea` consolidated 3 `purge-*.ts` scripts into `scripts/purge.ts` with subcommands.
+- `b6c9b1a` dropped the deprecated `PHASE3_TARGETED_RERUN` env var and stale architecture-doc references.
+
+**Bucket 3 — Quality + operational improvements (6 commits + 1 fix):**
+
+- `ce8889d` cross-check selectively for auto-approve candidates only (~$0.02–$0.04 / programme; disagreements veto auto-approve and route to /review).
+- `0b766ab` derive-vs-LLM mismatch detection in `executeDerived` (free DB-lookup; mismatch annotated on `provenance.deriveLlmMismatch`).
+- `142ad9f` (+ `55d63c3` test-mock fix) parallel-capped HEAD verification with blocker-domain pre-filter and Content-Length thin filter.
+- `fdbd1ef` per-programme cost cap (`MAX_COST_PER_PROGRAM_USD` default $1.50) — aborts current programme without throwing so multi-programme batches keep moving.
+- `0d75e6b` `blocker-recheck` Trigger.dev cron at `0 4 * * 1` — pre-recheck DELETE so the cascade runs without Wayback-first interference; safety-net re-insert on mid-loop exception.
+- `d32a2e1` /review keyboard navigation (J/K/O/?/Esc) + per-row SLA tier dot (`green` <7d / `orange` 7–13d / `red` ≥14d).
+
+**Production validation:**
+
+- 953 / 953 tests pass (storage 22, scoring 255, extraction 353, apps/web 323).
+- Workspace typecheck clean across all 8 packages.
+- Workspace lint clean.
+- `programs.launch_year` populated 91/91 (was 2/91).
+
+**Phase 3.10b + 3.10c follow-ups:** 18 code-only PRs sequenced inline in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) §§ 3.10b / 3.10c. None require a cohort scrape; eight close the loop on 3.10.5c (UI badges + Cloud Logging + Trigger.dev deploy + score history + reviewer assignment + sensitivity runner + prompts-stale audit + docs); ten pull Phase 5/6/7 work forward (`sensitivity_runs` table + severity classifier + diff-and-classify job + URL drift cron + news-signal scaffold + Resend plumbing + IMD refresh cron + OECD scaffold + IMD timeline badge + whitepaper PDF route).
+
 ### Implemented on main (Phase 2 complete — tag `phase-2-complete`)
 
 - **Schema**: 13 tables via Drizzle ORM. 12 core tables per [docs/BRIEF.md](BRIEF.md) plus `newsSources` (migration `00002`). Migration `00004` adds `scrape_cache` (24h TTL, deduped by URL hash) and `extraction_cache` (keyed by content hash + field key + prompt hash + window version). RLS policies on all tables; V1 uses a placeholder `authenticated` role (see [docs/decisions/001-rls-v1-placeholder-auth.md](decisions/001-rls-v1-placeholder-auth.md)).
