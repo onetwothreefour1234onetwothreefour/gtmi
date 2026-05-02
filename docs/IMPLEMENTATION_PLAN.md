@@ -518,15 +518,17 @@ A.1.2 / B.2.4 / D.1.2 / D.1.3 / D.1.4 / D.2.2 / D.2.3 / **D.2.4** /
 
 ---
 
-## Phase 3.10 — Pre-scale wiring + readiness pass (in progress)
+## Phase 3.10 — Pre-scale wiring + readiness pass
 
 **Goal:** finalise the orchestration, surface every Phase 3.9 capability through admin / Trigger.dev / public surfaces, and verify operational readiness BEFORE scaling extraction to the full 85-programme cohort.
 
 This is a wiring phase. No new mechanisms; no new methodology. Every step here is "an existing capability is implemented but not yet plumbed end-to-end through admin + monitoring + scheduled jobs." Detailed steps are tracked directly in this document below.
 
+**Status as of 2026-05-02:** code-only steps (3.10.1 → 3.10.5c) all shipped on `main` across 15 commits. Cohort dry-run + scale-decision steps (3.10.6 → 3.10.9) wait on the next live run; an additional code-only follow-up phase (3.10b) catches the gaps that surface when you walk through what was actually shipped vs what the dashboards and runbooks need to reflect it.
+
 **Steps (in execution order; each step lands as one PR unless noted):**
 
-#### 3.10.1 — Data hygiene PR
+#### 3.10.1 — Data hygiene PR — ✅ shipped (commit `a8136dd`)
 
 - Backfill `programs.launch_year` for every cohort programme (E.1.3 derive depends on it). Source: each programme's official launch date or the year of its current legal framework if reformed; capture year only.
 - Audit `packages/extraction/src/data/program-policy-history.ts` and add at least one entry per cohort programme that has a known reform in the 2021–2026 window. Stops at "what we can defensibly source"; leave blank where the policy history isn't reliably traceable.
@@ -534,7 +536,7 @@ This is a wiring phase. No new mechanisms; no new methodology. Every step here i
 
 **Acceptance:** `SELECT COUNT(*) FROM programs WHERE launch_year IS NULL` returns 0; the registry has ≥1 entry for at least 80% of cohort programmes.
 
-#### 3.10.2 — Admin / review wiring PR
+#### 3.10.2 — Admin / review wiring PR — ✅ shipped (commit `0f7da62`)
 
 - New `apps/web/(internal)/admin/blockers` route (server component): list `blocker_domains` rows with `domain`, `detection_signal`, `first_detected_at`, `last_seen_at`, `detected_for_program_id` (linked to `/programs/[id]`), `notes`. Editorial table.gtmi shape, mirroring the review queue.
 - Manual-override server action: form posting `domain` + free-text `note` writes a row with `detection_signal = 'manual_override'`. Same RLS role as `/review`.
@@ -543,14 +545,14 @@ This is a wiring phase. No new mechanisms; no new methodology. Every step here i
 
 **Acceptance:** `/admin/blockers` lists `www.isa.go.jp` correctly; manual-override insert round-trips; provenance drawer shows the right badge on at least one approved derived row per derive.
 
-#### 3.10.3 — Trigger.dev parity PR
+#### 3.10.3 — Trigger.dev parity PR — ✅ shipped (commit `8a5b9f4`)
 
 - `jobs/src/jobs/extract-single-program.ts` must exercise the same code paths as `canary-run.ts`: load `blocker_domains`, pass to `mergeDiscoveredUrls`, route blocker URLs through `scrapeWaybackFirst`, queue all 12 derives, support `mode = 'archive-first' | 'archive-only' | 'narrow' | 'gate-failed' | 'rubric-changed'`. Diff the canary file and the Trigger.dev file side-by-side; lift any orchestration delta into a shared helper in `@gtmi/extraction`.
 - Add a smoke test that runs the Trigger.dev twin against one programme (`668cec08-...` NLD HSM) in dev mode and asserts the output matches a CLI run on the same programme, modulo timestamps. Live-DB integration test, gated on `RUN_TRIGGER_PARITY=1`.
 
 **Acceptance:** Trigger.dev twin produces the same set of published + queued field IDs as `canary-run.ts` for NLD HSM; both publish all 9 applicable derives.
 
-#### 3.10.4 — Cost + observability PR
+#### 3.10.4 — Cost + observability PR — ✅ shipped (commit `99800ae`)
 
 - Wire `--estimate-only` into the Trigger.dev path: every job-run publishes a projected cost in the result payload alongside `programsRescored` / `compositesRefreshed`. Failures don't fail the run.
 - Add a structured-log marker on `[blocker-detect] domain=… signal=…` so a Cloud Logging metric counts blocker registrations per day. Tags: `program_id`, `country_iso`, `signal`. Surface on a Cloud Logging dashboard or alert when the daily count exceeds 5 (suggests a cohort-wide regression rather than a per-domain failure).
@@ -558,7 +560,7 @@ This is a wiring phase. No new mechanisms; no new methodology. Every step here i
 
 **Acceptance:** One scheduled run posts a cost projection + actual; one synthetic blocker-domain insert lights up the Cloud Logging metric.
 
-#### 3.10.5 — Discovery hint cohort sweep PR
+#### 3.10.5 — Discovery hint cohort sweep PR — ⏳ blocked on cohort dry-run (3.10.6)
 
 - For every cohort programme whose canary on the dry-run (step 3.10.6) flagged a blocker domain, write/update a `program-discovery-hints.ts` entry that explicitly steers off the blocker domain to the canonical authority's pages.
 - Pre-flight every URL named in a hint with a `HEAD` smoke check: assert HTTP 200 + content-length above the thin threshold. Drop URLs that fail; never paste a 404 into a hint.
@@ -566,7 +568,7 @@ This is a wiring phase. No new mechanisms; no new methodology. Every step here i
 
 **Acceptance:** Every blocker-flagged programme has a hint that does not name a domain in `blocker_domains`; every URL in the hints suite passes the HEAD smoke check.
 
-#### 3.10.5b — Repository cleanup pass (one PR, ~half day)
+#### 3.10.5b — Repository cleanup pass (one PR, ~half day) — ✅ shipped across 4 commits (`1b955ab` deletes, `069caec` check.ts, `e21fbea` purge.ts, `b6c9b1a` dead-code)
 
 The repo has accumulated phase-specific one-shots and legacy paths over Sessions 1–17. Doing this before scale means the cohort run inherits a smaller, clearer surface area.
 
@@ -599,7 +601,9 @@ The repo has accumulated phase-specific one-shots and legacy paths over Sessions
 
 **Acceptance:** Repo at HEAD has ≤25 scripts in `scripts/`; `canary-run.ts` ≤500 lines; CI green; no test regressions; no env vars referenced in code that are not in `.env.example`.
 
-#### 3.10.5c — Quality + operational improvements (one PR, ~1.5 days)
+#### 3.10.5c — Quality + operational improvements — ✅ all six shipped
+
+Per-item commit map: (1) cross-check `ce8889d`, (2) derive-LLM mismatch `0b766ab`, (3) HEAD-check parallel + blocker pre-filter `142ad9f` (+ `55d63c3` test-mock fix), (4) per-programme cost cap `fdbd1ef`, (5) blocker-recheck cron `0d75e6b`, (6) /review keyboard nav + SLA timer `d32a2e1`. Two derive-stage cleanups (`b6c9b1a`) and the launch_year backfill (`a8136dd`) round out the session.
 
 Six improvements that lift the signal-to-noise ratio of every cohort run. Each is independent; ship them as separate commits inside one PR.
 
@@ -624,7 +628,7 @@ Six improvements that lift the signal-to-noise ratio of every cohort run. Each i
 - (5) Insert a synthetic `blocker_domains` row pointing to a known-good site; the next weekly run clears it and logs `BLOCKER_CLEARED`.
 - (6) Manual reviewer test: full pending queue navigated + approved with keyboard only; SLA badges accurate against `created_at`.
 
-#### 3.10.6 — Cohort dry-run (`--mode discover-only`)
+#### 3.10.6 — Cohort dry-run (`--mode discover-only`) — ⏳ awaits live run
 
 - Run `pnpm tsx scripts/canary-run.ts --country <ISO3> --programId <uuid> --mode discover-only` against every cohort programme. No scrape, no extract — Stage 0 only. Refreshes the registry + telemetry without burning extraction cost.
 - Capture per-programme: discovered URL count, tier mix, `discovery_telemetry` row id. Diff against the previous canary's discovery (where one exists).
@@ -632,7 +636,7 @@ Six improvements that lift the signal-to-noise ratio of every cohort run. Each i
 
 **Acceptance:** Every cohort programme returns ≥3 Stage 0 URLs across tiers 1+2; `discovery_telemetry` carries one row per programme.
 
-#### 3.10.7 — Cohort archive-first dry-run (`--mode archive-first`)
+#### 3.10.7 — Cohort archive-first dry-run (`--mode archive-first`) — ⏳ awaits live run
 
 - Run `pnpm tsx scripts/canary-run.ts --country <ISO3> --programId <uuid> --mode archive-first` against every cohort programme. Re-extract from GCS snapshots where they exist; live-scrape only the unarchived URLs.
 - Surfaces the prompt / derive integration problems on the cohort without paying for full live scrapes. Cost is bounded by the unarchived-URL count.
@@ -640,19 +644,110 @@ Six improvements that lift the signal-to-noise ratio of every cohort run. Each i
 
 **Acceptance:** Every cohort programme produces a coverage row; the cohort-wide cost actual is within 20% of the cohort-wide projection.
 
-#### 3.10.8 — Pre-scale gate
+#### 3.10.8 — Pre-scale gate — ⏳ awaits 3.10.5 → 3.10.7
 
 - All of: every cohort programme passes Stage 0; `blocker_domains` is stable across two consecutive `discover-only` runs (no new domain registers on the second run); derive coverage in `field_values` matches the in-code derive count for the cohort (i.e. every cohort programme has 9–11 derived rows depending on country structure); auto-rescore composite published for every cohort programme; CI green; no provenance verifier failures across the cohort.
 - Capture a one-page snapshot in `docs/phase-3/post-3-9-cohort-snapshot.md` listing every cohort programme's coverage / derive count / blocker exposure.
 
 **Acceptance:** All gate items above pass simultaneously on a single date. That date becomes the gate-pass marker.
 
-#### 3.10.9 — Scale decision
+#### 3.10.9 — Scale decision — ⏳ awaits 3.10.8
 
 - At the end of step 3.10.8, decide between (a) `--mode full` cohort run in one batch, (b) tier-by-tier rollout (Tier 1 cohort first, then Tier 2 backfills), (c) region-by-region rollout. Capture the cost projection (from step 3.10.7's actuals × full cohort × estimated re-run multiplier) and the per-batch gating thresholds in a one-pager before pulling the trigger.
 - Trigger the chosen rollout via Trigger.dev (one job per programme) rather than CLI.
 
 **Acceptance:** Decision documented; first batch's projected cost is funded; rollout runs.
+
+---
+
+## Phase 3.10b — Code-only follow-ups (no scraping required)
+
+**Goal:** finish what 3.10.1–3.10.5c started, but couldn't fully close without surface-level UI / docs / ops work. None of these need a canary run, none change methodology, none extract new programmes. They sequence in front of 3.10.6 because they directly improve the signal a cohort dry-run will return.
+
+The eight items are independent. Each is a small PR.
+
+#### 3.10b.1 — `/review` UI badges for the new quality signals
+
+We surfaced two new quality signals during 3.10.5c — cross-check `disagree` and `deriveLlmMismatch` — but neither is shown explicitly on the review queue table. Reviewers have to open the provenance drawer per row to see the conflict. With ≥1500 rows queued in a cohort run that's a real ergonomic tax.
+
+- New chip variants in `<ReviewQueueTable>`: `chip-crosscheck-disagree` (oxblood) and `chip-derive-mismatch` (warning amber). Render in a new column or fold into the existing Status chip — analyst preference.
+- Filter tab "Quality signals" added to `<ReviewFilterTabs>` that selects rows where either chip is present. Lets a reviewer triage the high-priority disagreements first.
+- `<ProvenanceTrigger>` drawer renders an explicit "Cross-check disagreement" banner above the source card when `crossCheckResult === 'disagree'`, and a "Derive ↔ LLM mismatch" banner when `provenance.deriveLlmMismatch` is non-null. Both link out to the relevant Tier 2 / lookup-table source.
+
+**Acceptance:** A synthetic row with `crossCheckResult='disagree'` lights up the chip + banner; a synthetic row with `deriveLlmMismatch` set does the same; quality-signals filter tab returns only those rows.
+
+#### 3.10b.2 — Cloud Logging metric + alert definitions
+
+We're emitting `{"event":"blocker_detected",...}` JSON markers as of `99800ae`. The metric and the alert haven't been defined in GCP yet — Cloud Logging won't count anything until you tell it which event to watch.
+
+Documentation-only PR. Add a runbook section that names:
+
+- Log-based metric `blocker_detected_count` filtering on `jsonPayload.event="blocker_detected"`. `gcloud logging metrics create` command spelled out.
+- Alert policy: notify when the daily count exceeds 5 (suggests cohort-wide regression). `gcloud alpha monitoring policies create` recipe.
+- Symmetric pair: `derive_llm_mismatch_count` filtering on the `[DERIVE_LLM_MISMATCH]` text marker so a cohort-wide stale-lookup regression also pages.
+
+**Acceptance:** Both `gcloud` recipes documented in `docs/runbook.md`; one synthetic blocker insert lights up the metric in the Cloud Logging UI; one synthetic mismatch likewise.
+
+#### 3.10b.3 — Trigger.dev deploy of the new job + pipeline parity
+
+The `blocker-recheck` cron and the parity changes to `extract-single-program` (commits `0d75e6b`, `8a5b9f4`) are merged but Trigger.dev runs whatever is deployed, not whatever's in `main`. The next deploy needs to push both. This is a one-command operation but worth tracking on the plan so it doesn't get forgotten.
+
+- Verify Trigger.dev project state vs `main`.
+- Run `npx trigger.dev@3.3.17 deploy --env staging` (or `production` per ADR-023).
+- Smoke-test the new `blocker-recheck` job in the dashboard — manually trigger it, confirm the run completes with `domainsChecked` reflecting the registry size.
+- Smoke-test `extract-single-program` against NLD HSM as the parity test (RUN_TRIGGER_PARITY=1 mentioned in 3.10.3 if/when implemented; until then, manual diff).
+
+**Acceptance:** `blocker-recheck` runs once successfully via the dashboard; `extract-single-program` for NLD HSM produces the same per-row count it produces from `canary-run.ts` on the same inputs.
+
+#### 3.10b.4 — Composite-score history table
+
+The `scores` row gets overwritten on every rescore. Phase 5 calibration + the public dashboard's "score over time" panel both want a history. Foundation work, code-only.
+
+- New migration `00018_score_history.sql`: `score_history (id, program_id, scored_at, methodology_version_id, composite_score, paq_score, cme_score, metadata)`.
+- `scoreProgramFromDb` writes a row on every rescore (in addition to the upsert into `scores`).
+- New query helper `getScoreHistory(programId)` returns the last N rows ordered by `scored_at DESC`.
+- No UI yet — that's a Phase 4 follow-up.
+
+**Acceptance:** `scoreProgramFromDb` re-run twice produces two `score_history` rows; the existing `scores` upsert still works; tests cover the dual-write.
+
+#### 3.10b.5 — Sensitivity analysis runner
+
+Phase 5 closes on six sensitivity analyses (BRIEF.md §4 / METHODOLOGY.md §8). The runner doesn't exist. It can be built now with synthetic / current-cohort data so that when the cohort lands, sensitivity outputs land with it.
+
+- New `scripts/sensitivity.ts` with subcommands per analysis: `cme-paq-split`, `pillar-weights`, `normalization-fn`, `tier2-allowlist`, `coverage-cutoff`, `derive-confidence`.
+- Each subcommand re-scores the cohort under a perturbed config, diffs the top-10 ranking, prints a table.
+- Output schema in `docs/phase-3/sensitivity-output.md` so future dashboards render it directly.
+
+**Acceptance:** All six subcommands run against the current 2-programme cohort and produce non-empty output (rankings will be trivial with n=2; the runner shape is what matters).
+
+#### 3.10b.6 — Field-definitions edited-since-last-extraction audit
+
+Phase 3 included a "rubric-changed" mode in canary-run, but there's no proactive audit that surfaces "X% of fields have prompts edited since their last extraction" — useful for deciding when to run a cohort-wide re-extract.
+
+- New `scripts/check.ts prompts-stale` subcommand: list field × programme rows where `field_definitions.updated_at > field_values.extracted_at`. Group by field key, print the count and a sample programme.
+- Pairs with `--mode rubric-changed` for the actual re-extract.
+
+**Acceptance:** Subcommand runs against the live DB and produces a short report.
+
+#### 3.10b.7 — Reviewer-assignment column
+
+The `<ReviewQueueTable>` Reviewer column is hardcoded "Unassigned" with `data-testid="reviewer-cell"`. Cohort triage will be unmanageable without per-row assignment.
+
+- Migration `00019_review_assignment.sql`: `review_queue.assigned_to UUID NULL` + `review_queue.assigned_at TIMESTAMPTZ NULL`.
+- Server action `assignReviewer(rowId, reviewerEmail)`. Idempotent.
+- `<ReviewQueueTable>` reviewer cell renders the email when set, otherwise an "Assign me" inline button that calls the action with the current Supabase user.
+- Filter tab "My queue" added to `<ReviewFilterTabs>` selecting rows assigned to the current user.
+
+**Acceptance:** Assigning a row writes a row's assigned_to; "My queue" tab returns only my-assigned rows; clearing an assignment via the existing approve/reject flow nulls the column.
+
+#### 3.10b.8 — Documentation refresh + ADR-026
+
+- `docs/architecture.md` — add a "Phase 3.10 close — what shipped" section paralleling the Phase 3.9 one, listing the 15 commits with the same A–I commit-map shape.
+- `docs/runbook.md` — add the `gcloud` recipes from 3.10b.2; document the `blocker-recheck` cron and how to manually trigger it; document the `MAX_COST_PER_PROGRAM_USD` env var and how to override per-programme.
+- `docs/decisions/026-phase-3-10-readiness-pass.md` — unifying ADR for the cleanup + improvements + parity work. Captures the trade-offs (cross-check selectively-only vs every row; per-programme cap upfront-only vs runtime; SLA tier thresholds 7d/14d).
+- `docs/METHODOLOGY.md` — already at v6; verify the cross-check section reflects the new selective semantics rather than the old "Cross-check removed — extraction uses all sources" stance.
+
+**Acceptance:** Architecture doc lists every Phase 3.10 commit; runbook has the new ops recipes; ADR-026 merged; methodology cross-check paragraph updated.
 
 ---
 
