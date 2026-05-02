@@ -412,6 +412,46 @@ export const newsSignals = pgTable(
   ]
 );
 
+// Phase 3.10b.4 — composite-score history (migration 00019).
+// Append-only timeline. scoreProgramFromDb writes here on every run
+// in addition to upserting `scores`. Public-read so the dashboard can
+// render "score over time" once enough rows accumulate.
+export const scoreHistory = pgTable(
+  'score_history',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    programId: uuid('program_id')
+      .notNull()
+      .references(() => programs.id),
+    scoredAt: timestamp('scored_at', { withTimezone: true }).defaultNow().notNull(),
+    methodologyVersionId: uuid('methodology_version_id').references(() => methodologyVersions.id),
+    compositeScore: decimal('composite_score', { precision: 6, scale: 2 }),
+    paqScore: decimal('paq_score', { precision: 6, scale: 2 }),
+    cmeScore: decimal('cme_score', { precision: 6, scale: 2 }),
+    coveragePopulated: integer('coverage_populated'),
+    coverageTotal: integer('coverage_total'),
+    flaggedInsufficientDisclosure: boolean('flagged_insufficient_disclosure'),
+    metadata: jsonb('metadata'),
+  },
+  (table) => [
+    index('idx_score_history_program_id').on(table.programId),
+    index('idx_score_history_scored_at').on(table.scoredAt.desc()),
+    index('idx_score_history_program_scored_at').on(table.programId, table.scoredAt.desc()),
+    pgPolicy('Team members can write score_history', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+    pgPolicy('Public read score_history', {
+      as: 'permissive',
+      for: 'select',
+      to: 'public',
+      using: sql`true`,
+    }),
+  ]
+);
+
 // 12. sensitivity_runs (extended via migration 00018 — Phase 3.10c.1).
 // Legacy columns (run_type, results) remain nullable for backwards-
 // compatibility. New rows from scripts/sensitivity.ts (Phase 3.10b.5)

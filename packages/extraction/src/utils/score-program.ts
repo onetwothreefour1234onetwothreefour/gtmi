@@ -42,6 +42,7 @@ import {
   fieldValues,
   methodologyVersions,
   programs,
+  scoreHistory,
   scores,
 } from '@gtmi/db';
 import { ACTIVE_FIELD_CODES, PHASE2_PLACEHOLDER_PARAMS, runScoringEngine } from '@gtmi/scoring';
@@ -219,6 +220,30 @@ export async function scoreProgramFromDb(
       },
     })
     .returning({ id: scores.id });
+
+  // Phase 3.10b.4 — append-only history. Failure of this write is
+  // non-fatal — the `scores` upsert is the source of truth; the
+  // history is for trend rendering. We log + continue so a one-off
+  // DB hiccup doesn't roll back the rescore.
+  try {
+    await db.insert(scoreHistory).values({
+      programId,
+      methodologyVersionId: mvId,
+      scoredAt: output.scoredAt,
+      compositeScore: String(output.compositeScore),
+      paqScore: String(output.paqScore),
+      cmeScore: String(output.cmeScore),
+      coveragePopulated: output.populatedFieldCount,
+      coverageTotal: output.activeFieldCount,
+      flaggedInsufficientDisclosure: output.flaggedInsufficientDisclosure,
+      metadata,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[score-history] insert failed for program ${programId}: ${msg} — scores upsert succeeded, continuing`
+    );
+  }
 
   return {
     programId,
