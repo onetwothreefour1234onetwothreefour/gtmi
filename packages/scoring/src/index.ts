@@ -37,3 +37,14 @@ export type {
   CategoricalRubric,
 } from './types';
 export { ScoringError } from './types';
+// Phase 3.10c.2 — Phase 6 severity classifier.
+export {
+  classifyPolicyChangeSeverity,
+  SEVERITY_BREAKING_THRESHOLD,
+  SEVERITY_MATERIAL_THRESHOLD,
+} from './policy-change-severity';
+export type {
+  PolicyChangeSeverity,
+  PolicyChangeSeverityInput,
+  PolicyChangeSeverityResult,
+} from './policy-change-severity';
