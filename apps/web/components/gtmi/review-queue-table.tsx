@@ -5,10 +5,12 @@ import { CountryFlag } from './country-flag';
 import {
   isBulkApproveCandidate,
   readProvenanceConfidence,
+  readQualitySignals,
   relativeAge,
   reviewIdTag,
   slaTier,
   sourceDomain,
+  type QualitySignals,
   type SlaTier,
 } from '@/lib/review-queue-helpers';
 import type { ReviewListRow } from '@/lib/review-queries';
@@ -54,6 +56,7 @@ export function ReviewQueueTable({ rows, now, className }: ReviewQueueTableProps
         <tbody>
           {rows.map((row, idx) => {
             const prov = readProvenanceConfidence(row.provenance);
+            const qs = readQualitySignals(row.provenance);
             const tag = reviewIdTag(row.id);
             const candidate = isBulkApproveCandidate(prov);
             const lowConfidence =
@@ -100,6 +103,7 @@ export function ReviewQueueTable({ rows, now, className }: ReviewQueueTableProps
                   <p className="text-data-sm text-ink-4" style={{ fontSize: 11 }}>
                     {row.fieldLabel}
                   </p>
+                  <QualitySignalChips qs={qs} />
                 </td>
                 <td>
                   <span className="num text-ink-4" style={{ fontSize: 11 }}>
@@ -177,6 +181,38 @@ function ConfidenceCell({ prov }: { prov: ReturnType<typeof readProvenanceConfid
       <span aria-hidden className="block w-9" style={{ height: 4, background: 'var(--rule-soft)' }}>
         <span className="block h-full" style={{ width: `${pct}%`, background: accent }} />
       </span>
+    </span>
+  );
+}
+
+function QualitySignalChips({ qs }: { qs: QualitySignals }) {
+  if (!qs.crossCheckDisagrees && !qs.deriveLlmMismatch) return null;
+  return (
+    <span className="mt-1 inline-flex flex-wrap gap-1" data-testid="quality-signal-chips">
+      {qs.crossCheckDisagrees && (
+        <span
+          className="chip chip-accent"
+          style={{ fontSize: 10 }}
+          title={
+            qs.crossCheckUrl
+              ? `Tier-2 source disagrees: ${qs.crossCheckUrl}`
+              : 'Tier-2 source disagrees with the extracted value'
+          }
+          data-testid="chip-crosscheck-disagree"
+        >
+          ✗ Cross-check
+        </span>
+      )}
+      {qs.deriveLlmMismatch && (
+        <span
+          className="chip chip-accent"
+          style={{ fontSize: 10 }}
+          title={qs.mismatchNote ?? 'Derived value differs from prior LLM extraction'}
+          data-testid="chip-derive-mismatch"
+        >
+          ⚠ Derive ↔ LLM
+        </span>
+      )}
     </span>
   );
 }

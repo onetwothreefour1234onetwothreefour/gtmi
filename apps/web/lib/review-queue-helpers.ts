@@ -46,6 +46,44 @@ export function isBulkApproveCandidate(prov: ProvenanceConfidence): boolean {
 }
 
 /**
+ * Phase 3.10b.1 — quality-signal flags. Read defensively from the
+ * provenance JSONB; both signals are written by Phase 3.10 commits
+ * but pre-3.10 rows lack them and render as `false`.
+ *
+ *   crossCheckDisagrees — provenance.crossCheckResult === 'disagree'
+ *   deriveLlmMismatch    — provenance.deriveLlmMismatch is a non-empty string
+ */
+export interface QualitySignals {
+  crossCheckDisagrees: boolean;
+  deriveLlmMismatch: boolean;
+  /** The raw mismatch note when present, for the drawer banner. */
+  mismatchNote: string | null;
+  /** The raw cross-check Tier-2 URL when present, for the drawer banner. */
+  crossCheckUrl: string | null;
+}
+
+export function readQualitySignals(raw: unknown): QualitySignals {
+  if (raw === null || raw === undefined || typeof raw !== 'object') {
+    return {
+      crossCheckDisagrees: false,
+      deriveLlmMismatch: false,
+      mismatchNote: null,
+      crossCheckUrl: null,
+    };
+  }
+  const obj = raw as Record<string, unknown>;
+  const ccResult = obj['crossCheckResult'];
+  const mismatch = obj['deriveLlmMismatch'];
+  const ccUrl = obj['crossCheckUrl'];
+  return {
+    crossCheckDisagrees: ccResult === 'disagree',
+    deriveLlmMismatch: typeof mismatch === 'string' && mismatch.length > 0,
+    mismatchNote: typeof mismatch === 'string' && mismatch.length > 0 ? mismatch : null,
+    crossCheckUrl: typeof ccUrl === 'string' && ccUrl.length > 0 ? ccUrl : null,
+  };
+}
+
+/**
  * Source domain extracted from a sourceUrl. Trims protocol, drops `www.`,
  * truncates to 32 chars. Falls back to a literal "—" for empty inputs.
  */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slaTier } from './review-queue-helpers';
+import { readQualitySignals, slaTier } from './review-queue-helpers';
 import {
   isBulkApproveCandidate,
   matchesReviewTab,
@@ -243,5 +243,56 @@ describe('slaTier — Phase 3.10', () => {
 
   it('returns green when extractedAt is in the future (defensive)', () => {
     expect(slaTier(new Date('2026-05-10T12:00:00Z'), FROZEN)).toBe('green');
+  });
+});
+
+describe('readQualitySignals — Phase 3.10b.1', () => {
+  it('returns all-false on null / undefined / non-object', () => {
+    for (const v of [null, undefined, 42, 'string', false]) {
+      const r = readQualitySignals(v);
+      expect(r.crossCheckDisagrees).toBe(false);
+      expect(r.deriveLlmMismatch).toBe(false);
+      expect(r.mismatchNote).toBeNull();
+      expect(r.crossCheckUrl).toBeNull();
+    }
+  });
+
+  it('flags cross-check disagreement when crossCheckResult === "disagree"', () => {
+    const r = readQualitySignals({
+      crossCheckResult: 'disagree',
+      crossCheckUrl: 'https://fragomen.example.com/aus',
+    });
+    expect(r.crossCheckDisagrees).toBe(true);
+    expect(r.crossCheckUrl).toBe('https://fragomen.example.com/aus');
+  });
+
+  it('does NOT flag cross-check on "agree" or "not_checked"', () => {
+    expect(readQualitySignals({ crossCheckResult: 'agree' }).crossCheckDisagrees).toBe(false);
+    expect(readQualitySignals({ crossCheckResult: 'not_checked' }).crossCheckDisagrees).toBe(false);
+  });
+
+  it('flags derive-LLM mismatch when deriveLlmMismatch is non-empty string', () => {
+    const r = readQualitySignals({
+      deriveLlmMismatch: 'Prior LLM=183 vs derived=null',
+    });
+    expect(r.deriveLlmMismatch).toBe(true);
+    expect(r.mismatchNote).toBe('Prior LLM=183 vs derived=null');
+  });
+
+  it('does NOT flag derive-LLM mismatch on empty string or null', () => {
+    expect(readQualitySignals({ deriveLlmMismatch: '' }).deriveLlmMismatch).toBe(false);
+    expect(readQualitySignals({ deriveLlmMismatch: null }).deriveLlmMismatch).toBe(false);
+  });
+
+  it('reads both signals independently from the same provenance object', () => {
+    const r = readQualitySignals({
+      crossCheckResult: 'disagree',
+      crossCheckUrl: 'https://kpmg.example.com/sgp',
+      deriveLlmMismatch: 'Country lookup updated',
+    });
+    expect(r.crossCheckDisagrees).toBe(true);
+    expect(r.deriveLlmMismatch).toBe(true);
+    expect(r.crossCheckUrl).toBe('https://kpmg.example.com/sgp');
+    expect(r.mismatchNote).toBe('Country lookup updated');
   });
 });
