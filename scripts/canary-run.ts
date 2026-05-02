@@ -165,7 +165,16 @@ async function main() {
   // Phase 3.9 / W6 — --estimate-only short-circuits before any LLM
   // call. Computes projected cost from the resolved URL + field set
   // and exits 0. --confirm-cost is the explicit override that
-  // bypasses the MAX_RERUN_COST_USD guard.
+  // bypasses both the MAX_RERUN_COST_USD and MAX_COST_PER_PROGRAM_USD
+  // guards.
+  //
+  // Phase 3.10 — MAX_COST_PER_PROGRAM_USD adds a per-programme cap
+  // alongside the existing per-canary-invocation cap. For a
+  // single-programme canary the two converge; for multi-programme
+  // batches (Trigger.dev cohort runs) the per-programme cap fires
+  // independently per target so a runaway programme cannot consume
+  // the whole batch budget. Default $1.50 — well above NLD HSM's
+  // observed ~$0.40 / programme but below the cohort-wide $5 cap.
   const estimateOnly = process.argv.includes('--estimate-only');
   const confirmCost = process.argv.includes('--confirm-cost');
   const maxRerunCostUsdRaw = process.env['MAX_RERUN_COST_USD'];
@@ -173,6 +182,11 @@ async function main() {
     maxRerunCostUsdRaw && Number.isFinite(Number(maxRerunCostUsdRaw))
       ? Number(maxRerunCostUsdRaw)
       : 5;
+  const maxCostPerProgramUsdRaw = process.env['MAX_COST_PER_PROGRAM_USD'];
+  const maxCostPerProgramUsd =
+    maxCostPerProgramUsdRaw && Number.isFinite(Number(maxCostPerProgramUsdRaw))
+      ? Number(maxCostPerProgramUsdRaw)
+      : 1.5;
 
   console.log(
     `[Canary mode] ${mode}${mode === 'field' ? ` (${explicitFieldKeys.join(',')})` : ''}` +
@@ -593,6 +607,18 @@ async function main() {
         `[Cost guard] estimated $${estimate.total.toFixed(2)} > MAX_RERUN_COST_USD=$${maxRerunCostUsd}. ` +
           `Re-run with --confirm-cost to proceed, or raise the env var.`
       );
+    }
+    // Phase 3.10 — per-programme cap. Aborts THIS programme without
+    // throwing so a multi-programme batch keeps moving on to the next
+    // target. The canary writes a [COST_CAP_HIT] log line + skips the
+    // rest of this programme's pipeline. --confirm-cost overrides.
+    if (estimate.total > maxCostPerProgramUsd && !confirmCost) {
+      console.warn(
+        `[COST_CAP_HIT] program=${programName} estimated=$${estimate.total.toFixed(2)} > ` +
+          `MAX_COST_PER_PROGRAM_USD=$${maxCostPerProgramUsd}. Skipping this programme. ` +
+          `Re-run with --confirm-cost to proceed, or raise the env var.`
+      );
+      continue;
     }
 
     // Phase 2: Stage 1 — scrape program-specific URLs

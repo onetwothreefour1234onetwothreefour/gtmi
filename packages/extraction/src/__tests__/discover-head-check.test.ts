@@ -28,7 +28,7 @@ describe('_verifyOneUrl — Phase 3.10 HEAD-verification', () => {
   it('drops blocker-domain URLs without invoking fetch', async () => {
     const fetchSpy = vi.fn();
     globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
-    const { _verifyOneUrl } = await import('../stages/discover');
+    const { _verifyOneUrl } = await import('../stages/discover.js');
     const blockers = new Set(['www.isa.go.jp']);
     const result = await _verifyOneUrl(du('https://www.isa.go.jp/en/page'), blockers);
     expect(result).toBeNull();
@@ -38,7 +38,7 @@ describe('_verifyOneUrl — Phase 3.10 HEAD-verification', () => {
   it('matches hostname case-insensitively against the blocker set', async () => {
     const fetchSpy = vi.fn();
     globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
-    const { _verifyOneUrl } = await import('../stages/discover');
+    const { _verifyOneUrl } = await import('../stages/discover.js');
     const blockers = new Set(['www.isa.go.jp']);
     const result = await _verifyOneUrl(du('https://WWW.ISA.GO.JP/en/page'), blockers);
     expect(result).toBeNull();
@@ -50,7 +50,7 @@ describe('_verifyOneUrl — Phase 3.10 HEAD-verification', () => {
       status: 404,
       headers: new Headers(),
     })) as unknown as typeof globalThis.fetch;
-    const { _verifyOneUrl } = await import('../stages/discover');
+    const { _verifyOneUrl } = await import('../stages/discover.js');
     const result = await _verifyOneUrl(du('https://example.com/missing'), new Set());
     expect(result).toBeNull();
   });
@@ -60,7 +60,7 @@ describe('_verifyOneUrl — Phase 3.10 HEAD-verification', () => {
       status: 410,
       headers: new Headers(),
     })) as unknown as typeof globalThis.fetch;
-    const { _verifyOneUrl } = await import('../stages/discover');
+    const { _verifyOneUrl } = await import('../stages/discover.js');
     const result = await _verifyOneUrl(du('https://example.com/gone'), new Set());
     expect(result).toBeNull();
   });
@@ -70,7 +70,7 @@ describe('_verifyOneUrl — Phase 3.10 HEAD-verification', () => {
       status: 200,
       headers: new Headers({ 'content-length': '512' }),
     })) as unknown as typeof globalThis.fetch;
-    const { _verifyOneUrl } = await import('../stages/discover');
+    const { _verifyOneUrl } = await import('../stages/discover.js');
     const result = await _verifyOneUrl(du('https://example.com/thin'), new Set());
     expect(result).toBeNull();
   });
@@ -80,7 +80,7 @@ describe('_verifyOneUrl — Phase 3.10 HEAD-verification', () => {
       status: 200,
       headers: new Headers({ 'content-length': '4096' }),
     })) as unknown as typeof globalThis.fetch;
-    const { _verifyOneUrl } = await import('../stages/discover');
+    const { _verifyOneUrl } = await import('../stages/discover.js');
     const fat = du('https://example.com/fat');
     const result = await _verifyOneUrl(fat, new Set());
     expect(result).toEqual(fat);
@@ -91,7 +91,7 @@ describe('_verifyOneUrl — Phase 3.10 HEAD-verification', () => {
       status: 200,
       headers: new Headers(),
     })) as unknown as typeof globalThis.fetch;
-    const { _verifyOneUrl } = await import('../stages/discover');
+    const { _verifyOneUrl } = await import('../stages/discover.js');
     const dyn = du('https://gov.example/dyn');
     const result = await _verifyOneUrl(dyn, new Set());
     expect(result).toEqual(dyn);
@@ -101,7 +101,7 @@ describe('_verifyOneUrl — Phase 3.10 HEAD-verification', () => {
     globalThis.fetch = vi.fn(async () => {
       throw new Error('ECONNREFUSED');
     }) as unknown as typeof globalThis.fetch;
-    const { _verifyOneUrl } = await import('../stages/discover');
+    const { _verifyOneUrl } = await import('../stages/discover.js');
     const result = await _verifyOneUrl(du('https://example.invalid/'), new Set());
     expect(result).toBeNull();
   });
@@ -111,7 +111,7 @@ describe('_verifyOneUrl — Phase 3.10 HEAD-verification', () => {
       status: 200,
       headers: new Headers(),
     })) as unknown as typeof globalThis.fetch;
-    const { _verifyOneUrl } = await import('../stages/discover');
+    const { _verifyOneUrl } = await import('../stages/discover.js');
     const ok = du('https://gov.example/ok');
     const result = await _verifyOneUrl(ok, new Set());
     expect(result).toEqual(ok);
