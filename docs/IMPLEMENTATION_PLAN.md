@@ -751,6 +751,84 @@ The `<ReviewQueueTable>` Reviewer column is hardcoded "Unassigned" with `data-te
 
 ---
 
+## Phase 3.10c — Code-only items pulled forward from Phase 5/6/7
+
+**Goal:** parallel-track the parts of Phase 5 / 6 / 7 that don't require a cohort scrape run. Each becomes useful the moment the cohort lands; building them now means Phase 5 can publish on day one rather than waiting for infrastructure to be built around already-extracted data.
+
+Like 3.10b, these are independent small PRs.
+
+#### 3.10c.1 — `sensitivity_runs` table + writer (Phase 5 prereq)
+
+Migration `00020_sensitivity_runs.sql`: `sensitivity_runs (id, run_id, analysis_type, perturbation_jsonb, baseline_ranking_jsonb, perturbed_ranking_jsonb, spearman_rho, top10_shift, ran_at)`. Pairs with the `scripts/sensitivity.ts` runner from 3.10b.5 — the runner writes per-perturbation rows for audit and dashboard rendering. Migration only; schema-first. The runner from 3.10b.5 then writes into it.
+
+**Acceptance:** Migration applies cleanly via `apply-migration.ts`; the sensitivity runner from 3.10b.5 writes one row per perturbation and exits 0.
+
+#### 3.10c.2 — Severity classification helper (Phase 6)
+
+The Phase 6 plan calls for deterministic severity classes on `policy_changes`:
+
+- Breaking: PAQ delta > 5
+- Material: 1 ≤ PAQ delta ≤ 5
+- Minor: PAQ delta < 1 OR non-scoring change
+
+New helper `classifyPolicyChangeSeverity({ paqBefore, paqAfter, scoringFieldChanged })` in `@gtmi/scoring`. Pure function; tests cover each band + tied edge cases. The Phase 6 `diff-and-classify` job consumes it once weekly re-scrape diffs land.
+
+**Acceptance:** Helper exported with full test coverage (3 boundary cases + non-scoring path); existing `policy_changes` rows can be reclassified via a one-shot script.
+
+#### 3.10c.3 — `diff-and-classify` Trigger.dev job (Phase 6 scaffold)
+
+Phase 6 spec lists `weekly-rescrape`, `diff-and-classify`, `news-signal-ingest`. The first ships as `weekly-maintenance-scrape` (live since Phase 3.9 / W6). The second is a follow-up job that walks `scrape_history` rows where `content_hash` changed since the previous successful scrape, re-runs the extract path for the affected fields, diffs the new value against the prior `field_values` row, and writes a `policy_changes` row classified by 3.10c.2.
+
+Codes to a stub if `policy_changes` table is empty (Phase 5 has not landed yet).
+
+**Acceptance:** Job runs on a synthetic content_hash change in dev; produces a `policy_changes` row with the right severity; e2e parity test against `weekly-maintenance-scrape` (no field reflows when content_hash unchanged).
+
+#### 3.10c.4 — URL drift monthly HEAD-check job (Phase 6)
+
+Surfaces Tier 1 URL soft-404s before they cost a canary run. New Trigger.dev `url-drift-check` cron (1st of month, 02:00 UTC) walks `field_url_index`, sends a parallel HEAD batch (mirror the Phase 3.10 HEAD-verification helper), writes a `policy_changes` row with `severity='url_broken'` for any 404/410/non-resolving URL.
+
+**Acceptance:** Cron fires; one synthetic 404 lights up a `severity='url_broken'` row.
+
+#### 3.10c.5 — News-signal ingest scaffold (Phase 6)
+
+Tier 3 news ingestion via Exa semantic search. Stub for now: new `jobs/src/jobs/news-signal-ingest.ts` that loads `news_sources` (already seeded), runs a daily Exa query per source bounded to the prior 24h, writes hits into `news_signals` (table not yet defined — first migration to ship as part of this PR).
+
+Migration `00021_news_signals.sql`: `news_signals (id, source_id, programme_match_id, country_iso, headline, url, published_at, ingested_at, ai_summary, severity_hint)`. Severity_hint is the LLM's "this looks Material/Breaking/Minor" pre-tag; analyst confirms in /review.
+
+**Acceptance:** Migration applies; cron runs against an Exa stub returning a fixed result and writes one row.
+
+#### 3.10c.6 — Resend alert plumbing (Phase 6)
+
+Email alerts on Material/Breaking severity. Triggered from the `policy_changes` writer (3.10c.3). Code-only: Resend client wrapper in `@gtmi/extraction` (env `RESEND_API_KEY`); a tiny helper that batches the day's events into one digest per recipient at 09:00 UTC. The actual recipient list lands per-tenant later.
+
+**Acceptance:** Synthetic Material event triggers a single test-mode email via Resend's sandbox; the email body lists the changed fields with before/after values.
+
+#### 3.10c.7 — IMD Appeal annual refresh job (Phase 7 prereq)
+
+Trigger.dev `imd-appeal-refresh` cron (yearly, 1st March). Pulls the IMD Appeal scores from the published CSV (URL captured in `country-sources.ts`), diffs against the existing `countries.imd_appeal_score`, and writes the new values + a `policy_changes` summary row. CME gets re-normalized cohort-wide; every programme's composite is recomputed.
+
+**Acceptance:** Run against last-year's CSV produces the same scores currently in the DB; run against a synthetic perturbed CSV updates the scores + emits the summary row.
+
+#### 3.10c.8 — OECD tax treaty integration scaffold (Phase 7)
+
+Pillar D.3 supplementary source. Code-only API client + lookup helper in `@gtmi/extraction/src/data/oecd-tax-treaties.ts` (mirrors the V-Dem direct-API pattern). Doesn't change extraction yet — adds the data layer so the future cohort run can consult it as a Tier 1 supplement when programme tax pages are silent.
+
+**Acceptance:** Helper returns the right treaty count for a known sample country (e.g. Switzerland); typed contract for the Phase 7 wiring.
+
+#### 3.10c.9 — Annual IMD refresh — front-end timeline integration (Phase 6 visual)
+
+When 3.10c.7 fires, the `/changes` page should render the IMD refresh as a top-level event with an "all programmes affected" badge. Front-end-only PR; backend already produces the row.
+
+**Acceptance:** Synthetic IMD-refresh `policy_changes` row renders correctly; existing per-programme events still render in their old shape.
+
+#### 3.10c.10 — Methodology whitepaper scaffold (Phase 7)
+
+A static HTML / PDF rendering of the live methodology data (already on `/methodology`) for offline distribution to clients. Reuses the existing methodology DB pull; new route `/methodology/whitepaper.pdf` (Cloud Run-side `@vercel/og` analogue) + a print-CSS pass. Can be built now; the content already exists.
+
+**Acceptance:** `/methodology/whitepaper.pdf` returns a valid PDF; print-preview pagination is sane; cohort cells in the doc are populated as soon as Phase 5 publishes scores.
+
+---
+
 ## Phase 4 — Public Dashboard
 
 **Goal:** Interactive public-facing web dashboard. Every data point shows provenance on hover.
