@@ -7,14 +7,5 @@
     "rootDir": "."
   },
   "include": ["./**/*.ts"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "convert-assets.ts",
-    "migrate-rubric-scores.ts",
-    "audit-phase2.ts",
-    "diag-empty-fields.ts",
-    "scrape-audit.ts",
-    "test-efficiency.ts"
-  ]
+  "exclude": ["node_modules", "dist", "convert-assets.ts", "diag-empty-fields.ts"]
 }
