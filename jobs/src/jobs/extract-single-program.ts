@@ -19,6 +19,7 @@ import {
   loadProgramSourcesAsDiscovered,
   loadProvenUrlsForMissingFields,
   mergeDiscoveredUrls,
+  planCanaryCost,
   scoreProgramFromDb,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
   COUNTRY_NON_GOV_COSTS_POLICY,
@@ -79,6 +80,14 @@ interface PipelineResult {
     cmeScore: number;
     coverage: string;
     flagged: boolean;
+  } | null;
+  /** Phase 3.10 — projected total LLM cost for this programme run.
+   *  Computed upfront from the URL set + field set via planCanaryCost.
+   *  `actual` is null until per-call cost instrumentation lands. */
+  costEstimate: {
+    projected: number;
+    actual: number | null;
+    currency: 'USD';
   } | null;
 }
 
@@ -384,6 +393,22 @@ export const extractSingleProgram = task({
           !DERIVED_FIELD_KEYS.has(d.key)
       )
       .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd, label: d.label }));
+
+    // Phase 3.10 — projected cost (mirror canary-run.ts behaviour).
+    // Surfaced in PipelineResult for observability dashboards.
+    const projectedCost = planCanaryCost({
+      mode: 'full',
+      mergedUrls: mergedDiscoveredUrls,
+      archiveHitUrls: 0,
+      llmFieldCount: llmFields.length,
+      tier2EligibleFields: 0,
+      translationCandidateUrls: 0,
+    });
+    console.log(
+      `[Cost estimate] program=${programName} projected=$${projectedCost.total.toFixed(2)} ` +
+        `(batch=$${projectedCost.breakdown.batchExtraction.toFixed(2)} + ` +
+        `validation=$${projectedCost.breakdown.validation.toFixed(2)})`
+    );
 
     const allExtractionResults = await extract.executeAllFields(
       allUniqueScrapes,
@@ -744,6 +769,11 @@ export const extractSingleProgram = task({
       fieldsAutoApproved,
       fieldsQueued,
       composite,
+      costEstimate: {
+        projected: projectedCost.total,
+        actual: null,
+        currency: 'USD' as const,
+      },
     };
   },
 });

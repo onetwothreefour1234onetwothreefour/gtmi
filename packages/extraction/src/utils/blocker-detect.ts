@@ -180,6 +180,21 @@ export async function recordBlockerDomain(args: {
     console.log(
       `[blocker-detect] domain=${args.domain} signal=${args.signal} — persisted to blocker_domains`
     );
+    // Phase 3.10 — structured single-line JSON marker for Cloud
+    // Logging metric extraction. Cloud Logging parses single-line
+    // JSON into jsonPayload; a log-based metric filters on
+    // jsonPayload.event="blocker_detected" to count daily
+    // registrations and alert when the count exceeds threshold
+    // (suggesting a cohort-wide regression rather than a per-domain
+    // failure).
+    console.log(
+      JSON.stringify({
+        event: 'blocker_detected',
+        domain: args.domain.toLowerCase(),
+        signal: args.signal,
+        programId: args.programId ?? null,
+      })
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[blocker-detect] persist failed for ${args.domain}: ${msg}`);
