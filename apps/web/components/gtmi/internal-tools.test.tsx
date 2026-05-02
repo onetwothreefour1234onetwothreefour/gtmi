@@ -43,6 +43,8 @@ function mkReviewRow(overrides: Partial<ReviewListRow> = {}): ReviewListRow {
     extractedAt: new Date('2026-04-29T08:00:00Z'),
     provenance: COMPLETE_PROVENANCE,
     sourceUrl: 'https://www.mom.gov.sg/passes-and-permits/tech-pass',
+    assignedTo: null,
+    assignedAt: null,
     ...overrides,
   };
 }

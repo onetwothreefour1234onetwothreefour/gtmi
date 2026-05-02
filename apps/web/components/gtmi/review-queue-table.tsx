@@ -129,13 +129,12 @@ export function ReviewQueueTable({ rows, now, className }: ReviewQueueTableProps
                   </span>
                 </td>
                 <td>
-                  <span
-                    className="num text-ink-5"
-                    style={{ fontSize: 11, fontStyle: 'italic' }}
-                    data-testid="reviewer-cell"
-                  >
-                    Unassigned
-                  </span>
+                  <ReviewerCell
+                    rowId={row.id}
+                    assignedTo={row.assignedTo}
+                    assignedAt={row.assignedAt}
+                    now={now}
+                  />
                 </td>
                 <td>
                   <StatusChip kind={statusKind} />
@@ -178,6 +177,46 @@ function ConfidenceCell({ prov }: { prov: ReturnType<typeof readProvenanceConfid
       <span aria-hidden className="block w-9" style={{ height: 4, background: 'var(--rule-soft)' }}>
         <span className="block h-full" style={{ width: `${pct}%`, background: accent }} />
       </span>
+    </span>
+  );
+}
+
+function ReviewerCell({
+  rowId,
+  assignedTo,
+  assignedAt,
+  now,
+}: {
+  rowId: string;
+  assignedTo: string | null;
+  assignedAt: Date | null;
+  now?: Date;
+}) {
+  if (assignedTo === null) {
+    return (
+      <span
+        className="num text-ink-5"
+        style={{ fontSize: 11, fontStyle: 'italic' }}
+        data-testid="reviewer-cell"
+        data-row-id={rowId}
+      >
+        Unassigned
+      </span>
+    );
+  }
+  // Render the first 8 chars of the UUID as a compact handle.
+  const short = assignedTo.slice(0, 8);
+  const ageStr = assignedAt ? relativeAge(assignedAt, now) : null;
+  return (
+    <span
+      className="num text-ink-3"
+      style={{ fontSize: 11 }}
+      data-testid="reviewer-cell"
+      data-row-id={rowId}
+      data-assigned-to={assignedTo}
+      title={`Assigned ${ageStr ?? ''} (${assignedTo})`}
+    >
+      {short}…
     </span>
   );
 }

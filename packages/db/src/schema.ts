@@ -371,6 +371,8 @@ export const reviewQueue = pgTable(
     flaggedReason: text('flagged_reason').notNull(),
     priority: integer('priority').notNull(),
     assignedTo: uuid('assigned_to'),
+    // Phase 3.10b.7 — bumped whenever assignedTo is set / re-set.
+    assignedAt: timestamp('assigned_at', { withTimezone: true }),
     status: varchar('status', { length: 50 }).notNull(),
     resolvedAt: timestamp('resolved_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),

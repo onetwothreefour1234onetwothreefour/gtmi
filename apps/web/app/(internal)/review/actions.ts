@@ -407,3 +407,34 @@ export async function bulkApproveHighConfidence(): Promise<{ approved: number }>
   revalidatePath('/review');
   return { approved: ids.length };
 }
+
+// Phase 3.10b.7 — review-queue assignment.
+//
+// Pre-auth: the UUID is supplied by the analyst (pasted into the
+// inline prompt or arriving via the ?reviewer=… URL param). Post-auth
+// (Phase 5 / IAP), a thin wrapper will pull the current Supabase user
+// id and pass it through.
+//
+// Idempotent: re-assignment to the same user bumps assigned_at; null
+// clears both columns; transitions don't fight the existing approve /
+// reject flow.
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function assignReviewer(formData: FormData): Promise<void> {
+  const rowId = String(formData.get('rowId') ?? '').trim();
+  const reviewerRaw = String(formData.get('reviewer') ?? '').trim();
+  if (!UUID_RE.test(rowId)) throw new Error('assignReviewer: invalid rowId');
+  if (reviewerRaw !== '' && !UUID_RE.test(reviewerRaw)) {
+    throw new Error('assignReviewer: reviewer must be a UUID or empty');
+  }
+  const reviewer = reviewerRaw === '' ? null : reviewerRaw;
+  await db
+    .update(reviewQueue)
+    .set({
+      assignedTo: reviewer,
+      assignedAt: reviewer ? new Date() : null,
+    })
+    .where(eq(reviewQueue.fieldValueId, rowId));
+  revalidatePath('/review');
+}

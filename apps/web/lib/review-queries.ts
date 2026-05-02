@@ -1,5 +1,13 @@
 import 'server-only';
-import { db, fieldValues, fieldDefinitions, programs, countries, sources } from '@gtmi/db';
+import {
+  db,
+  fieldValues,
+  fieldDefinitions,
+  programs,
+  countries,
+  sources,
+  reviewQueue,
+} from '@gtmi/db';
 import { eq, desc, sql, inArray } from 'drizzle-orm';
 
 export type ReviewListRow = {
@@ -18,6 +26,10 @@ export type ReviewListRow = {
   provenance: unknown;
   /** Source URL backing the row, if a `sources` row is linked. */
   sourceUrl: string | null;
+  /** Phase 3.10b.7 — review_queue.assigned_to UUID, null when unassigned. */
+  assignedTo: string | null;
+  /** Phase 3.10b.7 — review_queue.assigned_at, null when unassigned. */
+  assignedAt: Date | null;
 };
 
 export type ReviewDetailRow = ReviewListRow & {
@@ -52,12 +64,15 @@ export async function listRecentlyReviewed(limit = 20): Promise<ReviewListRow[]>
       extractedAt: fieldValues.extractedAt,
       provenance: fieldValues.provenance,
       sourceUrl: sources.url,
+      assignedTo: reviewQueue.assignedTo,
+      assignedAt: reviewQueue.assignedAt,
     })
     .from(fieldValues)
     .innerJoin(programs, eq(programs.id, fieldValues.programId))
     .innerJoin(countries, eq(countries.isoCode, programs.countryIso))
     .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
     .leftJoin(sources, eq(sources.id, fieldValues.sourceId))
+    .leftJoin(reviewQueue, eq(reviewQueue.fieldValueId, fieldValues.id))
     .where(inArray(fieldValues.status, ['approved', 'rejected']))
     .orderBy(desc(fieldValues.reviewedAt))
     .limit(limit);
@@ -81,12 +96,15 @@ export async function listPendingReview(): Promise<ReviewListRow[]> {
       extractedAt: fieldValues.extractedAt,
       provenance: fieldValues.provenance,
       sourceUrl: sources.url,
+      assignedTo: reviewQueue.assignedTo,
+      assignedAt: reviewQueue.assignedAt,
     })
     .from(fieldValues)
     .innerJoin(programs, eq(programs.id, fieldValues.programId))
     .innerJoin(countries, eq(countries.isoCode, programs.countryIso))
     .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
     .leftJoin(sources, eq(sources.id, fieldValues.sourceId))
+    .leftJoin(reviewQueue, eq(reviewQueue.fieldValueId, fieldValues.id))
     .where(eq(fieldValues.status, 'pending_review'))
     .orderBy(desc(fieldValues.extractedAt));
 
@@ -121,12 +139,15 @@ export async function getReviewDetail(id: string): Promise<ReviewDetailRow | nul
       extractionPromptMd: fieldDefinitions.extractionPromptMd,
       scoringRubricJsonb: fieldDefinitions.scoringRubricJsonb,
       normalizationFn: fieldDefinitions.normalizationFn,
+      assignedTo: reviewQueue.assignedTo,
+      assignedAt: reviewQueue.assignedAt,
     })
     .from(fieldValues)
     .innerJoin(programs, eq(programs.id, fieldValues.programId))
     .innerJoin(countries, eq(countries.isoCode, programs.countryIso))
     .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
     .leftJoin(sources, eq(sources.id, fieldValues.sourceId))
+    .leftJoin(reviewQueue, eq(reviewQueue.fieldValueId, fieldValues.id))
     .where(eq(fieldValues.id, id))
     .limit(1);
 
