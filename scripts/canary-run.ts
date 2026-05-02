@@ -79,11 +79,6 @@ const TIER2_FALLBACK_CONFIDENCE_CAP = 0.85;
 // Set PHASE3_VDEM_ENABLED=false to disable for staged rollouts.
 const PHASE3_VDEM_ENABLED = process.env['PHASE3_VDEM_ENABLED'] !== 'false';
 
-// Phase 3.6.2 / ITEM 3 — legacy targeted precision re-run env flag.
-// Phase 3.9 / W12 — superseded by `--mode narrow`. Both still honoured;
-// the env var is treated as an alias for narrow mode.
-const PHASE3_TARGETED_RERUN_ENV = process.env['PHASE3_TARGETED_RERUN'] === 'true';
-
 // Phase 3.9 / W12 + W6 — surgical re-run modes.
 //
 //   full           = default. live Stage 0 + scrape every merged URL +
@@ -92,8 +87,7 @@ const PHASE3_TARGETED_RERUN_ENV = process.env['PHASE3_TARGETED_RERUN'] === 'true
 //                    the registry + telemetry.
 //   narrow         = no Stage 0 (registry + field-proven URLs only).
 //                    Extract only the field set still missing from
-//                    field_values. Equivalent to legacy
-//                    PHASE3_TARGETED_RERUN=true.
+//                    field_values.
 //   gate-failed    = no Stage 0. Extract only fields whose existing
 //                    field_values row carries a normalizationError or
 //                    is otherwise gate-flagged in pending_review state.
@@ -153,9 +147,6 @@ async function main() {
       );
     }
     mode = modeArgRaw as CanaryMode;
-  } else if (PHASE3_TARGETED_RERUN_ENV) {
-    // Backwards-compat: env var maps to narrow mode.
-    mode = 'narrow';
   }
 
   const fieldArgIdx = process.argv.indexOf('--field');
@@ -189,9 +180,9 @@ async function main() {
       (confirmCost ? ' [COST-CONFIRMED]' : '')
   );
 
-  // narrow + targeted_rerun share the same env-flag-based code path
-  // already in place below; keep PHASE3_TARGETED_RERUN derived from
-  // the resolved mode so all the existing branches still trigger.
+  // The narrow re-run branches downstream are gated on this single
+  // boolean, derived from the resolved mode so existing branches
+  // continue to work.
   const PHASE3_TARGETED_RERUN = mode === 'narrow';
 
   // --- Shared: load field definitions + wave filter ---
@@ -378,7 +369,7 @@ async function main() {
       : undefined;
     if (PHASE3_TARGETED_RERUN) {
       console.log(
-        `[Targeted re-run] PHASE3_TARGETED_RERUN=true — precision brief on ${preDiscoveryMissingKeys.length} missing field(s); excluding full registry from new discovery`
+        `[Targeted re-run] --mode narrow — precision brief on ${preDiscoveryMissingKeys.length} missing field(s); excluding full registry from new discovery`
       );
     }
 

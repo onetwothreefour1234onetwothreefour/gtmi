@@ -82,7 +82,7 @@ flowchart LR
     s5 --> s6
 ```
 
-Stage 0 uses the **Perplexity API** (`sonar` model, `PERPLEXITY_API_KEY`). Stage 1 uses the **Python/Playwright scraper service** (`SCRAPER_URL`). Stages 2–4 and bulk summaries use `claude-sonnet-4-6`. Four Claude model constants are exported from `packages/extraction/src/clients/anthropic.ts`: `MODEL_EXTRACTION` (Stage 2), `MODEL_VALIDATION` (Stage 3), `MODEL_CROSSCHECK` (Stage 4), and `MODEL_SUMMARY`. `MODEL_DISCOVERY` is also defined but unused by `discover.ts`. Each constant is independently updatable.
+Stage 0 uses the **Perplexity API** (`sonar` model, `PERPLEXITY_API_KEY`). Stage 1 uses the **Python/Playwright scraper service** (`SCRAPER_URL`). Stages 2–4 use `claude-sonnet-4-6`. Three Claude model constants are exported from `packages/extraction/src/clients/anthropic.ts`: `MODEL_EXTRACTION` (Stage 2), `MODEL_VALIDATION` (Stage 3), `MODEL_CROSSCHECK` (Stage 4). Each constant is independently updatable.
 
 **Wave configuration:** `scripts/wave-config.ts` exports `ACTIVE_FIELD_CODES = WAVE_1_FIELD_CODES ∪ (WAVE_2_ENABLED ? WAVE_2_FIELD_CODES : [])`. `WAVE_2_ENABLED = true` (Phase-2-close-out default) → all 48 methodology fields. `WAVE_2_ENABLED = false` reverts to the 27-field Wave 1 scope. All consumers — `canary-run.ts`, `extract-single-program.ts`, `run-paq-score.ts`, `diag-empty-fields.ts` — import `ACTIVE_FIELD_CODES` so a single flag flip changes scope everywhere. Note: Trigger.dev picks up `ACTIVE_FIELD_CODES` at runtime, so production scope changes the moment Trigger.dev redeploys. Staged rollouts to production must flip the flag to `false` before deploy.
 
