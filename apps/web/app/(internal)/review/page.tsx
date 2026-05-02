@@ -1,6 +1,7 @@
 import {
   ReviewQueueStats,
   ReviewQueueTable,
+  ReviewQueueKeyboard,
   ReviewFilterTabs,
   BulkApproveDialog,
   BulkApproveAllDialog,
@@ -114,6 +115,7 @@ export default async function ReviewPage({
         </div>
 
         <ReviewQueueTable rows={visible} now={renderedAt} />
+        <ReviewQueueKeyboard />
 
         <div className="mt-6">
           <DataTableNote>

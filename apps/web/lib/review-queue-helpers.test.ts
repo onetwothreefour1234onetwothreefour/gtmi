@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { slaTier } from './review-queue-helpers';
 import {
   isBulkApproveCandidate,
   matchesReviewTab,
@@ -211,5 +212,36 @@ describe('relativeAge', () => {
 
   it('returns dash for unparseable string', () => {
     expect(relativeAge('not a date', FROZEN)).toBe('—');
+  });
+});
+
+describe('slaTier — Phase 3.10', () => {
+  const FROZEN = new Date('2026-05-02T12:00:00Z');
+
+  it('returns green for fresh rows (<7d)', () => {
+    expect(slaTier(new Date('2026-05-01T12:00:00Z'), FROZEN)).toBe('green');
+    expect(slaTier(new Date('2026-04-26T12:00:01Z'), FROZEN)).toBe('green');
+  });
+
+  it('returns orange at 7d', () => {
+    expect(slaTier(new Date('2026-04-25T12:00:00Z'), FROZEN)).toBe('orange');
+  });
+
+  it('returns orange across 7d–13d', () => {
+    expect(slaTier(new Date('2026-04-20T12:00:00Z'), FROZEN)).toBe('orange');
+  });
+
+  it('returns red at 14d and beyond', () => {
+    expect(slaTier(new Date('2026-04-18T12:00:00Z'), FROZEN)).toBe('red');
+    expect(slaTier(new Date('2026-01-01T12:00:00Z'), FROZEN)).toBe('red');
+  });
+
+  it('returns green for null / unparseable', () => {
+    expect(slaTier(null, FROZEN)).toBe('green');
+    expect(slaTier('nonsense', FROZEN)).toBe('green');
+  });
+
+  it('returns green when extractedAt is in the future (defensive)', () => {
+    expect(slaTier(new Date('2026-05-10T12:00:00Z'), FROZEN)).toBe('green');
   });
 });

@@ -7,7 +7,9 @@ import {
   readProvenanceConfidence,
   relativeAge,
   reviewIdTag,
+  slaTier,
   sourceDomain,
+  type SlaTier,
 } from '@/lib/review-queue-helpers';
 import type { ReviewListRow } from '@/lib/review-queries';
 
@@ -50,12 +52,13 @@ export function ReviewQueueTable({ rows, now, className }: ReviewQueueTableProps
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {rows.map((row, idx) => {
             const prov = readProvenanceConfidence(row.provenance);
             const tag = reviewIdTag(row.id);
             const candidate = isBulkApproveCandidate(prov);
             const lowConfidence =
               prov.extractionConfidence !== null && prov.extractionConfidence < 0.7;
+            const sla = slaTier(row.extractedAt, now);
             const statusKind = candidate
               ? 'high-confidence'
               : lowConfidence
@@ -69,6 +72,9 @@ export function ReviewQueueTable({ rows, now, className }: ReviewQueueTableProps
                 data-testid="review-queue-row"
                 data-row-status={statusKind}
                 data-bulk-approve-candidate={candidate ? 'true' : 'false'}
+                data-row-index={idx}
+                data-row-id={row.id}
+                data-sla-tier={sla}
               >
                 <td>
                   <span className="num text-ink-4" style={{ fontSize: 11 }}>
@@ -114,7 +120,11 @@ export function ReviewQueueTable({ rows, now, className }: ReviewQueueTableProps
                   <ConfidenceCell prov={prov} />
                 </td>
                 <td>
-                  <span className="num text-ink-3" style={{ fontSize: 12 }}>
+                  <span
+                    className="num text-ink-3 inline-flex items-center gap-1.5"
+                    style={{ fontSize: 12 }}
+                  >
+                    <SlaDot tier={sla} />
                     {relativeAge(row.extractedAt, now)}
                   </span>
                 </td>
@@ -169,6 +179,27 @@ function ConfidenceCell({ prov }: { prov: ReturnType<typeof readProvenanceConfid
         <span className="block h-full" style={{ width: `${pct}%`, background: accent }} />
       </span>
     </span>
+  );
+}
+
+function SlaDot({ tier }: { tier: SlaTier }) {
+  if (tier === 'green') return null;
+  const color = tier === 'red' ? 'var(--accent)' : 'var(--warning)';
+  const label = tier === 'red' ? 'SLA breach: 14+ days old' : 'SLA warning: 7+ days old';
+  return (
+    <span
+      aria-label={label}
+      title={label}
+      role="img"
+      style={{
+        display: 'inline-block',
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        background: color,
+      }}
+      data-testid={`sla-dot-${tier}`}
+    />
   );
 }
 

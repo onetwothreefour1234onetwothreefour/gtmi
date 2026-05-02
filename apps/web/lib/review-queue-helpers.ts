@@ -95,6 +95,32 @@ export function relativeAge(extractedAt: Date | string | null, now: Date = new D
 }
 
 /**
+ * Phase 3.10 — SLA tier for the review-queue Age column.
+ *
+ *   green  — under 7 days old (or undated)
+ *   orange — 7 to 13 days old (warning band)
+ *   red    — 14 or more days old (overdue)
+ *
+ * Cohort runs queue ≥1500 rows; the SLA badge is the per-row signal
+ * to the reviewer that a row is aging out.
+ */
+export type SlaTier = 'green' | 'orange' | 'red';
+
+export const SLA_ORANGE_DAYS = 7;
+export const SLA_RED_DAYS = 14;
+
+export function slaTier(extractedAt: Date | string | null, now: Date = new Date()): SlaTier {
+  if (extractedAt === null || extractedAt === undefined) return 'green';
+  const t =
+    typeof extractedAt === 'string' ? new Date(extractedAt).getTime() : extractedAt.getTime();
+  if (Number.isNaN(t)) return 'green';
+  const days = Math.max(0, (now.getTime() - t) / (24 * 60 * 60 * 1000));
+  if (days >= SLA_RED_DAYS) return 'red';
+  if (days >= SLA_ORANGE_DAYS) return 'orange';
+  return 'green';
+}
+
+/**
  * Decide which row matches the active filter tab. Status fields on the
  * existing schema are 'pending_review' / 'approved' / 'rejected' / etc.;
  * 'in-review' and 'flagged' are not native statuses. We treat them as

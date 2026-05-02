@@ -57,6 +57,7 @@ export { CountriesGrid } from './countries-grid';
 export { InternalBadge } from './internal-badge';
 export { ReviewQueueStats } from './review-queue-stats';
 export { ReviewQueueTable } from './review-queue-table';
+export { ReviewQueueKeyboard } from './review-queue-keyboard';
 export { ReviewFilterTabs } from './review-filter-tabs';
 export { BulkApproveDialog } from './bulk-approve-dialog';
 export { BulkApproveAllDialog } from './bulk-approve-all-dialog';
