@@ -97,13 +97,27 @@ without a documented reason** (e.g., a methodology v2 indicator drop).
 
 ## What's next
 
-`IMPLEMENTATION_PLAN.md` §Phase 3 sub-phases, in order:
+**Phase 3 closed at Phase 3.9 (2026-05-02).** Sub-phases 3.1 (V-Dem
+direct-API), 3.2 (cross-departmental discovery audit), 3.3 (cohort-wide
+prompt sweep), 3.4 (Tier 2 backfill via ADR-013), 3.5 (methodology v2
+review via ADR-014), 3.6 (re-canary prep + ADR-015 self-improving
+discovery + ADR-016 derive stage), 3.7 (review-tab + rubric integrity
+ADRs 017/018/019), 3.8 (bulk-approve + on-demand + auto re-score ADRs
+020/021/022), and **3.9** (robustness + archive + anti-bot routing +
+expanded derives via ADRs 023/024/025) all shipped on `main`.
 
-1. **3.1 V-Dem direct-API** — closes E.3.1 cohort-wide.
-2. **3.2 Cross-departmental discovery audit** — D.3.x tax + E.2.x transparency.
-3. **3.3 Cohort-wide prompt sweep** — LLM_MISS → 0.
-4. **3.4 Tier 2 backfill (ADR-013)** — fields outside the scoring core.
-5. **3.5 Methodology v2 (ADR-014)** — restructure / drop / country-substitute.
+Phase 3.9 closing position:
 
-Phase 5 (the 5-country pilot) cannot start until every canary programme
-reaches ≥42/48 — the Phase 3 close-out gate.
+- **Derive coverage: 12/48** (was 7 entering 3.9). Every D-pillar
+  country-deterministic indicator and the E-pillar age + history
+  indicators are now derived without LLM invocation.
+- **Anti-bot routing live.** `blocker_domains` registry seeded
+  organically; `www.isa.go.jp` was the first auto-flag (2026-05-01).
+- **Production canary outcomes:** NLD HSM 44/48 (D.3.1 correctly null
+  per facts-and-circumstances; A.1.1/A.1.2/B.2.2 still IND-page-bound).
+  JPN HSP 23/48 (ISA's all-paths anti-bot wall is the structural
+  ceiling; the 11 applicable derives all publish).
+
+The Phase 5 gate has been replaced. The new gate is the **Phase 3.10
+readiness pass** — see [IMPLEMENTATION_PLAN.md §Phase 3.10](../IMPLEMENTATION_PLAN.md). Until that passes, no
+mass-cohort scrape runs.

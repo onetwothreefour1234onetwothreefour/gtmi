@@ -205,37 +205,51 @@ Exits 1 on any miss — suitable for CI gating once we choose to wire it.
 
 ## Common operational scripts
 
-| Script                                               | What it does                                                    |
-| ---------------------------------------------------- | --------------------------------------------------------------- |
-| `scripts/apply-migration.ts <filename>`              | Apply one SQL migration via DIRECT_URL with transaction.        |
-| `scripts/check-fts-column.ts`                        | Verify migration 00006 (programs FTS) landed.                   |
-| `scripts/check-programs-columns.ts`                  | List every column on `programs`.                                |
-| `scripts/check-drizzle-state.ts`                     | Inspect drizzle migration tracking state.                       |
-| `scripts/check-scored-programs.ts`                   | Print scored-cohort table.                                      |
-| `scripts/check-programs-by-state.ts`                 | Sample one program per state (scored / placeholder / unscored). |
-| `scripts/verify-provenance.ts`                       | ADR-007 provenance verifier (CI-friendly).                      |
-| `scripts/canary-run.ts --country AUS\|SGP\|CAN\|GBR` | Full 7-stage extraction pipeline canary.                        |
-| `scripts/run-paq-score.ts --country <ISO3>`          | Recompute and write a `scores` row.                             |
-| `scripts/compute-normalization-params.ts`            | Calibration helper (Phase 3 prereq).                            |
-| `apps/web/deploy.cmd`                                | Manual Cloud Run deploy fallback.                               |
+| Script                                                                     | What it does                                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/apply-migration.ts <filename>`                                    | Apply one SQL migration via DIRECT_URL with transaction.                                                                                                                                                                                                                         |
+| `scripts/check-fts-column.ts`                                              | Verify migration 00006 (programs FTS) landed.                                                                                                                                                                                                                                    |
+| `scripts/check-programs-columns.ts`                                        | List every column on `programs`.                                                                                                                                                                                                                                                 |
+| `scripts/check-drizzle-state.ts`                                           | Inspect drizzle migration tracking state.                                                                                                                                                                                                                                        |
+| `scripts/check-scored-programs.ts`                                         | Print scored-cohort table.                                                                                                                                                                                                                                                       |
+| `scripts/check-programs-by-state.ts`                                       | Sample one program per state (scored / placeholder / unscored).                                                                                                                                                                                                                  |
+| `scripts/verify-provenance.ts`                                             | ADR-007 provenance verifier (CI-friendly).                                                                                                                                                                                                                                       |
+| `scripts/canary-run.ts --country <ISO3> [--programId <uuid>] [--mode <m>]` | Full 7-stage extraction canary. `--mode` ∈ `{full, discover-only, narrow, gate-failed, rubric-changed, field, archive-first, archive-only}` (W12). `--estimate-only` short-circuits before any LLM call. `--confirm-cost` overrides the `MAX_RERUN_COST_USD` guard (default $5). |
+| `scripts/run-paq-score.ts --country <ISO3>`                                | Recompute and write a `scores` row.                                                                                                                                                                                                                                              |
+| `scripts/compute-normalization-params.ts`                                  | Calibration helper (Phase 5 prereq).                                                                                                                                                                                                                                             |
+| `apps/web/deploy.cmd`                                                      | Manual Cloud Run deploy fallback.                                                                                                                                                                                                                                                |
+
+### Phase 3.9 operational paths
+
+- **Inspect the blocker registry:** `SELECT domain, detection_signal, last_seen_at FROM blocker_domains ORDER BY last_seen_at DESC;`
+- **Manual blocker override:** `INSERT INTO blocker_domains (domain, detection_signal) VALUES ('hostname', 'manual_override');` (lowercased hostname; `ON CONFLICT` updates `last_seen_at`).
+- **Clear a blocker** (after a site fixed its anti-bot wall): `DELETE FROM blocker_domains WHERE domain = 'hostname';`
+- **Estimate canary cost without burning tokens:** `pnpm tsx scripts/canary-run.ts --country JPN --programId <uuid> --estimate-only`. Reads the URL set, the active field set, and per-call cost from `cost-estimate.ts`; prints the projected total.
+- **Re-extract from archive without re-scraping** (e.g. after a prompt edit): `pnpm tsx scripts/canary-run.ts --country JPN --programId <uuid> --mode archive-first` (or `archive-only` for strict — no live fallback).
+- **Narrow re-run for the missing-fields set:** `pnpm tsx scripts/canary-run.ts --country JPN --programId <uuid> --mode narrow`.
+- **Backfill `programs.launch_year`** (E.1.3 derive depends on it): `UPDATE programs SET launch_year = 2015 WHERE id = '...';`
+- **Add a `program_policy_history` entry** for E.1.1 derive: edit `packages/extraction/src/data/program-policy-history.ts`, add events with severity buckets, commit. The derive picks it up on next canary.
 
 ---
 
 ## Coverage strategy in one paragraph
 
 GTMI does not target 100% indicator coverage as a quality metric. The
-realistic per-programme ceiling, post the Phase 5 coverage push, is
-**42–44/48 (43 average)**. The remaining 4–6 indicators are either
-methodology gaps or country-level transparency gaps (e.g. Bahrain,
-Saudi Arabia, UAE don't publish admission statistics in any structured
-form). The credibility play is "publish only what we can defensibly
-source, surface what's missing per programme, let the reader apply
-their own credibility weighting" — not 100% coverage with fudged
-values. The `insufficient_disclosure` flag (programs <70% pillar
-coverage withheld from public ranking) is the safety net. Full framing
-in [METHODOLOGY.md §7.5.1](METHODOLOGY.md). Six Phase 5 work-streams
-that drive coverage from today's 30–34/48 baseline toward the ceiling
-are sequenced in [IMPLEMENTATION_PLAN.md §Phase 5](IMPLEMENTATION_PLAN.md).
+realistic per-programme ceiling, post Phase 3.9, is now visibly bimodal:
+programmes whose authority publishes substantively reachable content
+(e.g. NLD HSM at 44/48) vs. programmes whose authority is captured by
+the W15 anti-bot detector (e.g. JPN HSP at 23/48 — ISA's all-paths
+wall). Of the 12 derived indicators, 9 publish without LLM extraction
+on every cohort programme; the remaining 36 indicators carry the LLM
+extraction risk. The credibility play is "publish only what we can
+defensibly source, surface what's missing per programme, let the
+reader apply their own credibility weighting" — not 100% coverage
+with fudged values. The `insufficient_disclosure` flag (programs <70%
+pillar coverage withheld from public ranking) is the safety net. Full
+framing in [METHODOLOGY.md §7.5.1](METHODOLOGY.md). The Phase 3.10
+wiring + readiness pass is sequenced in
+[IMPLEMENTATION_PLAN.md §Phase 3.10](IMPLEMENTATION_PLAN.md) before
+any mass-cohort scrape runs.
 
 ---
 

@@ -459,6 +459,143 @@ After 3.1–3.5, expected per-programme coverage **42–44/48** (43 average). Ga
 
 **Out of scope (deferred):** Trigger.dev fallback for `rescoreCohort`; programme-level re-score button on `/review/[id]`; `methodologyVersionId` "current" flag for multi-version setups.
 
+### Phase 3.9 — Robustness, archive, anti-bot routing, expanded derives — ✅ COMPLETE (Sessions 15–17, branch `main`, 9 PRs A–I + W22 follow-up)
+
+**Goal:** close the operational and coverage gaps surfaced by Phase 3.6/3.7/3.8 canaries before scaling extraction to the full 85-programme cohort. Deliverables grouped into workstreams W0–W22; PRs A–E shipped Sessions 15–16, PRs F–I + W22 shipped Sessions 16–17.
+
+**Workstream summary (post-shipment):**
+
+| W#               | Title                                                                              | ADR             | Status            |
+| ---------------- | ---------------------------------------------------------------------------------- | --------------- | ----------------- |
+| W0               | Per-scrape archive snapshots (GCS)                                                 | extends ADR-008 | ✅ shipped (PR A) |
+| W2               | Native-language scrape + translation pipeline                                      | —               | ✅ shipped (PR B) |
+| W3               | Per-country cross-departmental authority registry                                  | extends ADR-002 | ✅ shipped (PR C) |
+| W5               | Per-program curated discovery hints                                                | —               | ✅ shipped (PR E) |
+| W6               | Weekly maintenance scrape via Trigger.dev                                          | ADR-023         | ✅ shipped (PR D) |
+| W6 cost-estimate | `--estimate-only` + cost guard                                                     | —               | ✅ shipped        |
+| W6 archive load  | `loadArchivedScrape` + `archive-first` mode                                        | extends ADR-008 | ✅ shipped        |
+| W8               | Discovery-yield telemetry write path                                               | —               | ✅ shipped        |
+| W9               | `extraction_attempts` history + `wasPublished` flip                                | —               | ✅ shipped        |
+| W10              | Yield-ranked URL merge                                                             | extends ADR-015 | ✅ shipped        |
+| W11              | Hash-based extraction short-circuit                                                | —               | ✅ shipped        |
+| W12              | `--mode {full,narrow,gate-failed,rubric-changed,field,archive-first,archive-only}` | —               | ✅ shipped        |
+| W13              | Surface `getCurrentPromptId` for explicit attempt tagging                          | —               | ✅ shipped        |
+| W14              | Stage 0 pre-discovery missing-fields brief                                         | —               | ✅ shipped        |
+| W15              | Country-agnostic anti-bot blocker detector                                         | ADR-024         | ✅ shipped (PR G) |
+| W16              | Wayback-first routing on flagged domains                                           | ADR-024         | ✅ shipped (PR G) |
+| W17              | PDF extraction integration tests (in-memory pypdf fixtures)                        | —               | ✅ shipped (PR F) |
+| W20              | E.1.3 program-age + E.1.1 policy-history derives                                   | ADR-025         | ✅ shipped (PR I) |
+| W21              | Country-level D.2.4 / D.3.1 / D.3.3 derives                                        | ADR-025         | ✅ shipped (PR H) |
+| W22              | URL-merge filter against `blocker_domains` registry                                | ADR-024         | ✅ shipped        |
+
+**Total derives published:** 12 of 48 (was 7 entering Phase 3.9).
+A.1.2 / B.2.4 / D.1.2 / D.1.3 / D.1.4 / D.2.2 / D.2.3 / **D.2.4** /
+**D.3.1** / **D.3.3** / **E.1.1** / **E.1.3**.
+
+**Schema changes:**
+
+- `00015_phase_3_9_archive.sql` — `scrape_history` extended with archive fields, `extractor_version` column.
+- `00016_phase_3_9_telemetry_attempts.sql` — `discovery_telemetry`, `extraction_attempts`, `extraction_prompts`, `field_url_yield` materialized view.
+- `00017_phase_3_9_blocker_domains.sql` — `blocker_domains` table (PR G).
+
+**Production-validated mechanisms:**
+
+- 2026-04-30: NLD HSM canary with W0–E shipped → 42/48.
+- 2026-05-01: NLD HSM with W15+W21+W20 shipped → 44/48; JPN HSP first run auto-flagged `www.isa.go.jp` as `hash_equality` blocker; second run logged Wayback-first routing for every ISA URL.
+- 2026-05-01: NLD HSM and JPN HSP launchYear set in DB; JPN HSP `PROGRAM_POLICY_HISTORY` seeded; JPN HSP → 23/48.
+- 2026-05-02: W22 shipped to stop the registry replay of blocked URLs into the merger.
+
+**Outcome — what Phase 3.9 closed:**
+
+- The "ISA-class blocker" failure mode is now a one-line registry update instead of a coverage cliff.
+- Five new indicators are now derived from country / programme data instead of brittle LLM extraction.
+- Re-runs are precision-targeted via `--mode narrow / gate-failed / rubric-changed / field`; cost is guarded by `--estimate-only`.
+- The full archive lives in GCS keyed by content hash, with archive-first re-extraction available for prompt / derive iteration without re-scraping.
+
+**Outcome — what Phase 3.9 did NOT close:**
+
+- Three programmes (JPN HSP, NLD HSM in single-canary form) still fall short of 48/48 because of structural facts (NLD's facts-and-circumstances tax residency ≠ a day-count, ISA's wall covering all substantive HSP content). The ceiling is now visible and documented; the next phase before mass scrape is the wiring + readiness pass below.
+
+---
+
+## Phase 3.10 — Pre-scale wiring + readiness pass (in progress)
+
+**Goal:** finalise the orchestration, surface every Phase 3.9 capability through admin / Trigger.dev / public surfaces, and verify operational readiness BEFORE scaling extraction to the full 85-programme cohort.
+
+This is a wiring phase. No new mechanisms; no new methodology. Every step here is "an existing capability is implemented but not yet plumbed end-to-end through admin + monitoring + scheduled jobs." Detailed steps are tracked directly in this document below.
+
+**Steps (in execution order; each step lands as one PR unless noted):**
+
+#### 3.10.1 — Data hygiene PR
+
+- Backfill `programs.launch_year` for every cohort programme (E.1.3 derive depends on it). Source: each programme's official launch date or the year of its current legal framework if reformed; capture year only.
+- Audit `packages/extraction/src/data/program-policy-history.ts` and add at least one entry per cohort programme that has a known reform in the 2021–2026 window. Stops at "what we can defensibly source"; leave blank where the policy history isn't reliably traceable.
+- Run `pnpm --filter @gtmi/extraction test -- derive-e11` after every batch to catch event-year-out-of-window typos.
+
+**Acceptance:** `SELECT COUNT(*) FROM programs WHERE launch_year IS NULL` returns 0; the registry has ≥1 entry for at least 80% of cohort programmes.
+
+#### 3.10.2 — Admin / review wiring PR
+
+- New `apps/web/(internal)/admin/blockers` route (server component): list `blocker_domains` rows with `domain`, `detection_signal`, `first_detected_at`, `last_seen_at`, `detected_for_program_id` (linked to `/programs/[id]`), `notes`. Editorial table.gtmi shape, mirroring the review queue.
+- Manual-override server action: form posting `domain` + free-text `note` writes a row with `detection_signal = 'manual_override'`. Same RLS role as `/review`.
+- Verify the existing `<ProvenanceTrigger>` drawer renders the `derived-knowledge` and `derived-computation` badges for the five new derives (D.2.4 / D.3.1 / D.3.3 / E.1.1 / E.1.3) — likely already works because the model name is the only condition; smoke-test by approving one of each in `/review` and confirming the badge.
+- Verify `/programs/[id]` and `/countries/[iso]` re-render the new D.2.4 / D.3.3 / E.1.1 / E.1.3 indicator rows after publish.
+
+**Acceptance:** `/admin/blockers` lists `www.isa.go.jp` correctly; manual-override insert round-trips; provenance drawer shows the right badge on at least one approved derived row per derive.
+
+#### 3.10.3 — Trigger.dev parity PR
+
+- `jobs/src/jobs/extract-single-program.ts` must exercise the same code paths as `canary-run.ts`: load `blocker_domains`, pass to `mergeDiscoveredUrls`, route blocker URLs through `scrapeWaybackFirst`, queue all 12 derives, support `mode = 'archive-first' | 'archive-only' | 'narrow' | 'gate-failed' | 'rubric-changed'`. Diff the canary file and the Trigger.dev file side-by-side; lift any orchestration delta into a shared helper in `@gtmi/extraction`.
+- Add a smoke test that runs the Trigger.dev twin against one programme (`668cec08-...` NLD HSM) in dev mode and asserts the output matches a CLI run on the same programme, modulo timestamps. Live-DB integration test, gated on `RUN_TRIGGER_PARITY=1`.
+
+**Acceptance:** Trigger.dev twin produces the same set of published + queued field IDs as `canary-run.ts` for NLD HSM; both publish all 9 applicable derives.
+
+#### 3.10.4 — Cost + observability PR
+
+- Wire `--estimate-only` into the Trigger.dev path: every job-run publishes a projected cost in the result payload alongside `programsRescored` / `compositesRefreshed`. Failures don't fail the run.
+- Add a structured-log marker on `[blocker-detect] domain=… signal=…` so a Cloud Logging metric counts blocker registrations per day. Tags: `program_id`, `country_iso`, `signal`. Surface on a Cloud Logging dashboard or alert when the daily count exceeds 5 (suggests a cohort-wide regression rather than a per-domain failure).
+- Trigger.dev job result extends to carry `costEstimate: { projected: number, actual: number, currency: 'USD' }`.
+
+**Acceptance:** One scheduled run posts a cost projection + actual; one synthetic blocker-domain insert lights up the Cloud Logging metric.
+
+#### 3.10.5 — Discovery hint cohort sweep PR
+
+- For every cohort programme whose canary on the dry-run (step 3.10.6) flagged a blocker domain, write/update a `program-discovery-hints.ts` entry that explicitly steers off the blocker domain to the canonical authority's pages.
+- Pre-flight every URL named in a hint with a `HEAD` smoke check: assert HTTP 200 + content-length above the thin threshold. Drop URLs that fail; never paste a 404 into a hint.
+- Sequence: do this AFTER step 3.10.6 (dry-run reveals which programmes need it).
+
+**Acceptance:** Every blocker-flagged programme has a hint that does not name a domain in `blocker_domains`; every URL in the hints suite passes the HEAD smoke check.
+
+#### 3.10.6 — Cohort dry-run (`--mode discover-only`)
+
+- Run `pnpm tsx scripts/canary-run.ts --country <ISO3> --programId <uuid> --mode discover-only` against every cohort programme. No scrape, no extract — Stage 0 only. Refreshes the registry + telemetry without burning extraction cost.
+- Capture per-programme: discovered URL count, tier mix, `discovery_telemetry` row id. Diff against the previous canary's discovery (where one exists).
+- Triage anything where Stage 0 returned <3 URLs as a discovery failure; flag for hint extension or country-departments expansion.
+
+**Acceptance:** Every cohort programme returns ≥3 Stage 0 URLs across tiers 1+2; `discovery_telemetry` carries one row per programme.
+
+#### 3.10.7 — Cohort archive-first dry-run (`--mode archive-first`)
+
+- Run `pnpm tsx scripts/canary-run.ts --country <ISO3> --programId <uuid> --mode archive-first` against every cohort programme. Re-extract from GCS snapshots where they exist; live-scrape only the unarchived URLs.
+- Surfaces the prompt / derive integration problems on the cohort without paying for full live scrapes. Cost is bounded by the unarchived-URL count.
+- Output: per-programme coverage delta vs. the most recent live canary; per-programme cost actual vs. estimate.
+
+**Acceptance:** Every cohort programme produces a coverage row; the cohort-wide cost actual is within 20% of the cohort-wide projection.
+
+#### 3.10.8 — Pre-scale gate
+
+- All of: every cohort programme passes Stage 0; `blocker_domains` is stable across two consecutive `discover-only` runs (no new domain registers on the second run); derive coverage in `field_values` matches the in-code derive count for the cohort (i.e. every cohort programme has 9–11 derived rows depending on country structure); auto-rescore composite published for every cohort programme; CI green; no provenance verifier failures across the cohort.
+- Capture a one-page snapshot in `docs/phase-3/post-3-9-cohort-snapshot.md` listing every cohort programme's coverage / derive count / blocker exposure.
+
+**Acceptance:** All gate items above pass simultaneously on a single date. That date becomes the gate-pass marker.
+
+#### 3.10.9 — Scale decision
+
+- At the end of step 3.10.8, decide between (a) `--mode full` cohort run in one batch, (b) tier-by-tier rollout (Tier 1 cohort first, then Tier 2 backfills), (c) region-by-region rollout. Capture the cost projection (from step 3.10.7's actuals × full cohort × estimated re-run multiplier) and the per-batch gating thresholds in a one-pager before pulling the trigger.
+- Trigger the chosen rollout via Trigger.dev (one job per programme) rather than CLI.
+
+**Acceptance:** Decision documented; first batch's projected cost is funded; rollout runs.
+
 ---
 
 ## Phase 4 — Public Dashboard
