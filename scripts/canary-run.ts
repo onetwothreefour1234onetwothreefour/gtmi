@@ -1,5 +1,6 @@
 import {
   DiscoverStageImpl,
+  CrossCheckStageImpl,
   ExtractStageImpl,
   HumanReviewStageImpl,
   PublishStageImpl,
@@ -336,6 +337,12 @@ async function main() {
   const validate = new ValidateStageImpl();
   const humanReview = new HumanReviewStageImpl();
   const publish = new PublishStageImpl();
+  // Phase 3.10 — cross-check is invoked ONLY for auto-approve
+  // candidates against a Tier 2 source. Pending-review rows already
+  // get human eyes; cross-check on them would be redundant LLM cost.
+  // Disagreements override auto-approve and route to /review with
+  // crossCheckResult='disagrees' on the row's provenance.
+  const crossCheckStage = new CrossCheckStageImpl();
 
   // --- Per-target pipeline ---
   for (const target of CANARY_TARGETS) {
@@ -1243,12 +1250,44 @@ async function main() {
         `  ↳ Validation: ${validation.isValid ? 'valid' : 'invalid'} (confidence: ${validation.validationConfidence})`
       );
 
-      const crossCheck: CrossCheckResult = {
+      // Phase 3.10 — cross-check selectively for auto-approve candidates.
+      // Default to not_checked / agrees=true (the legacy shape). When the
+      // confidence-pass condition holds AND a Tier 2 scrape with usable
+      // content exists, run crossCheck.execute() against it. A crosscheck
+      // disagreement overrides isAutoApproved → /review with the
+      // disagreement recorded in provenance.crossCheckResult.
+      let crossCheck: CrossCheckResult = {
         agrees: true,
         tier2Url: '',
-        notes: 'Cross-check removed — extraction uses all sources',
+        notes: 'Cross-check skipped — no Tier 2 source available',
       };
-      const crossCheckOutcome: CrossCheckOutcome = 'not_checked';
+      let crossCheckOutcome: CrossCheckOutcome = 'not_checked';
+
+      const wouldAutoApprove =
+        extraction.extractionConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD &&
+        validation.isValid &&
+        validation.validationConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD;
+
+      const tier2ForCrossCheck =
+        wouldAutoApprove && tier2Scrapes.length > 0 ? tier2Scrapes[0]! : null;
+      if (tier2ForCrossCheck) {
+        try {
+          crossCheck = await crossCheckStage.execute(extraction, tier2ForCrossCheck);
+          crossCheckOutcome = crossCheck.agrees ? 'agree' : 'disagree';
+          console.log(
+            `  ↳ [${def.key}] Cross-check: ${crossCheckOutcome} (Tier 2: ${tier2ForCrossCheck.url})`
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`  ↳ [${def.key}] Cross-check failed: ${msg} — falling back to not_checked`);
+          crossCheck = {
+            agrees: true,
+            tier2Url: tier2ForCrossCheck.url,
+            notes: `Cross-check call failed: ${msg}`,
+          };
+          crossCheckOutcome = 'not_checked';
+        }
+      }
 
       const pendingContext = {
         sourceUrl,
@@ -1257,7 +1296,7 @@ async function main() {
         scrapeTimestamp: winningScrape.scrapedAt.toISOString(),
         contentHash: winningScrape.contentHash,
         crossCheckResult: crossCheckOutcome,
-        crossCheckUrl: null,
+        crossCheckUrl: tier2ForCrossCheck ? tier2ForCrossCheck.url : null,
         methodologyVersion: METHODOLOGY_VERSION,
         // Phase 3.9 / W7 — let humanReview.enqueue propagate the
         // archive path through to field_values for queued rows.
@@ -1273,12 +1312,20 @@ async function main() {
           : {}),
       };
 
-      const isAutoApproved =
-        extraction.extractionConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD &&
-        validation.isValid &&
-        validation.validationConfidence >= AUTO_APPROVE_CONFIDENCE_THRESHOLD;
+      // Phase 3.10 — a cross-check disagreement vetoes auto-approve.
+      // The row routes to /review with crossCheckResult='disagree'
+      // recorded in provenance so the reviewer sees the conflict.
+      const isAutoApproved = wouldAutoApprove && crossCheckOutcome !== 'disagree';
 
-      console.log(`  ↳ Decision: ${isAutoApproved ? 'AUTO-APPROVED' : 'QUEUED FOR REVIEW'}`);
+      console.log(
+        `  ↳ Decision: ${
+          isAutoApproved
+            ? 'AUTO-APPROVED'
+            : wouldAutoApprove && crossCheckOutcome === 'disagree'
+              ? 'QUEUED FOR REVIEW (cross-check disagreement)'
+              : 'QUEUED FOR REVIEW'
+        }`
+      );
 
       if (!isAutoApproved) {
         await humanReview.enqueue(extraction, validation, crossCheck, pendingContext);
@@ -1299,7 +1346,7 @@ async function main() {
         validationModel: validation.validationModel,
         validationConfidence: validation.validationConfidence,
         crossCheckResult: crossCheckOutcome,
-        crossCheckUrl: null,
+        crossCheckUrl: tier2ForCrossCheck ? tier2ForCrossCheck.url : null,
         reviewedBy: 'auto',
         reviewedAt: new Date(),
         methodologyVersion: METHODOLOGY_VERSION,
