@@ -9,7 +9,7 @@ import {
 } from '@gtmi/scoring';
 import type { FieldDefinitionRecord } from '@gtmi/scoring';
 import { createHash } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { ExtractionOutput, ValidationResult } from '../types/extraction';
 import type { ProvenanceRecord } from '../types/provenance';
 import type { PublishStage } from '../types/pipeline';
@@ -456,6 +456,64 @@ export class PublishStageImpl implements PublishStage {
       // (Approved derived rows are written by /review, not here.)
     }
 
+    // Phase 3.10 — derive vs. LLM mismatch detection. When an existing
+    // field_values row for this (program, field) was written by an LLM
+    // extraction (extractionModel does NOT start with 'derived-' /
+    // country-substitute / direct-API), compare its normalized value
+    // against the new derived row. A mismatch is a strong signal that
+    // either the country lookup is stale OR the LLM extracted from a
+    // wrong page; either way the analyst should adjudicate. The derive
+    // still publishes (methodology-mandated source); the mismatch is a
+    // log-line + a notes hint on the new row's provenance.
+    let mismatchNote: string | null = null;
+    try {
+      const priorRows = await db
+        .select({
+          valueNormalized: fieldValues.valueNormalized,
+          provenance: fieldValues.provenance,
+          status: fieldValues.status,
+        })
+        .from(fieldValues)
+        .where(
+          and(
+            eq(fieldValues.programId, extraction.programId),
+            eq(fieldValues.fieldDefinitionId, fieldDefinitionId)
+          )
+        )
+        .limit(1);
+      const prior = priorRows[0];
+      if (prior) {
+        const priorProv = (prior.provenance ?? {}) as Record<string, unknown>;
+        const priorModel = String(priorProv['extractionModel'] ?? '');
+        const priorIsLlm =
+          priorModel !== '' &&
+          !priorModel.startsWith('derived-') &&
+          priorModel !== 'country-substitute-regional' &&
+          priorModel !== 'world-bank-api-direct' &&
+          priorModel !== 'v-dem-api-direct';
+        if (priorIsLlm) {
+          const priorValueStr = JSON.stringify(prior.valueNormalized);
+          const newValueStr = JSON.stringify(valueNormalized);
+          if (priorValueStr !== newValueStr) {
+            mismatchNote = `Prior LLM extraction (model=${priorModel}, status=${prior.status}) value=${priorValueStr} differs from new derived value=${newValueStr}`;
+            console.warn(
+              `[DERIVE_LLM_MISMATCH] program=${extraction.programId} field=${extraction.fieldDefinitionKey} prior_model=${priorModel} prior_status=${prior.status} prior_value=${priorValueStr} derived_value=${newValueStr}`
+            );
+          }
+        }
+      }
+    } catch {
+      // Defensive: if the lookup fails, fall through and publish the
+      // derived row without the mismatch annotation. The mismatch log
+      // line is a quality enhancement, not a hard gate.
+    }
+    const provenanceWithMismatch = mismatchNote
+      ? {
+          ...provenance,
+          deriveLlmMismatch: mismatchNote,
+        }
+      : provenance;
+
     const inserted = await db
       .insert(fieldValues)
       .values({
@@ -463,7 +521,7 @@ export class PublishStageImpl implements PublishStage {
         fieldDefinitionId,
         valueRaw: extraction.valueRaw,
         valueNormalized,
-        provenance,
+        provenance: provenanceWithMismatch,
         status: 'pending_review',
         extractedAt: extraction.extractedAt,
         methodologyVersionId,
@@ -475,7 +533,7 @@ export class PublishStageImpl implements PublishStage {
         set: {
           valueRaw: extraction.valueRaw,
           valueNormalized,
-          provenance,
+          provenance: provenanceWithMismatch,
           status: 'pending_review',
           extractedAt: extraction.extractedAt,
           methodologyVersionId,
