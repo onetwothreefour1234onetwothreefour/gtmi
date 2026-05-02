@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { db, discoveryCache, sources, programs } from '@gtmi/db';
+import { db, discoveryCache, sources, programs, blockerDomains } from '@gtmi/db';
 import { and, eq, gt } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import type { DiscoveredUrl, DiscoveryResult } from '../types/extraction';
@@ -272,33 +272,102 @@ function parseDiscoveredUrls(raw: string, programId: string): DiscoveredUrl[] {
   return parsed.map((item, i) => assertDiscoveredUrl(item, i, programId));
 }
 
-async function verifyUrls(urls: DiscoveredUrl[]): Promise<DiscoveredUrl[]> {
-  const results = await Promise.all(
-    urls.map(async (discovered) => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10_000);
-      try {
-        const res = await fetch(discovered.url, {
-          method: 'HEAD',
-          signal: controller.signal,
-        });
-        if (res.status === 404 || res.status === 410) {
-          console.warn(
-            `[Discovery] Discarded unreachable URL: ${discovered.url} (status: ${res.status})`
-          );
-          return null;
-        }
-        return discovered;
-      } catch {
+// Phase 3.10 — verifyUrls improvements:
+//   1. Concurrency-capped (8 parallel HEAD requests) so we don't
+//      hammer a single authority with 20+ simultaneous connections.
+//   2. Reduced per-URL timeout from 10s to 5s — government HEAD
+//      responses are fast; 10s only matters for hung connections.
+//   3. Drop URLs whose hostname is in `blocker_domains` BEFORE the
+//      HEAD request. Saves the round-trip and prevents the URL from
+//      entering the registry.
+//   4. Drop URLs whose Content-Length header is present AND below
+//      the thin threshold (1024 bytes). Optimistic: pages that omit
+//      Content-Length are kept (most dynamic government pages do).
+const VERIFY_HEAD_CONCURRENCY = 8;
+const VERIFY_HEAD_TIMEOUT_MS = 5_000;
+const VERIFY_THIN_CONTENT_LENGTH = 1024;
+
+async function loadBlockerDomainSet(): Promise<Set<string>> {
+  try {
+    const rows = await db.select({ domain: blockerDomains.domain }).from(blockerDomains);
+    return new Set(rows.map((r) => r.domain.toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
+
+function urlHostname(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Single-URL HEAD verification with blocker-domain pre-check, thin-
+ * Content-Length filter, and 5s timeout. Exported as `_verifyOneUrl`
+ * for unit tests; not part of the public surface.
+ */
+export async function _verifyOneUrl(
+  discovered: DiscoveredUrl,
+  blockers: ReadonlySet<string>
+): Promise<DiscoveredUrl | null> {
+  const host = urlHostname(discovered.url);
+  if (host !== '' && blockers.has(host)) {
+    console.warn(
+      `[Discovery] Discarded blocker-domain URL pre-HEAD: ${discovered.url} (domain: ${host})`
+    );
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), VERIFY_HEAD_TIMEOUT_MS);
+  try {
+    const res = await fetch(discovered.url, { method: 'HEAD', signal: controller.signal });
+    if (res.status === 404 || res.status === 410) {
+      console.warn(
+        `[Discovery] Discarded unreachable URL: ${discovered.url} (status: ${res.status})`
+      );
+      return null;
+    }
+    const contentLengthHeader = res.headers.get('content-length');
+    if (contentLengthHeader !== null) {
+      const len = Number(contentLengthHeader);
+      if (Number.isFinite(len) && len < VERIFY_THIN_CONTENT_LENGTH) {
         console.warn(
-          `[Discovery] Discarded unreachable URL: ${discovered.url} (status: connection error)`
+          `[Discovery] Discarded thin URL: ${discovered.url} (Content-Length: ${len} < ${VERIFY_THIN_CONTENT_LENGTH})`
         );
         return null;
-      } finally {
-        clearTimeout(timer);
       }
-    })
+    }
+    return discovered;
+  } catch {
+    console.warn(
+      `[Discovery] Discarded unreachable URL: ${discovered.url} (status: connection error)`
+    );
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function verifyUrls(urls: DiscoveredUrl[]): Promise<DiscoveredUrl[]> {
+  if (urls.length === 0) return [];
+  const blockers = await loadBlockerDomainSet();
+  const results: (DiscoveredUrl | null)[] = new Array(urls.length).fill(null);
+  let cursor = 0;
+  async function worker(): Promise<void> {
+    while (true) {
+      const i = cursor++;
+      if (i >= urls.length) return;
+      results[i] = await _verifyOneUrl(urls[i]!, blockers);
+    }
+  }
+  const workers = Array.from({ length: Math.min(VERIFY_HEAD_CONCURRENCY, urls.length) }, () =>
+    worker()
   );
+  await Promise.all(workers);
   return results.filter((u): u is DiscoveredUrl => u !== null);
 }
 
