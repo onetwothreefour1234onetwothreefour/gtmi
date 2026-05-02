@@ -331,7 +331,13 @@ export async function _verifyOneUrl(
       );
       return null;
     }
-    const contentLengthHeader = res.headers.get('content-length');
+    // Defensive: some test mocks return a response shape without a
+    // headers Headers instance. Treat missing headers as "no Content-
+    // Length" rather than throwing.
+    const contentLengthHeader =
+      res.headers && typeof res.headers.get === 'function'
+        ? res.headers.get('content-length')
+        : null;
     if (contentLengthHeader !== null) {
       const len = Number(contentLengthHeader);
       if (Number.isFinite(len) && len < VERIFY_THIN_CONTENT_LENGTH) {
