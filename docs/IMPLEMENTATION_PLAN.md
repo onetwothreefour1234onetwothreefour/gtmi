@@ -566,6 +566,64 @@ This is a wiring phase. No new mechanisms; no new methodology. Every step here i
 
 **Acceptance:** Every blocker-flagged programme has a hint that does not name a domain in `blocker_domains`; every URL in the hints suite passes the HEAD smoke check.
 
+#### 3.10.5b — Repository cleanup pass (one PR, ~half day)
+
+The repo has accumulated phase-specific one-shots and legacy paths over Sessions 1–17. Doing this before scale means the cohort run inherits a smaller, clearer surface area.
+
+**Delete (phase-specific one-shots, work already merged):**
+
+- `scripts/apply-tier2-allowlist.ts` — ADR-013 + migration 00010 already applied.
+- `scripts/backfill-extraction-attempts.ts` — backfill for migration 00016 ran during Phase 3.9.
+- `scripts/backfill-monetary-normalization.ts` — pre-currency-fix rows are already re-normalized.
+- `scripts/backfill-value-indicator-scores.ts` — `value_indicator_score` populated at publish time since Phase 3.7; backfill ran.
+- `scripts/fix-c31-not-stated-leak.ts` — closed by ADR-019 rubric gate.
+- `scripts/invalidate-extraction-cache-phase-3-3.ts` — Phase 3.3 prompt sweep is closed.
+- `scripts/migrate-rubric-scores.ts` — methodology v2 rubric migration completed.
+- `scripts/phase-3-6-3-aus-dq-fixes.ts`, `scripts/phase-3-6-4-sgp-rederive.ts`, `scripts/phase-3-6-5-rederive-a12.ts`, `scripts/phase3-wipe-discovery-cache-aus.ts` — phase-specific re-derivations.
+- `scripts/audit-phase2.ts`, `scripts/audit-scrape-cache.ts`, `scripts/dq-aus-detail.ts`, `scripts/scrape-audit.ts`, `scripts/test-efficiency.ts` — ad-hoc debugging tools whose value has expired.
+- `scripts/run-migration.ts` — superseded by `apply-migration.ts` (ADR-012).
+- `scripts/purge-thin-scrape-cache.ts` — Phase 3.6 Fix C made this unnecessary.
+
+**Consolidate (move from `scripts/` into a workspace utility):**
+
+- `scripts/check-fts-column.ts`, `scripts/check-programs-columns.ts`, `scripts/check-programs-by-state.ts`, `scripts/check-drizzle-state.ts`, `scripts/check-scored-programs.ts`, `scripts/check-rubrics.ts`, `scripts/check-tier1-url-drift.ts`, `scripts/check-median-wage-coverage.ts`, `scripts/check-field-types.ts`, `scripts/verify-tables.ts`, `scripts/verify-sgp-derives.ts` — fold into a single `scripts/check.ts` with subcommands (`check fts`, `check programs --by-state`, `check rubrics`, …). Pattern matches `apply-migration.ts`'s one-shot model.
+- `scripts/diag-empty-fields.ts`, `scripts/audit-empty-fields-rollup.ts` → consolidate as `scripts/diag.ts` with subcommands.
+- `scripts/purge-orphan-pending.ts`, `scripts/purge-bad-scrapes.ts`, `scripts/purge-empty-field-values.ts` → consolidate as `scripts/purge.ts` with subcommands.
+
+**Remove legacy code paths in source:**
+
+- `scripts/canary-run.ts` is 1361 lines. Extract Stage 1 (URL discovery + merge), Stage 2 (extract + derive orchestration), and the cost-estimate block into named helpers in `@gtmi/extraction` so the canary becomes ≤500 lines. Mirror in `jobs/src/jobs/extract-single-program.ts` per step 3.10.3 — the parity work and the cleanup share the same target shape.
+- Delete the `PHASE3_TARGETED_RERUN` env var and its `--mode narrow` alias path. `--mode narrow` is the supported entry point; the env var has been a deprecated alias since Phase 3.9 / W12.
+- Audit `MODEL_DISCOVERY` constant in `packages/extraction/src/clients/anthropic.ts` — `discover.ts` calls Perplexity exclusively; remove the unused constant.
+- Audit `phase2Placeholder` flag spread across `apps/web` and `scripts/run-paq-score.ts`. With ≥5 cohort programmes scored after step 3.10.7, calibration runs and the flag clears; the conditional UI rendering should follow.
+
+**Acceptance:** Repo at HEAD has ≤25 scripts in `scripts/`; `canary-run.ts` ≤500 lines; CI green; no test regressions; no env vars referenced in code that are not in `.env.example`.
+
+#### 3.10.5c — Quality + operational improvements (one PR, ~1.5 days)
+
+Six improvements that lift the signal-to-noise ratio of every cohort run. Each is independent; ship them as separate commits inside one PR.
+
+1. **Activate the cross-check stage in canary-run.ts.** Currently hardcoded `not_checked` / `agrees: true`. Wire `crossCheck.execute()` against the merged Tier 2 sources for every published value. Disagreements surface in the provenance drawer's `crossCheckResult` field; review-queue priority lifts on disagreement. **Why:** the cross-check field is in the schema and the UI; only the canary callsite is bypassing it. Best free quality gain.
+
+2. **Derive vs. LLM mismatch detection.** When both a derive and an LLM extraction produce a value for the same field × programme, log a `DERIVE_LLM_MISMATCH` event and route the LLM row through /review with a `mismatch_with_derive` annotation. Catches stale country lookups (e.g. NLD changes its tax-residency rule but `country-tax-residency.ts` wasn't updated). **Why:** a lookup table that's silently wrong is the most expensive failure mode; this surfaces it.
+
+3. **HEAD-check at URL discovery.** `discover.ts` already discards 404 / 410 URLs after a HEAD request, but the check is per-URL and serial. Parallelize (8 concurrent HEAD requests, 5s timeout each) and extend to also discard URLs whose HEAD `Content-Length` is below the thin threshold OR whose hostname is in `blocker_domains`. Saves ~30s per Stage 0 run plus prevents broken/blocked URLs entering the registry. **Why:** registry is forever; one bad insert pollutes every future merge.
+
+4. **Per-programme cost cap.** New `MAX_COST_PER_PROGRAM_USD` env (default $1.50). Mid-run, when `costEstimate.actual` exceeds the cap, the canary aborts the remaining field set with a `COST_CAP_HIT` log line and writes whatever has already published. Mirrors the existing `MAX_RERUN_COST_USD` shape but at the per-programme grain. **Why:** scale runs need a per-programme circuit breaker, not just a per-run one.
+
+5. **Auto-recheck of `blocker_domains` (weekly cron).** New Trigger.dev job `blocker-recheck` running `0 4 * * 1` (one hour after `weekly-maintenance-scrape`). For every row in `blocker_domains`, re-fetches one canonical URL on the domain through the standard cascade. If the response is non-thin AND content_hash differs from the historical interstitial-hash, deletes the row and logs `BLOCKER_CLEARED`. **Why:** sites fix anti-bot walls. A flag that stays on forever is a slow false positive that depresses cohort coverage.
+
+6. **/review keyboard navigation + SLA timer.** Add `J/K` to navigate rows, `A` to approve, `R` to reject (focus-aware so it doesn't fire while typing in the value field). Add a per-row "Aged Xd Yh" badge that lights orange at 7d, red at 14d. **Why:** the cohort run will queue ≥1500 rows for /review; the current click-driven flow is the single biggest reviewer-throughput bottleneck.
+
+**Acceptance per item:**
+
+- (1) `crossCheckResult` non-null on every newly published row in the next canary; one /review row demonstrably routed because of a Tier-1/Tier-2 disagreement.
+- (2) Synthetic mismatch (manually edit one country lookup) round-trips into a `mismatch_with_derive` review row; existing `field_values` unaffected when no mismatch.
+- (3) Stage 0 logs report N URLs discovered, M passed HEAD; M < N in any cohort run with broken URLs; runtime drop measurable.
+- (4) Synthetic over-budget run (set `MAX_COST_PER_PROGRAM_USD=0.10`) aborts mid-canary with the right log line and partial-publish state preserved.
+- (5) Insert a synthetic `blocker_domains` row pointing to a known-good site; the next weekly run clears it and logs `BLOCKER_CLEARED`.
+- (6) Manual reviewer test: full pending queue navigated + approved with keyboard only; SLA badges accurate against `created_at`.
+
 #### 3.10.6 — Cohort dry-run (`--mode discover-only`)
 
 - Run `pnpm tsx scripts/canary-run.ts --country <ISO3> --programId <uuid> --mode discover-only` against every cohort programme. No scrape, no extract — Stage 0 only. Refreshes the registry + telemetry without burning extraction cost.
