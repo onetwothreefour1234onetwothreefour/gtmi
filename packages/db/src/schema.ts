@@ -412,24 +412,45 @@ export const newsSignals = pgTable(
   ]
 );
 
-// 12. sensitivity_runs
+// 12. sensitivity_runs (extended via migration 00018 — Phase 3.10c.1).
+// Legacy columns (run_type, results) remain nullable for backwards-
+// compatibility. New rows from scripts/sensitivity.ts (Phase 3.10b.5)
+// use the per-perturbation columns: run_id, analysis_type,
+// perturbation_jsonb, baseline_ranking_jsonb, perturbed_ranking_jsonb,
+// spearman_rho, top10_shift, notes.
 export const sensitivityRuns = pgTable(
   'sensitivity_runs',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    methodologyVersionId: uuid('methodology_version_id')
-      .notNull()
-      .references(() => methodologyVersions.id),
-    runType: varchar('run_type', { length: 50 }).notNull(),
+    methodologyVersionId: uuid('methodology_version_id').references(() => methodologyVersions.id),
+    runType: varchar('run_type', { length: 50 }),
     runAt: timestamp('run_at').defaultNow().notNull(),
-    results: jsonb('results').notNull(),
+    results: jsonb('results'),
+    // Phase 3.10c.1 — per-perturbation rows.
+    runId: uuid('run_id'),
+    analysisType: varchar('analysis_type', { length: 40 }),
+    perturbationJsonb: jsonb('perturbation_jsonb'),
+    baselineRankingJsonb: jsonb('baseline_ranking_jsonb'),
+    perturbedRankingJsonb: jsonb('perturbed_ranking_jsonb'),
+    spearmanRho: decimal('spearman_rho', { precision: 6, scale: 4 }),
+    top10Shift: integer('top10_shift'),
+    notes: text('notes'),
   },
   (table) => [
     index('idx_sensitivity_runs_methodology').on(table.methodologyVersionId),
+    index('idx_sensitivity_runs_run_id').on(table.runId),
+    index('idx_sensitivity_runs_analysis_type').on(table.analysisType),
+    index('idx_sensitivity_runs_ran_at').on(table.runAt.desc()),
     pgPolicy('Team members can write sensitivity_runs', {
       as: 'permissive',
       for: 'all',
       to: 'authenticated', // V1 PLACEHOLDER: tighten to specific team role before public launch.
+      using: sql`true`,
+    }),
+    pgPolicy('Public read sensitivity_runs', {
+      as: 'permissive',
+      for: 'select',
+      to: 'public',
       using: sql`true`,
     }),
   ]
