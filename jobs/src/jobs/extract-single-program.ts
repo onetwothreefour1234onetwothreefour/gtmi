@@ -14,6 +14,11 @@ import {
   deriveD14,
   deriveD22,
   deriveD23,
+  deriveD24,
+  deriveD31,
+  deriveD33,
+  deriveE11,
+  deriveE13,
   dynamicTierQuotas,
   dynamicUrlCap,
   loadProgramSourcesAsDiscovered,
@@ -21,10 +26,14 @@ import {
   mergeDiscoveredUrls,
   planCanaryCost,
   scoreProgramFromDb,
+  COUNTRY_CIVIC_TEST_POLICY,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
   COUNTRY_NON_GOV_COSTS_POLICY,
   COUNTRY_PR_PRESENCE_POLICY,
   COUNTRY_PR_TIMELINE,
+  COUNTRY_TAX_BASIS,
+  COUNTRY_TAX_RESIDENCY,
+  PROGRAM_POLICY_HISTORY,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
@@ -35,7 +44,7 @@ import type {
   ProvenanceRecord,
   ScrapeResult,
 } from '@gtmi/extraction';
-import { db, fieldDefinitions, fieldValues } from '@gtmi/db';
+import { db, blockerDomains, fieldDefinitions, fieldValues, programs } from '@gtmi/db';
 import { sql } from 'drizzle-orm';
 import { ACTIVE_FIELD_CODES } from '../../../scripts/wave-config';
 import {
@@ -166,13 +175,24 @@ export const extractSingleProgram = task({
 
     const provenUrls = await loadProvenUrlsForMissingFields(programId, country, missingFieldKeys);
     const registryUrls = await loadProgramSourcesAsDiscovered(programId);
+    // Phase 3.9 / W22 — load the blocker registry once and pass to
+    // the merger so prior-run registry entries on now-known blocker
+    // domains stop displacing fresh non-blocked URLs.
+    const blockerRows = await db.select({ domain: blockerDomains.domain }).from(blockerDomains);
+    const blockerDomainSet = new Set<string>(blockerRows.map((r) => r.domain.toLowerCase()));
     const mergedDiscoveredUrls = mergeDiscoveredUrls({
       freshFromStage0: discoveryResult.discoveredUrls,
       fromSourcesTable: registryUrls,
       fromProvenance: provenUrls,
       cap,
       quotas,
+      blockerDomains: blockerDomainSet,
     });
+    if (blockerDomainSet.size > 0) {
+      console.log(
+        `[Discovery merge] filtered against ${blockerDomainSet.size} blocker domain(s): ${[...blockerDomainSet].join(', ')}`
+      );
+    }
     console.log(
       `[Discovery merge] populated=${populatedFieldCount} → cap=${cap} (quotas T1=${quotas[1]} T2=${quotas[2]} T3=${quotas[3]})`
     );
@@ -378,12 +398,17 @@ export const extractSingleProgram = task({
     // stage owns these — see ADR-016). ---
     const DERIVED_FIELD_KEYS = new Set([
       'A.1.2',
-      'D.1.2',
-      'D.2.2',
-      'D.2.3',
       'B.2.4',
+      'D.1.2',
       'D.1.3',
       'D.1.4',
+      'D.2.2',
+      'D.2.3',
+      'D.2.4',
+      'D.3.1',
+      'D.3.3',
+      'E.1.1',
+      'E.1.3',
     ]);
     const llmFields: FieldSpec[] = allFieldDefs
       .filter(
@@ -579,6 +604,49 @@ export const extractSingleProgram = task({
         policy: prPresence,
       });
 
+      // Phase 3.9 / W21 — country-level D.2.4 / D.3.1 / D.3.3 derives.
+      const d24Result = deriveD24({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: COUNTRY_CIVIC_TEST_POLICY[country] ?? null,
+      });
+      const d31Result = deriveD31({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: COUNTRY_TAX_RESIDENCY[country] ?? null,
+      });
+      const d33Result = deriveD33({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        policy: COUNTRY_TAX_BASIS[country] ?? null,
+      });
+
+      // Phase 3.9 / W20 — E.1.3 (program age) + E.1.1 (severity-weighted
+      // policy-change count). E.1.3 reads programs.launch_year; load
+      // it now since the job's per-target run doesn't already have it.
+      const programRow = await db
+        .select({ launchYear: programs.launchYear })
+        .from(programs)
+        .where(eq(programs.id, programId))
+        .limit(1);
+      const launchYear = programRow[0]?.launchYear ?? null;
+      const e13Result = deriveE13({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        launchYear,
+        currentYear: new Date().getUTCFullYear(),
+      });
+      const e11Result = deriveE11({
+        programId,
+        countryIso: country,
+        methodologyVersion: METHODOLOGY_VERSION,
+        history: PROGRAM_POLICY_HISTORY[programId] ?? null,
+      });
+
       for (const derived of [
         a12Result,
         d12DerivedResult,
@@ -587,6 +655,11 @@ export const extractSingleProgram = task({
         b24Result,
         d13Result,
         d14Result,
+        d24Result,
+        d31Result,
+        d33Result,
+        e13Result,
+        e11Result,
       ]) {
         if (!derived) continue;
         try {
