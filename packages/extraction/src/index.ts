@@ -28,6 +28,15 @@ export {
   formatRunCostSummary,
 } from './utils/llm-cost';
 export type { AnthropicUsage, LlmCallRecord } from './utils/llm-cost';
+
+// Phase 3.10d / F.2 — Sentry-ready error reporter.
+export {
+  initErrorReporter,
+  captureException,
+  captureMessage,
+  flushErrorReporter,
+} from './utils/error-reporter';
+export type { ErrorContext } from './utils/error-reporter';
 export type { ExtractionModel } from './clients/anthropic';
 
 export type {

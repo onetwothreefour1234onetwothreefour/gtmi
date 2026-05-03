@@ -6,6 +6,7 @@ import {
   PublishStageImpl,
   ScrapeStageImpl,
   ValidateStageImpl,
+  captureException,
   deriveA12,
   deriveB24,
   deriveD12,
@@ -20,6 +21,8 @@ import {
   deriveE13,
   dynamicTierQuotas,
   dynamicUrlCap,
+  flushErrorReporter,
+  initErrorReporter,
   loadArchivedScrape,
   loadFieldUrlYield,
   loadProgramSourcesAsDiscovered,
@@ -1419,7 +1422,15 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Phase 3.10d / F.2 — Sentry-ready error reporting around the main entry.
+// initErrorReporter is idempotent and resolves before main() runs so any
+// captureException call from inside the script is delivered to Sentry
+// (when SENTRY_DSN + @sentry/node are set) or stderr otherwise.
+initErrorReporter()
+  .then(() => main())
+  .catch(async (err) => {
+    captureException(err, { tags: { entrypoint: 'canary-run' } });
+    await flushErrorReporter();
+    console.error(err);
+    process.exit(1);
+  });

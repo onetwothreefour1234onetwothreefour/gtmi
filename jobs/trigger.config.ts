@@ -1,4 +1,8 @@
 import { defineConfig } from '@trigger.dev/sdk/v3';
+// Phase 3.10d / F.2 — side-effect import wires the Sentry-ready error
+// reporter once per task worker. captureException / captureMessage from
+// any job module routes through it.
+import './src/boot';
 
 /**
  * Required environment variables — set all of these in the Trigger.dev dashboard
