@@ -180,5 +180,7 @@ export * from './data/program-policy-history';
 export * from './data/country-departments';
 // Phase 3.9 / W5 — per-program curated discovery hints.
 export * from './data/program-discovery-hints';
+// Phase 3.10c.8 — OECD tax treaty supplementary lookup (Phase 7 prereq).
+export * from './data/oecd-tax-treaties';
 // Phase 3.6.4 / FIX 1 — currency detection (with bare-$ country fallback).
 export { detectCurrency, BARE_DOLLAR_COUNTRY_FALLBACK } from './utils/currency';
