@@ -46,6 +46,7 @@ import {
   scores,
 } from '@gtmi/db';
 import { ACTIVE_FIELD_CODES, PHASE2_PLACEHOLDER_PARAMS, runScoringEngine } from '@gtmi/scoring';
+import { loadCalibratedParams } from './calibration';
 import type {
   CategoricalRubric,
   Direction,
@@ -77,6 +78,11 @@ const PHASE2_METADATA = {
   phase2Placeholder: true,
   placeholderReason:
     'NORMALIZATION_PARAMS are engineer-chosen ranges, not calibrated from real distribution data. Do not publish publicly.',
+} as const;
+
+const CALIBRATED_METADATA = {
+  phase2Placeholder: false,
+  placeholderReason: null,
 } as const;
 
 /**
@@ -175,9 +181,13 @@ export async function scoreProgramFromDb(
       normalizationFn: d.normalizationFn as NormalizationFn,
       direction: d.direction as Direction,
     })),
-    normalizationParams: PHASE2_PLACEHOLDER_PARAMS,
+    // Phase 3.10d / B.1 — read calibrated params from
+    // methodology_versions; fall back to placeholders when calibration
+    // hasn't run for this version yet.
+    normalizationParams: (await loadCalibratedParams(mvId)) ?? PHASE2_PLACEHOLDER_PARAMS,
     activeFieldKeys: ACTIVE_FIELD_CODES,
   };
+  const isCalibrated = input.normalizationParams !== PHASE2_PLACEHOLDER_PARAMS;
 
   // 7. Run engine.
   const output = runScoringEngine(input);
@@ -185,7 +195,7 @@ export async function scoreProgramFromDb(
   // 8. Upsert into `scores`.
   const coveragePct = (output.populatedFieldCount / Math.max(1, output.activeFieldCount)) * 100;
   const metadata = {
-    ...PHASE2_METADATA,
+    ...(isCalibrated ? CALIBRATED_METADATA : PHASE2_METADATA),
     activeFieldCodes: ACTIVE_FIELD_CODES,
     activeFieldCount: output.activeFieldCount,
     populatedFieldCount: output.populatedFieldCount,

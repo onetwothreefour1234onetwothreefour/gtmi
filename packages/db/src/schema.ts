@@ -177,6 +177,10 @@ export const methodologyVersions = pgTable(
     cmePaqSplit: jsonb('cme_paq_split').notNull(),
     changeNotes: text('change_notes'),
     createdBy: uuid('created_by'),
+    // Phase 3.10d / B.1 — calibrated normalization params (migration 00023).
+    calibratedParams: jsonb('calibrated_params'),
+    calibratedAt: timestamp('calibrated_at', { withTimezone: true }),
+    calibratedNPrograms: integer('calibrated_n_programs'),
   },
   () => [
     pgPolicy('Team members can write methodology_versions', {
