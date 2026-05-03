@@ -8,7 +8,13 @@ import { sql, type SQL } from 'drizzle-orm';
 // row starts returning 404/410. Listed here so the dashboard's filter
 // chips and SeverityChip render it; the Phase 5 activation will add
 // dedicated styling.
-export type PolicyChangeSeverity = 'minor' | 'material' | 'breaking' | 'url_broken';
+export type PolicyChangeSeverity =
+  | 'minor'
+  | 'material'
+  | 'breaking'
+  | 'url_broken'
+  // Phase 3.10c.7 — IMD Appeal annual refresh marker.
+  | 'imd_refresh';
 
 export interface PolicyChangesFilters {
   severities?: PolicyChangeSeverity[];

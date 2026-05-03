@@ -29,6 +29,9 @@ const SEVERITY_COLOR: Record<string, string> = {
   material: 'var(--navy)',
   minor: 'var(--ink-4)',
   url_broken: 'var(--warning)',
+  // Phase 3.10c.9 — IMD Appeal annual refresh marker. Cohort-wide
+  // event distinct from per-programme breaking/material changes.
+  imd_refresh: 'var(--accent-oxblood)',
 };
 
 const SEVERITY_LABEL: Record<string, string> = {
@@ -36,6 +39,7 @@ const SEVERITY_LABEL: Record<string, string> = {
   material: 'Material revision',
   minor: 'Minor revision',
   url_broken: 'Source URL drift',
+  imd_refresh: 'IMD Appeal refresh',
 };
 
 /**
@@ -201,6 +205,16 @@ function ChangesTimeline({ events }: { events: PolicyChangeRow[] }) {
                 {e.programName}
               </h3>
               <span className="num text-data-sm">{e.fieldKey}</span>
+              {e.severity === 'imd_refresh' && (
+                <span
+                  className="chip chip-accent"
+                  style={{ fontSize: 10 }}
+                  data-testid="imd-refresh-cohort-badge"
+                  title="IMD Appeal refresh — affects every programme's CME score"
+                >
+                  All programmes affected
+                </span>
+              )}
               {typeof e.paqDelta === 'number' && (
                 <span
                   className="num ml-auto text-data-sm"
@@ -274,6 +288,7 @@ function ChangesTimeline({ events }: { events: PolicyChangeRow[] }) {
  */
 function bucketForEvent(e: PolicyChangeRow): ChangesFilterTab {
   if (e.severity === 'url_broken') return 'provenance';
+  if (e.severity === 'imd_refresh') return 'countries';
   if (typeof e.pillar === 'string' && e.pillar === 'E') return 'countries';
   if (!e.fieldKey || e.fieldKey === 'METHODOLOGY') return 'methodology';
   return 'data';
