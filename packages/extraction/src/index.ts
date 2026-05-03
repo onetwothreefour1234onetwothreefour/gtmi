@@ -13,6 +13,10 @@ export {
   ExaError,
 } from './utils/exa-client';
 export type { ExaSearchOptions, ExaSearchResponse, ExaResult } from './utils/exa-client';
+
+// Phase 3.10d / C.3 — Wayback Save Page Now client.
+export { captureUrl, archiveOnDrift, isWaybackEnabled, WaybackError } from './utils/wayback';
+export type { WaybackArchiveResult } from './utils/wayback';
 export type { ExtractionModel } from './clients/anthropic';
 
 export type {

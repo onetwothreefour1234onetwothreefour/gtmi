@@ -311,6 +311,9 @@ export const scrapeHistory = pgTable(
     needsReextraction: boolean('needs_reextraction').default(false).notNull(),
     supersededBy: uuid('superseded_by'),
     requestHeaders: jsonb('request_headers'),
+    // Phase 3.10d / C.3 — Wayback Save Page Now on content drift.
+    waybackUrl: text('wayback_url'),
+    waybackCapturedAt: timestamp('wayback_captured_at', { withTimezone: true }),
   },
   (table) => [
     index('idx_scrape_history_source_scraped').on(table.sourceId, table.scrapedAt.desc()),

@@ -17,6 +17,7 @@ import { db, scrapeHistory, sources } from '@gtmi/db';
 import { and, desc, eq } from 'drizzle-orm';
 import { archivePathFor, contentTypeForExt, getStorage } from '@gtmi/storage';
 import type { ScrapeResult } from '../types/extraction';
+import { archiveOnDrift } from './wayback';
 
 /** Bumped when scrape→markdown extraction logic changes meaningfully. */
 export const EXTRACTOR_VERSION = 'v1';
@@ -128,6 +129,10 @@ export async function archiveScrapeResult(
   // of the re-check.
   const previousHash = await lastArchivedHash(sourceId);
   const isUnchanged = previousHash !== null && previousHash === result.contentHash;
+  // Phase 3.10d / C.3 — content drift = had a prior hash AND it differs.
+  // First-time scrapes (previousHash === null) are not drift; we don't
+  // want to flood Save Page Now with first-publish snapshots.
+  const isDrift = previousHash !== null && previousHash !== result.contentHash;
 
   // Phase 3.9 / W1 — choose archive extension from result.contentType
   // when caller didn't override. PDF scrapes archive as .pdf so future
@@ -178,6 +183,13 @@ export async function archiveScrapeResult(
     }
   }
 
+  // Phase 3.10d / C.3 — fire Save Page Now BEFORE the scrape_history
+  // insert so the wayback URL can land on the new row in a single
+  // write. archiveOnDrift returns null when WAYBACK_ENABLED is unset,
+  // when there's no drift, or on any failure; the rest of the archive
+  // path is unaffected so a Wayback hiccup never blocks scraping.
+  const waybackResult = await archiveOnDrift(result.url, isDrift);
+
   try {
     const inserted = await db
       .insert(scrapeHistory)
@@ -198,6 +210,8 @@ export async function archiveScrapeResult(
         // the prior 'archived' row but stamp a fresh scraped_at so
         // the freshness clock for url-monitoring stays current.
         status: isUnchanged ? 'unchanged' : 'archived',
+        waybackUrl: waybackResult?.archiveUrl ?? null,
+        waybackCapturedAt: waybackResult ? new Date() : null,
       })
       .returning({ id: scrapeHistory.id });
     const id = inserted[0]?.id;
