@@ -32,17 +32,142 @@ interface ImdAppealRow {
   appealScore: number;
 }
 
+const ISO_COLUMNS = ['iso', 'iso3', 'iso_code', 'country_iso', 'code'];
+const RANK_COLUMNS = ['rank', 'imd_rank', 'overall_rank'];
+const APPEAL_COLUMNS = ['appeal', 'appeal_factor', 'appeal_score', 'appeal_index'];
+
+function findColumn(headers: string[], candidates: string[]): number {
+  for (const candidate of candidates) {
+    const idx = headers.findIndex((h) => h === candidate);
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
 /**
- * Stub IMD CSV fetch. Real implementation: download CSV from
- * IMD_APPEAL_CSV_URL, parse, return one row per cohort country.
+ * Phase 3.10d / C.2 — minimal RFC 4180 CSV parser.
+ *
+ * Handles quoted fields, escaped quotes (""), and CR/LF line endings.
+ * Doesn't pull a dependency because the IMD CSV is small (≤80 rows)
+ * and we don't need streaming / typed accessors / async iteration.
+ */
+export function parseCsv(input: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+
+    if (inQuotes) {
+      if (c === '"') {
+        if (input[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += c;
+      }
+      continue;
+    }
+
+    if (c === '"') {
+      inQuotes = true;
+      continue;
+    }
+    if (c === ',') {
+      row.push(field);
+      field = '';
+      continue;
+    }
+    if (c === '\r') continue;
+    if (c === '\n') {
+      row.push(field);
+      field = '';
+      // Skip blank lines.
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+      continue;
+    }
+    field += c;
+  }
+  // Flush the trailing row if no newline at EOF.
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    if (row.length > 1 || row[0] !== '') rows.push(row);
+  }
+  return rows;
+}
+
+/**
+ * Phase 3.10d / C.2 — fetch + parse the IMD Appeal CSV.
+ *
+ * Robust to year-on-year column-name drift: we look for the iso /
+ * rank / appeal columns under a small set of canonical header names
+ * (lower-snake-case). Rejects rows with non-3-letter ISO codes or
+ * non-numeric rank/appeal values rather than coercing junk values.
  */
 async function fetchImdAppealCsv(): Promise<ImdAppealRow[]> {
   const url = process.env['IMD_APPEAL_CSV_URL'];
   if (!url) return [];
-  // TODO(Phase 7): fetch + parse the CSV. Schema is published by IMD
-  // each year; the column mapping (iso, rank, appeal_factor) is stable
-  // across years.
-  return [];
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: { accept: 'text/csv,application/octet-stream;q=0.8,*/*;q=0.5' },
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[imd-appeal-refresh] CSV fetch failed: ${msg}`);
+    return [];
+  }
+  if (!response.ok) {
+    console.warn(`[imd-appeal-refresh] CSV fetch returned ${response.status}`);
+    return [];
+  }
+
+  const body = await response.text();
+  const grid = parseCsv(body);
+  if (grid.length < 2) {
+    console.warn('[imd-appeal-refresh] CSV had no data rows');
+    return [];
+  }
+
+  const headers = grid[0]!.map((h) =>
+    h
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_')
+  );
+  const isoIdx = findColumn(headers, ISO_COLUMNS);
+  const rankIdx = findColumn(headers, RANK_COLUMNS);
+  const appealIdx = findColumn(headers, APPEAL_COLUMNS);
+  if (isoIdx === -1 || rankIdx === -1 || appealIdx === -1) {
+    console.warn(
+      `[imd-appeal-refresh] CSV missing expected columns. headers=${JSON.stringify(headers)}`
+    );
+    return [];
+  }
+
+  const out: ImdAppealRow[] = [];
+  for (let r = 1; r < grid.length; r++) {
+    const row = grid[r]!;
+    const iso = (row[isoIdx] ?? '').trim().toUpperCase();
+    const rankStr = (row[rankIdx] ?? '').trim();
+    const appealStr = (row[appealIdx] ?? '').trim();
+    const rank = Number.parseInt(rankStr, 10);
+    const appealScore = Number.parseFloat(appealStr);
+    if (!/^[A-Z]{3}$/.test(iso) || !Number.isFinite(rank) || !Number.isFinite(appealScore)) {
+      continue;
+    }
+    out.push({ iso3: iso, rank, appealScore });
+  }
+  return out;
 }
 
 interface CohortRow {
@@ -202,4 +327,4 @@ export const imdAppealRefresh = schedules.task({
   },
 });
 
-export { recomputeCohortNormalization, applyAndDiff };
+export { recomputeCohortNormalization, applyAndDiff, fetchImdAppealCsv };
