@@ -10,6 +10,7 @@
   "dependencies": {
     "@gtmi/db": "workspace:*",
     "@gtmi/extraction": "workspace:*",
+    "@gtmi/scoring": "workspace:*",
     "@trigger.dev/sdk": "^3.3.17",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2"

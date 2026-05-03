@@ -164,6 +164,9 @@ importers:
       '@gtmi/extraction':
         specifier: workspace:*
         version: link:../packages/extraction
+      '@gtmi/scoring':
+        specifier: workspace:*
+        version: link:../packages/scoring
       '@trigger.dev/sdk':
         specifier: ^3.3.17
         version: 3.3.17(zod@3.23.8)
