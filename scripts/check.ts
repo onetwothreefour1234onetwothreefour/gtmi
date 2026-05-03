@@ -16,6 +16,7 @@
  *   rubrics            — print scoring_rubric_jsonb keys + last 400 chars of prompt for a sample of categorical fields
  *   field-types        — list normalization_fn / data_type for the Wave 1 + Wave 2 field set, bucketed
  *   tables             — verify the five cache tables exist (scrape_cache, discovery_cache, extraction_cache, validation_cache, crosscheck_cache)
+ *   prompts-stale      — list field × programme rows where the active prompt was edited after the last extraction (Phase 3.10b.6)
  *
  * Connects via DIRECT_URL when present, falls back to DATABASE_URL.
  * Read-only — no script writes to the database.
@@ -35,7 +36,8 @@ type Subcommand =
   | 'scored'
   | 'rubrics'
   | 'field-types'
-  | 'tables';
+  | 'tables'
+  | 'prompts-stale';
 
 const VALID_SUBCOMMANDS: ReadonlySet<Subcommand> = new Set([
   'fts',
@@ -46,6 +48,7 @@ const VALID_SUBCOMMANDS: ReadonlySet<Subcommand> = new Set([
   'rubrics',
   'field-types',
   'tables',
+  'prompts-stale',
 ]);
 
 function getConnection(): { url: string; ssl: boolean } {
@@ -239,6 +242,57 @@ async function checkFieldTypes(sql: Sql): Promise<void> {
   );
 }
 
+/**
+ * Phase 3.10b.6 — list field × programme rows where the active prompt
+ * (extraction_prompts.created_at via field_definitions.current_prompt_id)
+ * is newer than the row's last extracted_at. Pairs with
+ * `--mode rubric-changed` for the actual re-extract.
+ */
+async function checkPromptsStale(sql: Sql): Promise<void> {
+  type Row = {
+    field_key: string;
+    field_definition_id: string;
+    stale_count: number;
+    sample_program_id: string;
+    sample_program_name: string;
+  };
+  const rows = await sql<Row[]>`
+    SELECT
+      fd.key AS field_key,
+      fd.id AS field_definition_id,
+      COUNT(*)::int AS stale_count,
+      MIN(p.id::text) AS sample_program_id,
+      MIN(p.name) AS sample_program_name
+    FROM field_definitions fd
+    JOIN extraction_prompts ep ON ep.id = fd.current_prompt_id
+    JOIN field_values fv ON fv.field_definition_id = fd.id
+    JOIN programs p ON p.id = fv.program_id
+    WHERE fv.extracted_at IS NOT NULL
+      AND ep.created_at > fv.extracted_at
+    GROUP BY fd.key, fd.id
+    ORDER BY stale_count DESC
+  `;
+  if (rows.length === 0) {
+    console.log(
+      'No prompts-stale rows. Every published value was extracted under the current prompt.'
+    );
+    return;
+  }
+  let totalStale = 0;
+  console.log(`Field key       | Stale rows | Sample programme`);
+  console.log(`----------------|------------|-----------------------`);
+  for (const r of rows) {
+    totalStale += r.stale_count;
+    console.log(
+      `  ${r.field_key.padEnd(13)} | ${String(r.stale_count).padStart(10)} | ${r.sample_program_name.slice(0, 40)}`
+    );
+  }
+  console.log(`\nTotal stale rows: ${totalStale} across ${rows.length} field(s).`);
+  console.log(
+    `Re-extract via: pnpm tsx scripts/canary-run.ts --country <ISO3> --programId <uuid> --mode rubric-changed`
+  );
+}
+
 async function checkTables(sql: Sql): Promise<void> {
   const EXPECTED_TABLES = [
     'scrape_cache',
@@ -306,6 +360,9 @@ async function main(): Promise<void> {
         break;
       case 'tables':
         await checkTables(sql);
+        break;
+      case 'prompts-stale':
+        await checkPromptsStale(sql);
         break;
     }
   } finally {
