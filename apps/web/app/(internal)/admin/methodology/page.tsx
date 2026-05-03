@@ -1,5 +1,6 @@
 import { db, methodologyVersions } from '@gtmi/db';
 import { desc } from 'drizzle-orm';
+import Link from 'next/link';
 import { updateMethodologyChangeNotes } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -53,12 +54,22 @@ export default async function AdminMethodologyPage() {
         <h1 className="serif text-ink" style={{ fontSize: 36, fontWeight: 400, marginBottom: 8 }}>
           Methodology versions.
         </h1>
-        <p className="text-ink-3" style={{ fontSize: 13, marginBottom: 24, maxWidth: 640 }}>
+        <p className="text-ink-3" style={{ fontSize: 13, marginBottom: 12, maxWidth: 640 }}>
           One row per methodology version. Weights, normalization choices, and the CME/PAQ split are{' '}
           <em>not</em> editable from this UI — those are source-of-truth in{' '}
           <code className="num">packages/scoring</code> and the seed. The only thing this surface
           edits is <code className="num">change_notes</code> (the human-readable changelog) so
           analysts can record what changed without a deploy.
+        </p>
+        <p className="mb-6">
+          <Link
+            href="/admin/methodology/compare"
+            className="btn-link num"
+            style={{ fontSize: 11 }}
+            data-testid="admin-methodology-compare-link"
+          >
+            Compare two versions ›
+          </Link>
         </p>
 
         {rows.length === 0 ? (
