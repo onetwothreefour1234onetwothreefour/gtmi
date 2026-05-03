@@ -13,6 +13,7 @@ import { getReviewQueueStats } from '@/lib/review-queue-stats';
 import {
   matchesReviewTab,
   readProvenanceConfidence,
+  readQualitySignals,
   type ReviewFilterTab,
 } from '@/lib/review-queue-helpers';
 import type { ReviewListRow } from '@/lib/review-queries';
@@ -21,7 +22,14 @@ import { rescoreCohort } from './rescore-actions';
 
 export const dynamic = 'force-dynamic';
 
-const VALID_TABS: ReviewFilterTab[] = ['all', 'pending', 'in-review', 'flagged', 'high-confidence'];
+const VALID_TABS: ReviewFilterTab[] = [
+  'all',
+  'pending',
+  'in-review',
+  'flagged',
+  'high-confidence',
+  'quality-signals',
+];
 
 function parseTab(raw: string | undefined): ReviewFilterTab {
   return VALID_TABS.includes(raw as ReviewFilterTab) ? (raw as ReviewFilterTab) : 'all';
@@ -52,17 +60,24 @@ export default async function ReviewPage({
     'in-review': 0,
     flagged: 0,
     'high-confidence': 0,
+    'quality-signals': 0,
   };
   for (const row of datasetRows) {
     const prov = readProvenanceConfidence(row.provenance);
+    const qs = readQualitySignals(row.provenance);
     for (const t of VALID_TABS) {
       if (t === 'all') continue;
-      if (matchesReviewTab(t, row.status, prov)) counts[t] += 1;
+      if (matchesReviewTab(t, row.status, prov, qs)) counts[t] += 1;
     }
   }
 
   const visible = datasetRows.filter((row) =>
-    matchesReviewTab(activeTab, row.status, readProvenanceConfidence(row.provenance))
+    matchesReviewTab(
+      activeTab,
+      row.status,
+      readProvenanceConfidence(row.provenance),
+      readQualitySignals(row.provenance)
+    )
   );
 
   // Pinned at SSR so the queue table's relative-age column doesn't drift on

@@ -3,7 +3,14 @@
  * vitest can import without 'server-only'.
  */
 
-export type ReviewFilterTab = 'all' | 'pending' | 'in-review' | 'flagged' | 'high-confidence';
+export type ReviewFilterTab =
+  | 'all'
+  | 'pending'
+  | 'in-review'
+  | 'flagged'
+  | 'high-confidence'
+  // Phase 3.10d / D.2 — rows where either Phase 3.10b.1 quality signal fires.
+  | 'quality-signals';
 
 export interface ProvenanceConfidence {
   extractionConfidence: number | null;
@@ -172,7 +179,8 @@ export function slaTier(extractedAt: Date | string | null, now: Date = new Date(
 export function matchesReviewTab(
   tab: ReviewFilterTab,
   status: string,
-  prov: ProvenanceConfidence
+  prov: ProvenanceConfidence,
+  qualitySignals?: QualitySignals
 ): boolean {
   if (tab === 'all') return true;
   if (status !== 'pending_review') return false;
@@ -184,6 +192,9 @@ export function matchesReviewTab(
   }
   if (tab === 'in-review') {
     return !isBulkApproveCandidate(prov) && !((prov.extractionConfidence ?? 1) < 0.7);
+  }
+  if (tab === 'quality-signals') {
+    return Boolean(qualitySignals?.crossCheckDisagrees || qualitySignals?.deriveLlmMismatch);
   }
   return false;
 }

@@ -19,6 +19,9 @@ const TABS: { id: ReviewFilterTab; label: string }[] = [
   { id: 'in-review', label: 'In review' },
   { id: 'flagged', label: 'Flagged' },
   { id: 'high-confidence', label: 'High confidence' },
+  // Phase 3.10d / D.2 — surfaces rows where cross-check disagreement OR
+  // derive-LLM mismatch fired (Phase 3.10b.1 quality signals).
+  { id: 'quality-signals', label: 'Quality signals' },
 ];
 
 /**
