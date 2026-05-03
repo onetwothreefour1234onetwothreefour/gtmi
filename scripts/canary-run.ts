@@ -47,7 +47,7 @@ import type {
 } from '@gtmi/extraction';
 import { db, fieldDefinitions, fieldValues, programs } from '@gtmi/db';
 import { sql } from 'drizzle-orm';
-import { ACTIVE_FIELD_CODES } from './wave-config';
+import { ACTIVE_FIELD_CODES } from '@gtmi/scoring';
 import {
   COUNTRY_LEVEL_SOURCES,
   getCountryLevelSources,

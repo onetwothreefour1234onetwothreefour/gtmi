@@ -37,7 +37,7 @@ import {
 import { and, inArray } from 'drizzle-orm';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { ACTIVE_FIELD_CODES } from './wave-config';
+import { ACTIVE_FIELD_CODES } from '@gtmi/scoring';
 
 const MAX_CONTENT_CHARS = 30000;
 const STOP_WORDS = new Set([

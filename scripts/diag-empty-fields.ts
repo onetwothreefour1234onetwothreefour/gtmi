@@ -18,7 +18,7 @@
 
 import { db, fieldDefinitions, fieldValues, programs, sources, scrapeCache } from '@gtmi/db';
 import { and, eq, inArray } from 'drizzle-orm';
-import { ACTIVE_FIELD_CODES } from './wave-config';
+import { ACTIVE_FIELD_CODES } from '@gtmi/scoring';
 
 const MAX_CONTENT_CHARS = 30000;
 
