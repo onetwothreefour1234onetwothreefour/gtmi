@@ -153,6 +153,9 @@ export {
 export type { BlockerSignal } from './utils/blocker-detect';
 export { scoreProgramFromDb } from './utils/score-program';
 export type { ScoreProgramOptions, ScoreProgramResult } from './utils/score-program';
+// Phase 3.10c.6 — Resend alerts (Phase 6 plumbing).
+export { sendDailyDigest, loadDigestEvents, renderDigestBody } from './utils/resend-alerts';
+export type { DigestEvent, DigestMode, DigestResult } from './utils/resend-alerts';
 
 // Phase 3.6 / ADR-016 — static lookup tables for the derive stage.
 // Re-exported from `packages/extraction/src/data/` (moved from `scripts/`
