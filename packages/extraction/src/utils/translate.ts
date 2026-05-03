@@ -31,6 +31,7 @@ import { db, translationCache } from '@gtmi/db';
 import { eq } from 'drizzle-orm';
 import { createAnthropicClient, MODEL_EXTRACTION } from '../clients/anthropic';
 import { getCountryDepartments } from '../data/country-departments';
+import { recordLlmCall } from './llm-cost';
 
 /** Bumped when the translation prompt or model changes meaningfully. */
 export const TRANSLATION_VERSION = 'v1';
@@ -196,6 +197,12 @@ export async function translateIfNeeded(args: {
           content: `Translate the following ${sourceLanguage}-language markdown to English. Return ONLY the translated text:\n\n---\n${args.content}\n---`,
         },
       ],
+    });
+    recordLlmCall({
+      stage: 'translate',
+      model: response.model,
+      usage: response.usage,
+      programId: null,
     });
     type ContentItem = (typeof response.content)[number];
     const lastTextBlock = response.content

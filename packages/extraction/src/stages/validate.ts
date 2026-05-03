@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { db, validationCache } from '@gtmi/db';
 import { eq } from 'drizzle-orm';
 import { createAnthropicClient, MODEL_VALIDATION } from '../clients/anthropic';
+import { recordLlmCall } from '../utils/llm-cost';
 import type { ExtractionOutput, ScrapeResult } from '../types/extraction';
 import type { ValidationResult } from '../types/extraction';
 import type { ValidateStage } from '../types/pipeline';
@@ -236,6 +237,13 @@ export class ValidateStageImpl implements ValidateStage {
           `Validation API call failed for field ${extraction.fieldDefinitionKey} / program ${extraction.programId}: ${msg}`
         );
       });
+    recordLlmCall({
+      stage: 'validate',
+      model: response.model,
+      usage: response.usage,
+      programId: extraction.programId,
+      fieldKey: extraction.fieldDefinitionKey,
+    });
 
     type ContentItem = (typeof response.content)[number];
     const lastTextBlock = response.content

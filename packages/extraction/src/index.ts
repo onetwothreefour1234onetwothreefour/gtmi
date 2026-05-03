@@ -17,6 +17,17 @@ export type { ExaSearchOptions, ExaSearchResponse, ExaResult } from './utils/exa
 // Phase 3.10d / C.3 — Wayback Save Page Now client.
 export { captureUrl, archiveOnDrift, isWaybackEnabled, WaybackError } from './utils/wayback';
 export type { WaybackArchiveResult } from './utils/wayback';
+
+// Phase 3.10d / F.1 — per-LLM-call cost instrumentation.
+export {
+  LLM_PRICING,
+  estimateCallCost,
+  recordLlmCall,
+  getRunCostAggregate,
+  resetRunCostAggregate,
+  formatRunCostSummary,
+} from './utils/llm-cost';
+export type { AnthropicUsage, LlmCallRecord } from './utils/llm-cost';
 export type { ExtractionModel } from './clients/anthropic';
 
 export type {

@@ -6,6 +6,7 @@ import type { ExtractionOutput, FieldSpec, ScrapeResult } from '../types/extract
 import type { ExtractStage } from '../types/pipeline';
 import { selectContentWindow } from '../utils/window';
 import { recordAttempts } from '../utils/attempts';
+import { recordLlmCall } from '../utils/llm-cost';
 
 const SYSTEM_PROMPT =
   'You are a precise data extraction agent for immigration program research. Extract ' +
@@ -357,6 +358,13 @@ export class ExtractStageImpl implements ExtractStage {
         },
       ],
     });
+    recordLlmCall({
+      stage: 'extract.reextract',
+      model: response.model,
+      usage: response.usage,
+      programId,
+      fieldKey,
+    });
     type ContentItem = (typeof response.content)[number];
     const lastTextBlock = response.content
       .filter((b): b is Extract<ContentItem, { type: 'text' }> => b.type === 'text')
@@ -424,6 +432,13 @@ export class ExtractStageImpl implements ExtractStage {
               ),
             },
           ],
+        });
+        recordLlmCall({
+          stage: 'extract.single',
+          model: response.model,
+          usage: response.usage,
+          programId,
+          fieldKey,
         });
 
         type ContentItem = (typeof response.content)[number];
@@ -519,6 +534,13 @@ export class ExtractStageImpl implements ExtractStage {
               content: buildBatchUserMessage(uncached, programName, countryIso, content),
             },
           ],
+        });
+        recordLlmCall({
+          stage: 'extract.batch',
+          model: response.model,
+          usage: response.usage,
+          programId,
+          fieldKey: uncached.map((f) => f.key).join(','),
         });
 
         type ContentItem = (typeof response.content)[number];

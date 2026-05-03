@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { db, crosscheckCache } from '@gtmi/db';
 import { eq } from 'drizzle-orm';
 import { createAnthropicClient, MODEL_CROSSCHECK } from '../clients/anthropic';
+import { recordLlmCall } from '../utils/llm-cost';
 import type { CrossCheckResult, ExtractionOutput, ScrapeResult } from '../types/extraction';
 import type { CrossCheckStage } from '../types/pipeline';
 
@@ -145,6 +146,13 @@ export class CrossCheckStageImpl implements CrossCheckStage {
           `Cross-check API call failed for field ${extraction.fieldDefinitionKey} / program ${extraction.programId}: ${msg}`
         );
       });
+    recordLlmCall({
+      stage: 'cross-check',
+      model: response.model,
+      usage: response.usage,
+      programId: extraction.programId,
+      fieldKey: extraction.fieldDefinitionKey,
+    });
 
     type ContentItem = (typeof response.content)[number];
     const lastTextBlock = response.content
