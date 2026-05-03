@@ -31,6 +31,7 @@
  */
 import 'dotenv/config';
 import * as dotenv from 'dotenv';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import postgres from 'postgres';
@@ -84,6 +85,26 @@ async function main(): Promise<void> {
         const preview = stmt.slice(0, 80).replace(/\s+/g, ' ');
         await tx.unsafe(stmt);
         console.log(`  OK   ${preview}${stmt.length > 80 ? '…' : ''}`);
+      }
+      // Phase 3.10d / A.1 — record the apply in migrations_applied
+      // (idempotent ON CONFLICT). Best-effort; the table only exists
+      // after migration 00022 is applied, so the INSERT is wrapped to
+      // tolerate the table-missing case during the bootstrap apply.
+      try {
+        const checksum = createHash('sha256').update(source, 'utf8').digest('hex');
+        const operator =
+          process.env['USER'] ?? process.env['USERNAME'] ?? process.env['LOGNAME'] ?? 'unknown';
+        await tx`
+          INSERT INTO migrations_applied (filename, applied_at, applied_by, checksum_sha256)
+          VALUES (${basename(filePath)}, NOW(), ${operator}, ${checksum})
+          ON CONFLICT (filename) DO UPDATE SET
+            applied_at = NOW(),
+            applied_by = ${operator},
+            checksum_sha256 = ${checksum}
+        `;
+      } catch {
+        // migrations_applied table doesn't exist yet (pre-00022).
+        // Silent; the table itself will record the bootstrap apply.
       }
     });
     console.log('\nMigration applied successfully (transaction committed).');

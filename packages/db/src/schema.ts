@@ -428,6 +428,35 @@ export const newsSignals = pgTable(
   ]
 );
 
+// Phase 3.10d.A.1 — migration apply audit trail (migration 00022).
+// apply-migration.ts writes a row on every successful apply; idempotent
+// ON CONFLICT. Pairs with ADR-012 to give us a real journal without
+// pretending to be a drizzle-kit project.
+export const migrationsApplied = pgTable(
+  'migrations_applied',
+  {
+    filename: text('filename').primaryKey(),
+    appliedAt: timestamp('applied_at', { withTimezone: true }).defaultNow().notNull(),
+    appliedBy: text('applied_by'),
+    checksumSha256: text('checksum_sha256'),
+  },
+  (table) => [
+    index('idx_migrations_applied_at').on(table.appliedAt.desc()),
+    pgPolicy('Team members can write migrations_applied', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+    pgPolicy('Public read migrations_applied', {
+      as: 'permissive',
+      for: 'select',
+      to: 'public',
+      using: sql`true`,
+    }),
+  ]
+);
+
 // Phase 3.10b.4 — composite-score history (migration 00019).
 // Append-only timeline. scoreProgramFromDb writes here on every run
 // in addition to upserting `scores`. Public-read so the dashboard can
