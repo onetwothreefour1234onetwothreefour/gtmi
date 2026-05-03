@@ -9,6 +9,7 @@ import type {
   ProgramDetailFieldValue,
   ProgramDetailPolicyChange,
   ProgramDetailScore,
+  ProgramDetailScoreHistoryPoint,
   ProgramDetailSource,
   PillarScores,
 } from './program-detail-types';
@@ -88,6 +89,14 @@ interface CohortMemberRow {
   programId: string;
   programName: string;
   pillarScores: unknown;
+}
+
+interface ScoreHistoryRow {
+  scoredAt: Date;
+  composite: string | null;
+  cme: string | null;
+  paq: string | null;
+  methodologyVersion: string | null;
 }
 
 function toNumber(v: string | null): number | null {
@@ -239,14 +248,34 @@ async function fetchProgramDetail(programId: string): Promise<ProgramDetail | nu
     ORDER BY s.scored_at DESC
   `;
 
-  const [headerRaw, scoreRaw, fvRaw, sourcesRaw, policyRaw, cohortRaw] = await Promise.all([
-    db.execute(headerSql),
-    db.execute(scoreSql),
-    db.execute(fieldValuesSql),
-    db.execute(sourcesSql),
-    db.execute(policyChangesSql),
-    db.execute(cohortSql),
-  ]);
+  // Phase 3.10d / E.2 — score-over-time panel.
+  // 36 points caps the panel at ~3 years of weekly scoring without
+  // pulling the entire append-only log when a programme has been
+  // re-scored daily during a noisy week.
+  const scoreHistorySql = sql`
+    SELECT
+      sh.scored_at      AS "scoredAt",
+      sh.composite_score AS composite,
+      sh.cme_score       AS cme,
+      sh.paq_score       AS paq,
+      mv.version_tag     AS "methodologyVersion"
+    FROM score_history sh
+    LEFT JOIN methodology_versions mv ON mv.id = sh.methodology_version_id
+    WHERE sh.program_id = ${programId}
+    ORDER BY sh.scored_at DESC
+    LIMIT 36
+  `;
+
+  const [headerRaw, scoreRaw, fvRaw, sourcesRaw, policyRaw, cohortRaw, scoreHistoryRaw] =
+    await Promise.all([
+      db.execute(headerSql),
+      db.execute(scoreSql),
+      db.execute(fieldValuesSql),
+      db.execute(sourcesSql),
+      db.execute(policyChangesSql),
+      db.execute(cohortSql),
+      db.execute(scoreHistorySql),
+    ]);
 
   const headerRows = headerRaw as unknown as HeaderRow[];
   if (headerRows.length === 0) return null;
@@ -327,6 +356,19 @@ async function fetchProgramDetail(programId: string): Promise<ProgramDetail | nu
   if (score?.pillarScores) cohortPillarScores.push(score.pillarScores);
   const medianPillarScores = computeMedianPillarScores(cohortPillarScores);
 
+  // Re-order oldest → newest so the timeline reads left-to-right.
+  const scoreHistory: ProgramDetailScoreHistoryPoint[] = (
+    scoreHistoryRaw as unknown as ScoreHistoryRow[]
+  )
+    .map((r) => ({
+      scoredAt: new Date(r.scoredAt).toISOString(),
+      composite: toNumber(r.composite),
+      cme: toNumber(r.cme),
+      paq: toNumber(r.paq),
+      methodologyVersion: r.methodologyVersion,
+    }))
+    .reverse();
+
   return {
     header: {
       programId: h.programId,
@@ -349,6 +391,7 @@ async function fetchProgramDetail(programId: string): Promise<ProgramDetail | nu
     fieldValues,
     sources,
     policyChanges,
+    scoreHistory,
     cohort: {
       scoredCount: cohortMembers.length + (score?.pillarScores ? 1 : 0),
       medianPillarScores,

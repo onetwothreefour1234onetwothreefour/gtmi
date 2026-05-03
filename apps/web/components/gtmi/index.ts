@@ -25,6 +25,8 @@ export { PillarBreakdownTable } from './pillar-breakdown-table';
 export { ProgramHeader } from './program-header';
 export { PillarStrip } from './pillar-strip';
 export { PillarBreakdown } from './pillar-breakdown';
+// Phase 3.10d / E.2 — score-over-time panel.
+export { ScoreOverTime } from './score-over-time';
 export { CountryFlag } from './country-flag';
 export { JsonLd } from './json-ld';
 

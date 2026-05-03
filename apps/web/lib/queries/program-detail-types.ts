@@ -83,6 +83,15 @@ export interface ProgramDetailPolicyChange {
   paqDelta: number | null;
 }
 
+/** One snapshot from `score_history`. Phase 3.10d / E.2. */
+export interface ProgramDetailScoreHistoryPoint {
+  scoredAt: string;
+  composite: number | null;
+  cme: number | null;
+  paq: number | null;
+  methodologyVersion: string | null;
+}
+
 export interface ProgramDetail {
   header: ProgramDetailHeader;
   score: ProgramDetailScore | null;
@@ -90,6 +99,8 @@ export interface ProgramDetail {
   fieldValues: ProgramDetailFieldValue[];
   sources: ProgramDetailSource[];
   policyChanges: ProgramDetailPolicyChange[];
+  /** Phase 3.10d / E.2 — append-only composite history, oldest → newest. */
+  scoreHistory: ProgramDetailScoreHistoryPoint[];
   /**
    * Cohort metadata for the radar overlay. Phase 4.3 reality: 2 scored
    * programs (AUS, SGP). The radar uses this to render the "n=2" caveat.

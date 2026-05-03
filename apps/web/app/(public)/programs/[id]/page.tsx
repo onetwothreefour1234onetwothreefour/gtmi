@@ -7,6 +7,7 @@ import {
   PillarStrip,
   PillarBreakdown,
   PolicyTimeline,
+  ScoreOverTime,
   DataTableNote,
   JsonLd,
 } from '@/components/gtmi';
@@ -212,6 +213,8 @@ export default async function ProgramDetailPage({ params }: PageProps) {
           )}
         </div>
       </section>
+
+      {isScored && <ScoreOverTime history={detail.scoreHistory} />}
 
       <section className="px-12 py-12" style={{ background: 'var(--paper)' }}>
         <div className="mx-auto max-w-page">
