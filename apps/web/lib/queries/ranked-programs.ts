@@ -34,12 +34,26 @@ type RawRow = {
   scoredAt: Date | null;
   lastVerifiedAt: Date | null;
   searchRank: number | null;
+  /** PG array_agg of most-recent N composite_score values, oldest → newest. */
+  scoreHistory: (string | number)[] | null;
 };
+
+const SCORE_HISTORY_POINTS = 12;
 
 function toNumber(value: string | null): number | null {
   if (value === null || value === undefined) return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function toScoreHistory(raw: (string | number)[] | null): number[] {
+  if (!raw || !Array.isArray(raw)) return [];
+  const out: number[] = [];
+  for (const v of raw) {
+    const n = typeof v === 'number' ? v : Number(v);
+    if (Number.isFinite(n)) out.push(n);
+  }
+  return out;
 }
 
 function toPillarScores(raw: unknown): PillarScores | null {
@@ -155,7 +169,8 @@ async function fetchRankedPrograms(query: RankedProgramsQuery): Promise<RankedPr
       latest_scores.flagged_insufficient_disclosure     AS "flaggedInsufficientDisclosure",
       latest_scores.scored_at                           AS "scoredAt",
       field_counts.last_verified_at                     AS "lastVerifiedAt",
-      ${searchRankSelect}                               AS "searchRank"
+      ${searchRankSelect}                               AS "searchRank",
+      score_trend.history                               AS "scoreHistory"
     FROM programs
     INNER JOIN countries ON countries.iso_code = programs.country_iso
     LEFT JOIN LATERAL (
@@ -180,6 +195,19 @@ async function fetchRankedPrograms(query: RankedProgramsQuery): Promise<RankedPr
       WHERE fv.program_id = programs.id
         AND fv.status = 'approved'
     ) AS field_counts ON TRUE
+    LEFT JOIN LATERAL (
+      -- Phase 3.10d / E.1: most-recent N composite_score points,
+      -- re-ordered oldest → newest for the sparkline.
+      SELECT array_agg(composite_score ORDER BY scored_at ASC) AS history
+      FROM (
+        SELECT sh.composite_score, sh.scored_at
+        FROM score_history sh
+        WHERE sh.program_id = programs.id
+          AND sh.composite_score IS NOT NULL
+        ORDER BY sh.scored_at DESC
+        LIMIT ${SCORE_HISTORY_POINTS}
+      ) AS recent
+    ) AS score_trend ON TRUE
     ${whereClause}
     ORDER BY ${orderBy}
     LIMIT ${limit}
@@ -248,6 +276,7 @@ async function fetchRankedPrograms(query: RankedProgramsQuery): Promise<RankedPr
     scoredAt: r.scoredAt ? new Date(r.scoredAt).toISOString() : null,
     lastVerifiedAt: r.lastVerifiedAt ? new Date(r.lastVerifiedAt).toISOString() : null,
     searchRank: r.searchRank,
+    scoreHistory: toScoreHistory(r.scoreHistory),
   }));
 
   const totalCount = (totalRaw as unknown as { total: number }[])[0]?.total ?? 0;

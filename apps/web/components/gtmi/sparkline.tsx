@@ -12,6 +12,14 @@ export interface SparklineProps {
   highlight?: string;
   /** Optional override for accessible label. Default reads off the values. */
   ariaLabel?: string;
+  /**
+   * Phase 3.10d / E.1 — disclosure: 'real' when values come from
+   * score_history (≥ MIN_REAL_HISTORY points), 'placeholder' when the
+   * caller fell back to the deterministic pseudo-walk. Surfaces as a
+   * data attribute on the SVG so tests + analyst tooling can tell the
+   * two apart without re-deriving from values.
+   */
+  dataSource?: 'real' | 'placeholder';
   className?: string;
 }
 
@@ -31,6 +39,7 @@ export function Sparkline({
   color = 'var(--ink-3)',
   highlight = 'var(--accent)',
   ariaLabel,
+  dataSource,
   className,
 }: SparklineProps) {
   if (values.length < 2) return null;
@@ -64,6 +73,7 @@ export function Sparkline({
       className={cn('block overflow-visible', className)}
       data-testid="sparkline"
       data-trend={trendUp ? 'up' : 'down'}
+      data-source={dataSource}
     >
       <path
         d={d}

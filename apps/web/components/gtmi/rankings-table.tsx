@@ -35,6 +35,13 @@ interface HeaderSpec {
   width?: string;
 }
 
+/**
+ * Phase 3.10d / E.1 — minimum points before we trust score_history.
+ * Below this we render the deterministic pseudo-walk so the column is
+ * never misleadingly empty for new programmes.
+ */
+const MIN_REAL_HISTORY = 4;
+
 const HEADERS: HeaderSpec[] = [
   { field: null, label: '#', sortable: false, width: '36px' },
   { field: 'country', label: 'Country', sortable: true, width: '180px' },
@@ -174,9 +181,17 @@ export function RankingsTable({
             const derived = deriveRow(row, advisorWeights);
             const rank = scoredRanks.get(row.programId);
             const isLeader = rank === 1;
+            // Phase 3.10d / E.1 — prefer real score_history when we have
+            // ≥ MIN_REAL_HISTORY points. Below that the trend is
+            // statistically uninformative so we keep the deterministic
+            // pseudo-walk and disclose it in the row's ariaLabel.
+            const realHistory = row.scoreHistory ?? [];
+            const useReal = realHistory.length >= MIN_REAL_HISTORY && !advisorWeights;
             const trend =
               derived.composite !== null
-                ? deterministicTrend(row.programId, derived.composite)
+                ? useReal
+                  ? realHistory
+                  : deterministicTrend(row.programId, derived.composite)
                 : null;
             return (
               <motion.tr
@@ -248,7 +263,12 @@ export function RankingsTable({
                       width={64}
                       height={18}
                       color={isLeader ? 'var(--accent)' : 'var(--ink-3)'}
-                      ariaLabel={`12-month trend for ${row.programName} (placeholder; deterministic until score history matures)`}
+                      ariaLabel={
+                        useReal
+                          ? `${trend.length}-point composite history for ${row.programName} from score_history`
+                          : `12-month trend for ${row.programName} (placeholder; deterministic until score history matures)`
+                      }
+                      dataSource={useReal ? 'real' : 'placeholder'}
                     />
                   ) : (
                     <span className="num text-ink-5" style={{ fontSize: 11 }}>

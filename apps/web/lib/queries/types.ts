@@ -38,6 +38,12 @@ export interface RankedProgramRow {
   flaggedInsufficientDisclosure: boolean;
   /** Latest scored_at, or null. Used for the "trend" sparkline (single point in 4.2). */
   scoredAt: string | null;
+  /**
+   * Phase 3.10d / E.1 — recent composite-score history (oldest → newest, up
+   * to ~12 points). Empty array when score_history has < 2 rows for this
+   * programme; rankings UI falls back to the deterministic placeholder.
+   */
+  scoreHistory: number[];
   /** Latest extracted_at across this program's field_values. */
   lastVerifiedAt: string | null;
   /** Optional ts_rank score from FTS — present only when the query carries a search term. */
