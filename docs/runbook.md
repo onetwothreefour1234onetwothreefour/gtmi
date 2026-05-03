@@ -261,6 +261,153 @@ any mass-cohort scrape runs.
 
 ---
 
+## Cloud Logging metrics + alerts (Phase 3.10b.2)
+
+The `[blocker-detect]` and `[DERIVE_LLM_MISMATCH]` events emit
+structured single-line markers for Cloud Logging metric extraction.
+Define the metrics + alerts via `gcloud` once per project; they fire
+automatically thereafter.
+
+### Define `blocker_detected_count`
+
+```sh
+gcloud logging metrics create blocker_detected_count \
+  --project=gtmi-494008 \
+  --description="Daily count of W15 anti-bot blocker registrations" \
+  --log-filter='jsonPayload.event="blocker_detected"'
+```
+
+The metric counts every emitted JSON marker per day. Pair with an
+alert when the daily count exceeds 5 (suggests cohort-wide
+regression rather than per-domain failure):
+
+```sh
+gcloud alpha monitoring policies create \
+  --project=gtmi-494008 \
+  --notification-channels=<channel-id> \
+  --display-name='Blocker registrations spike' \
+  --condition-display-name='blocker_detected_count > 5/day' \
+  --condition-filter='metric.type="logging.googleapis.com/user/blocker_detected_count" AND resource.type="cloud_run_revision"' \
+  --condition-threshold-value=5 \
+  --condition-threshold-duration=86400s \
+  --condition-threshold-comparison=COMPARISON_GT
+```
+
+### Define `derive_llm_mismatch_count`
+
+The `[DERIVE_LLM_MISMATCH]` log line is text-based; filter on the
+literal token:
+
+```sh
+gcloud logging metrics create derive_llm_mismatch_count \
+  --project=gtmi-494008 \
+  --description="Cohort-wide count of stale country lookups detected by Phase 3.10.5c.2" \
+  --log-filter='textPayload:"[DERIVE_LLM_MISMATCH]"'
+```
+
+Same alert pattern at threshold 3/week — a stale lookup is rare
+enough that more than three in seven days is worth paging on.
+
+### Verify the metrics
+
+```sh
+gcloud logging metrics list --project=gtmi-494008 \
+  --filter='name~"(blocker_detected|derive_llm_mismatch)"'
+```
+
+Synthetic test for `blocker_detected`: insert a row into
+`blocker_domains` via `/admin/blockers` and confirm the metric
+counter increments within one minute. For `derive_llm_mismatch`:
+manually edit a country lookup (e.g. flip NLD's
+`country-tax-residency.ts` `triggerDays` to a stale value), re-run a
+canary, then revert.
+
+---
+
+## Trigger.dev deploy verification (Phase 3.10b.3)
+
+Trigger.dev runs whatever was last deployed, not whatever's in
+`main`. After merging changes to `jobs/src/jobs/`, push to the
+project explicitly.
+
+### Deploy
+
+```sh
+# From the repo root
+pnpm --filter @gtmi/jobs exec npx trigger.dev@3.3.17 deploy
+```
+
+The CLI is pinned to 3.3.17 to match the SDK (per ADR — see
+`jobs/package.json`). Don't use `@latest` — the CLI 4.x line drifted
+from the 3.x SDK.
+
+### Smoke-test new jobs in dashboard
+
+After deploy, manually fire each new job once via the Trigger.dev
+dashboard ("Test run") and confirm the run completes:
+
+| Job                         | Expected result on empty DB                                       |
+| --------------------------- | ----------------------------------------------------------------- |
+| `blocker-recheck`           | `domainsChecked = N` from registry, `domainsCleared = 0` likely   |
+| `diff-and-classify`         | `scrapesChanged = 0` until cohort runs                            |
+| `url-drift-check`           | `urlsChecked = N` from `field_url_index`, `urlsBroken = 0` likely |
+| `news-signal-ingest`        | `mode = 'stub'` until `EXA_API_KEY` is set                        |
+| `policy-digest`             | `mode = 'unconfigured'` until `RESEND_*` env vars are set         |
+| `imd-appeal-refresh`        | `mode = 'stub'` until `IMD_APPEAL_CSV_URL` is set                 |
+| `weekly-maintenance-scrape` | walks the registry; idempotent                                    |
+| `extract-single-program`    | runs against a fixed programme via dashboard form                 |
+
+### Verify scheduled crons
+
+The Trigger.dev dashboard shows the next scheduled run for every
+`schedules.task`. Confirm:
+
+| Cron                        | Expected next-run UTC   |
+| --------------------------- | ----------------------- |
+| `weekly-maintenance-scrape` | next Monday 03:00       |
+| `blocker-recheck`           | next Monday 04:00       |
+| `diff-and-classify`         | next Monday 05:00       |
+| `policy-digest`             | tomorrow 09:00          |
+| `news-signal-ingest`        | tomorrow 06:00          |
+| `url-drift-check`           | 1st of next month 02:00 |
+| `imd-appeal-refresh`        | next 1st of March 06:00 |
+
+### Required Trigger.dev env vars
+
+Set in the Trigger.dev dashboard → Project → Environment Variables.
+Required for production runs:
+
+```
+ANTHROPIC_API_KEY
+PERPLEXITY_API_KEY
+SCRAPER_URL
+DATABASE_URL
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+```
+
+Optional (gate features):
+
+```
+EXA_API_KEY                 # news-signal-ingest live mode
+RESEND_API_KEY              # policy-digest live mode
+RESEND_FROM
+RESEND_RECIPIENTS
+IMD_APPEAL_CSV_URL          # imd-appeal-refresh live mode
+PHASE3_VDEM_ENABLED         # default true
+PHASE3_TIER2_FALLBACK       # default false
+MAX_RERUN_COST_USD          # default 5
+MAX_COST_PER_PROGRAM_USD    # default 1.5
+```
+
+### Rollback
+
+Trigger.dev keeps the previous deployment around. From the
+dashboard → Deployments, "Rollback" on the failed version. The
+crons resume against the prior code on their next scheduled fire.
+
+---
+
 ## Linked documentation
 
 - [BRIEF.md](BRIEF.md) — canonical product specification
