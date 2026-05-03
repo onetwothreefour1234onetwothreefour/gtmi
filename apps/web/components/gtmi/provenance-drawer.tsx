@@ -322,6 +322,10 @@ export function ProvenanceDrawer({
               </aside>
             )}
 
+            {/* Phase 3.10d / D.1 — quality-signal banners. Read defensively
+                from provenance JSONB so pre-3.10 rows don't break. */}
+            <QualitySignalBanners provenance={p as unknown as Record<string, unknown>} />
+
             {/* Derived inputs detail */}
             {derivedInputs && (
               <section
@@ -586,5 +590,86 @@ function DerivedInputDisplay({ value }: { value: DerivedInputValue }) {
         </>
       )}
     </span>
+  );
+}
+
+/**
+ * Phase 3.10d / D.1 — drawer banners for the two quality signals
+ * shipped in Phase 3.10b.1 (cross-check disagreement and derive-LLM
+ * mismatch). The table shows chips per row; the drawer surfaces the
+ * full context so the reviewer can adjudicate without leaving the
+ * panel.
+ */
+function QualitySignalBanners({ provenance }: { provenance: Record<string, unknown> }) {
+  const ccResult = provenance['crossCheckResult'];
+  const ccUrl =
+    typeof provenance['crossCheckUrl'] === 'string'
+      ? (provenance['crossCheckUrl'] as string)
+      : null;
+  const mismatch =
+    typeof provenance['deriveLlmMismatch'] === 'string' &&
+    (provenance['deriveLlmMismatch'] as string).length > 0
+      ? (provenance['deriveLlmMismatch'] as string)
+      : null;
+  const showCrossCheck = ccResult === 'disagree';
+  if (!showCrossCheck && !mismatch) return null;
+  return (
+    <div className="mt-4 grid gap-3" data-testid="quality-signal-banners">
+      {showCrossCheck && (
+        <aside
+          role="note"
+          className="border-l-4 px-4 py-3 text-data-sm"
+          style={{
+            borderColor: 'var(--accent)',
+            background: 'rgba(155, 32, 49, 0.06)',
+          }}
+          data-testid="banner-crosscheck-disagree"
+        >
+          <p className="eyebrow mb-1" style={{ color: 'var(--accent)' }}>
+            Cross-check disagreement
+          </p>
+          <p className="text-ink" style={{ fontSize: 12, lineHeight: 1.5 }}>
+            A Tier-2 source disagrees with this extracted value. The row is queued for /review with{' '}
+            <code className="num">crossCheckResult=disagree</code> recorded for the audit trail.
+            Adjudicate in /review before approving.
+          </p>
+          {ccUrl && (
+            <p className="mt-2 text-data-sm">
+              <a
+                href={ccUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-accent underline-offset-4 hover:underline"
+              >
+                View Tier-2 source ↗
+              </a>
+            </p>
+          )}
+        </aside>
+      )}
+      {mismatch && (
+        <aside
+          role="note"
+          className="border-l-4 px-4 py-3 text-data-sm"
+          style={{
+            borderColor: 'var(--accent)',
+            background: 'rgba(155, 32, 49, 0.06)',
+          }}
+          data-testid="banner-derive-llm-mismatch"
+        >
+          <p className="eyebrow mb-1" style={{ color: 'var(--accent)' }}>
+            Derive ↔ LLM mismatch
+          </p>
+          <p className="text-ink" style={{ fontSize: 12, lineHeight: 1.5 }}>
+            The derived value differs from a prior LLM extraction for this field. The
+            methodology-mandated derive published; the prior LLM row is preserved for audit. Either
+            the country lookup is stale or the LLM extracted from a wrong page.
+          </p>
+          <p className="mt-2 text-data-sm text-ink-3" style={{ fontSize: 11 }}>
+            <strong>Note:</strong> {mismatch}
+          </p>
+        </aside>
+      )}
+    </div>
   );
 }
