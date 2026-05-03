@@ -21,10 +21,13 @@ import {
   deriveE13,
   dynamicTierQuotas,
   dynamicUrlCap,
+  formatRunCostSummary,
+  getRunCostAggregate,
   loadProgramSourcesAsDiscovered,
   loadProvenUrlsForMissingFields,
   mergeDiscoveredUrls,
   planCanaryCost,
+  resetRunCostAggregate,
   scoreProgramFromDb,
   COUNTRY_CIVIC_TEST_POLICY,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
@@ -108,6 +111,13 @@ export const extractSingleProgram = task({
     country: string;
   }): Promise<PipelineResult> => {
     const { programId, programName, country } = payload;
+
+    // Phase 3.10d / K.3 — reset the F.1 per-run cost aggregator at the
+    // start of each task run so PipelineResult.costEstimate.actual
+    // reflects just THIS programme's LLM calls. Trigger.dev workers
+    // are reused across runs; without the reset we'd report
+    // accumulating cross-task totals.
+    resetRunCostAggregate();
 
     // Fail fast if any required env var is missing — surfaces config issues early.
     const missingVars = REQUIRED_ENV_VARS.filter((v: string) => !process.env[v]);
@@ -834,6 +844,16 @@ export const extractSingleProgram = task({
       console.warn(`[field_url_yield] refresh failed: ${msg}`);
     }
 
+    // Phase 3.10d / K.3 — per-run cost report. Snapshot the F.1
+    // aggregator and surface its total + per-stage breakdown both as
+    // a structured PipelineResult.costEstimate.actual value and as a
+    // human-readable line in the task log.
+    const costAggregate = getRunCostAggregate();
+    console.log('');
+    console.log('────────────────────────────────────────');
+    console.log(formatRunCostSummary());
+    console.log('────────────────────────────────────────');
+
     return {
       programId,
       urlsDiscovered: discoveryResult.discoveredUrls.length,
@@ -844,7 +864,7 @@ export const extractSingleProgram = task({
       composite,
       costEstimate: {
         projected: projectedCost.total,
-        actual: null,
+        actual: costAggregate.totalCost,
         currency: 'USD' as const,
       },
     };

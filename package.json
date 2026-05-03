@@ -24,7 +24,10 @@
     "typescript-eslint": "^8.58.2"
   },
   "pnpm": {
-    "shamefullyHoist": true
+    "shamefullyHoist": true,
+    "overrides": {
+      "@opentelemetry/api": "1.9.0"
+    }
   },
   "lint-staged": {
     "*.{ts,tsx}": [

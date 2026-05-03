@@ -7,6 +7,8 @@ import {
   ScrapeStageImpl,
   ValidateStageImpl,
   captureException,
+  formatRunCostSummary,
+  resetRunCostAggregate,
   deriveA12,
   deriveB24,
   deriveD12,
@@ -131,6 +133,12 @@ const VALID_MODES: ReadonlySet<CanaryMode> = new Set([
 ]);
 
 async function main() {
+  // Phase 3.10d / K.3 — start each canary run with a clean per-run
+  // aggregator. F.1 records every Anthropic messages.create into the
+  // module-level aggregator; resetting here ensures the closing
+  // formatRunCostSummary() block reports just THIS run's calls.
+  resetRunCostAggregate();
+
   const countryArgIdx = process.argv.indexOf('--country');
   const countryArg = countryArgIdx !== -1 ? process.argv[countryArgIdx + 1] : undefined;
   if (!countryArg || countryArg.length !== 3) {
@@ -1420,6 +1428,15 @@ async function main() {
       console.warn(`[field_url_yield] refresh failed: ${msg}`);
     }
   }
+
+  // Phase 3.10d / K.3 — per-run cost report. Reads the in-process
+  // aggregator F.1 populates from every Anthropic messages.create
+  // call. Always printed, even on zero-call dry-runs, so the analyst
+  // sees the $ cost of every canary at the bottom of the log.
+  console.log('');
+  console.log('────────────────────────────────────────');
+  console.log(formatRunCostSummary());
+  console.log('────────────────────────────────────────');
 }
 
 // Phase 3.10d / F.2 — Sentry-ready error reporting around the main entry.
