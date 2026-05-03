@@ -391,24 +391,38 @@ export const reviewQueue = pgTable(
   ]
 );
 
-// 11. news_signals
+// 11. news_signals (extended via migration 00021 — Phase 3.10c.5).
 export const newsSignals = pgTable(
   'news_signals',
   {
     id: uuid('id').defaultRandom().primaryKey(),
     sourceUrl: text('source_url').notNull(),
     publication: text('publication').notNull(),
-    detectedAt: timestamp('detected_at').defaultNow().notNull(),
+    detectedAt: timestamp('detected_at', { withTimezone: true }).defaultNow().notNull(),
     matchedPrograms: jsonb('matched_programs'),
     summary: text('summary'),
     triggeredReviewQueueId: uuid('triggered_review_queue_id').references(() => reviewQueue.id),
+    // Phase 3.10c.5 — Exa ingest extensions.
+    countryIso: varchar('country_iso', { length: 3 }),
+    headline: text('headline'),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    aiSummary: text('ai_summary'),
+    severityHint: varchar('severity_hint', { length: 20 }),
   },
   (table) => [
     index('idx_news_signals_review_queue').on(table.triggeredReviewQueueId),
+    index('idx_news_signals_country_iso').on(table.countryIso),
+    index('idx_news_signals_detected_at').on(table.detectedAt.desc()),
     pgPolicy('Team members can write news_signals', {
       as: 'permissive',
       for: 'all',
       to: 'authenticated', // V1 PLACEHOLDER: tighten to specific team role before public launch.
+      using: sql`true`,
+    }),
+    pgPolicy('Public read news_signals', {
+      as: 'permissive',
+      for: 'select',
+      to: 'public',
       using: sql`true`,
     }),
   ]
