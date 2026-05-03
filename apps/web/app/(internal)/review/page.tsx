@@ -17,8 +17,10 @@ import {
   type ReviewFilterTab,
 } from '@/lib/review-queue-helpers';
 import type { ReviewListRow } from '@/lib/review-queries';
-import { bulkApproveAllPending, bulkApproveHighConfidence } from './actions';
+import { assignReviewer, bulkApproveAllPending, bulkApproveHighConfidence } from './actions';
 import { rescoreCohort } from './rescore-actions';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const dynamic = 'force-dynamic';
 
@@ -29,20 +31,27 @@ const VALID_TABS: ReviewFilterTab[] = [
   'flagged',
   'high-confidence',
   'quality-signals',
+  'my-queue',
 ];
 
 function parseTab(raw: string | undefined): ReviewFilterTab {
   return VALID_TABS.includes(raw as ReviewFilterTab) ? (raw as ReviewFilterTab) : 'all';
 }
 
+function parseReviewer(raw: string | undefined): string | null {
+  if (!raw) return null;
+  return UUID_RE.test(raw) ? raw : null;
+}
+
 export default async function ReviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; view?: string }>;
+  searchParams: Promise<{ tab?: string; view?: string; reviewer?: string }>;
 }) {
-  const { tab: rawTab, view: rawView } = await searchParams;
+  const { tab: rawTab, view: rawView, reviewer: rawReviewer } = await searchParams;
   const activeTab = parseTab(rawTab);
   const view = rawView === 'reviewed' ? 'reviewed' : 'pending';
+  const reviewerId = parseReviewer(rawReviewer);
 
   const [pendingRows, recentRows, stats] = await Promise.all([
     listPendingReview(),
@@ -61,13 +70,14 @@ export default async function ReviewPage({
     flagged: 0,
     'high-confidence': 0,
     'quality-signals': 0,
+    'my-queue': 0,
   };
   for (const row of datasetRows) {
     const prov = readProvenanceConfidence(row.provenance);
     const qs = readQualitySignals(row.provenance);
     for (const t of VALID_TABS) {
       if (t === 'all') continue;
-      if (matchesReviewTab(t, row.status, prov, qs)) counts[t] += 1;
+      if (matchesReviewTab(t, row.status, prov, qs, row.assignedTo, reviewerId)) counts[t] += 1;
     }
   }
 
@@ -76,7 +86,9 @@ export default async function ReviewPage({
       activeTab,
       row.status,
       readProvenanceConfidence(row.provenance),
-      readQualitySignals(row.provenance)
+      readQualitySignals(row.provenance),
+      row.assignedTo,
+      reviewerId
     )
   );
 
@@ -117,9 +129,9 @@ export default async function ReviewPage({
           className="mb-4 flex flex-wrap items-center justify-between gap-3 border-y py-3"
           style={{ borderColor: 'var(--rule)' }}
         >
-          <ReviewFilterTabs counts={counts} active={activeTab} />
+          <ReviewFilterTabs counts={counts} active={activeTab} reviewerId={reviewerId} />
           <div className="flex flex-wrap items-center gap-3">
-            <ViewToggle active={view} />
+            <ViewToggle active={view} reviewerId={reviewerId} />
             <BulkApproveDialog
               candidateCount={stats.highConfidence}
               onConfirm={bulkApproveHighConfidence}
@@ -129,7 +141,12 @@ export default async function ReviewPage({
           </div>
         </div>
 
-        <ReviewQueueTable rows={visible} now={renderedAt} />
+        <ReviewQueueTable
+          rows={visible}
+          now={renderedAt}
+          reviewerId={reviewerId}
+          onAssign={assignReviewer}
+        />
         <ReviewQueueKeyboard />
 
         <div className="mt-6">
@@ -145,8 +162,18 @@ export default async function ReviewPage({
   );
 }
 
-function ViewToggle({ active }: { active: 'pending' | 'reviewed' }) {
+function ViewToggle({
+  active,
+  reviewerId,
+}: {
+  active: 'pending' | 'reviewed';
+  reviewerId: string | null;
+}) {
   // Server component link toggle so URL state is the single source of truth.
+  // Preserves ?reviewer=… across the toggle so D.3's "My queue" tab survives.
+  const reviewerQs = reviewerId ? `reviewer=${encodeURIComponent(reviewerId)}` : '';
+  const pendingHref = reviewerQs ? `/review?${reviewerQs}` : '/review';
+  const reviewedHref = reviewerQs ? `/review?view=reviewed&${reviewerQs}` : '/review?view=reviewed';
   return (
     <div
       className="flex border"
@@ -154,14 +181,14 @@ function ViewToggle({ active }: { active: 'pending' | 'reviewed' }) {
       data-testid="review-view-toggle"
     >
       <a
-        href="/review"
+        href={pendingHref}
         className={`chip h-7 cursor-pointer border-0 ${active === 'pending' ? 'chip-ink' : ''}`}
         aria-pressed={active === 'pending'}
       >
         Pending
       </a>
       <a
-        href="/review?view=reviewed"
+        href={reviewedHref}
         className={`chip h-7 cursor-pointer border-0 border-l ${active === 'reviewed' ? 'chip-ink' : ''}`}
         style={{ borderLeftColor: 'var(--rule)' }}
         aria-pressed={active === 'reviewed'}

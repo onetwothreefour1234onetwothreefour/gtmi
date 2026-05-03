@@ -10,7 +10,9 @@ export type ReviewFilterTab =
   | 'flagged'
   | 'high-confidence'
   // Phase 3.10d / D.2 — rows where either Phase 3.10b.1 quality signal fires.
-  | 'quality-signals';
+  | 'quality-signals'
+  // Phase 3.10d / D.3 — rows assigned to the current reviewer (?reviewer=<uuid>).
+  | 'my-queue';
 
 export interface ProvenanceConfidence {
   extractionConfidence: number | null;
@@ -180,9 +182,14 @@ export function matchesReviewTab(
   tab: ReviewFilterTab,
   status: string,
   prov: ProvenanceConfidence,
-  qualitySignals?: QualitySignals
+  qualitySignals?: QualitySignals,
+  assignedTo: string | null = null,
+  reviewerId: string | null = null
 ): boolean {
   if (tab === 'all') return true;
+  if (tab === 'my-queue') {
+    return reviewerId !== null && assignedTo === reviewerId;
+  }
   if (status !== 'pending_review') return false;
   if (tab === 'pending') return true;
   if (tab === 'high-confidence') return isBulkApproveCandidate(prov);

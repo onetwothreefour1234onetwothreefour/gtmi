@@ -10,10 +10,15 @@ export interface ReviewFilterTabsProps {
   counts: Record<ReviewFilterTab, number>;
   /** Active tab (defaults to "all"). */
   active: ReviewFilterTab;
+  /**
+   * Phase 3.10d / D.3 — when set (via ?reviewer=<uuid>) the "My queue"
+   * chip renders, otherwise it's hidden. Pre-auth identity stub.
+   */
+  reviewerId?: string | null;
   className?: string;
 }
 
-const TABS: { id: ReviewFilterTab; label: string }[] = [
+const BASE_TABS: { id: ReviewFilterTab; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'pending', label: 'Pending' },
   { id: 'in-review', label: 'In review' },
@@ -23,15 +28,21 @@ const TABS: { id: ReviewFilterTab; label: string }[] = [
   // derive-LLM mismatch fired (Phase 3.10b.1 quality signals).
   { id: 'quality-signals', label: 'Quality signals' },
 ];
+// Phase 3.10d / D.3 — only added when ?reviewer=<uuid> is present.
+const MY_QUEUE_TAB: { id: ReviewFilterTab; label: string } = {
+  id: 'my-queue',
+  label: 'My queue',
+};
 
 /**
  * Filter chip strip for the I-01 review queue. Pushes the active tab to the
  * URL `?tab=` param so the server-rendered table reads back the same value
  * on the next request (no client-only state).
  */
-export function ReviewFilterTabs({ counts, active, className }: ReviewFilterTabsProps) {
+export function ReviewFilterTabs({ counts, active, reviewerId, className }: ReviewFilterTabsProps) {
   const router = useRouter();
   const search = useSearchParams();
+  const tabs = reviewerId ? [...BASE_TABS, MY_QUEUE_TAB] : BASE_TABS;
   const onSelect = (id: ReviewFilterTab) => {
     const next = new URLSearchParams(search.toString());
     if (id === 'all') next.delete('tab');
@@ -46,7 +57,7 @@ export function ReviewFilterTabs({ counts, active, className }: ReviewFilterTabs
       aria-label="Review queue filters"
       data-testid="review-filter-tabs"
     >
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const isActive = active === t.id;
         const count = counts[t.id];
         return (

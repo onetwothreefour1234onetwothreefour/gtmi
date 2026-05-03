@@ -145,6 +145,43 @@ describe('matchesReviewTab', () => {
     expect(matchesReviewTab('in-review', 'pending_review', HIGH)).toBe(false);
     expect(matchesReviewTab('in-review', 'pending_review', LOW)).toBe(false);
   });
+
+  it('"quality-signals" matches when either Phase 3.10b.1 signal fires', () => {
+    const cc = {
+      crossCheckDisagrees: true,
+      deriveLlmMismatch: false,
+      mismatchNote: null,
+      crossCheckUrl: 'https://t2.example/x',
+    };
+    const dl = {
+      crossCheckDisagrees: false,
+      deriveLlmMismatch: true,
+      mismatchNote: '0.42 vs 0.18',
+      crossCheckUrl: null,
+    };
+    const none = {
+      crossCheckDisagrees: false,
+      deriveLlmMismatch: false,
+      mismatchNote: null,
+      crossCheckUrl: null,
+    };
+    expect(matchesReviewTab('quality-signals', 'pending_review', MID, cc)).toBe(true);
+    expect(matchesReviewTab('quality-signals', 'pending_review', MID, dl)).toBe(true);
+    expect(matchesReviewTab('quality-signals', 'pending_review', MID, none)).toBe(false);
+    // approved rows are excluded — quality-signals is a pending-only filter.
+    expect(matchesReviewTab('quality-signals', 'approved', MID, cc)).toBe(false);
+  });
+
+  it('"my-queue" matches rows assigned to the reviewer regardless of pending status', () => {
+    const me = '11111111-1111-1111-1111-111111111111';
+    const other = '22222222-2222-2222-2222-222222222222';
+    expect(matchesReviewTab('my-queue', 'pending_review', MID, undefined, me, me)).toBe(true);
+    expect(matchesReviewTab('my-queue', 'approved', HIGH, undefined, me, me)).toBe(true);
+    expect(matchesReviewTab('my-queue', 'pending_review', MID, undefined, other, me)).toBe(false);
+    expect(matchesReviewTab('my-queue', 'pending_review', MID, undefined, null, me)).toBe(false);
+    // No reviewer set → never matches even if assignedTo is present.
+    expect(matchesReviewTab('my-queue', 'pending_review', MID, undefined, me, null)).toBe(false);
+  });
 });
 
 describe('reviewIdTag', () => {

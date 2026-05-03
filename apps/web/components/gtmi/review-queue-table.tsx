@@ -19,6 +19,18 @@ export interface ReviewQueueTableProps {
   rows: ReviewListRow[];
   /** Pass `now` from the server render so SSR + hydration agree on relative-age. */
   now?: Date;
+  /**
+   * Phase 3.10d / D.3 — current reviewer UUID (?reviewer=…), pre-auth stub.
+   * When set, unassigned rows render an inline "Assign me" form action.
+   */
+  reviewerId?: string | null;
+  /**
+   * Phase 3.10d / D.3 — server action invoked by the inline form. The
+   * action reads `rowId` and `reviewer` from FormData and updates
+   * review_queue.assigned_to. Decoupled from the table so this file
+   * stays free of `'use server'` and can be unit-tested.
+   */
+  onAssign?: (formData: FormData) => Promise<void>;
   className?: string;
 }
 
@@ -28,7 +40,13 @@ export interface ReviewQueueTableProps {
  * Reviewer · Status · Open. The Impact column renders `—` per analyst Q9
  * (composite-delta computation deferred).
  */
-export function ReviewQueueTable({ rows, now, className }: ReviewQueueTableProps) {
+export function ReviewQueueTable({
+  rows,
+  now,
+  reviewerId,
+  onAssign,
+  className,
+}: ReviewQueueTableProps) {
   if (rows.length === 0) {
     return (
       <p className={cn('italic text-ink-4', className)} data-testid="review-queue-empty">
@@ -138,6 +156,8 @@ export function ReviewQueueTable({ rows, now, className }: ReviewQueueTableProps
                     assignedTo={row.assignedTo}
                     assignedAt={row.assignedAt}
                     now={now}
+                    reviewerId={reviewerId ?? null}
+                    onAssign={onAssign}
                   />
                 </td>
                 <td>
@@ -222,13 +242,36 @@ function ReviewerCell({
   assignedTo,
   assignedAt,
   now,
+  reviewerId,
+  onAssign,
 }: {
   rowId: string;
   assignedTo: string | null;
   assignedAt: Date | null;
   now?: Date;
+  reviewerId: string | null;
+  onAssign?: (formData: FormData) => Promise<void>;
 }) {
   if (assignedTo === null) {
+    // Phase 3.10d / D.3 — when ?reviewer=<uuid> is present, render an
+    // inline form action so the analyst can claim the row without
+    // pasting their UUID into a prompt.
+    if (reviewerId && onAssign) {
+      return (
+        <form action={onAssign} data-testid="assign-me-form" data-row-id={rowId}>
+          <input type="hidden" name="rowId" value={rowId} />
+          <input type="hidden" name="reviewer" value={reviewerId} />
+          <button
+            type="submit"
+            className="btn-link num"
+            style={{ fontSize: 11 }}
+            data-testid="assign-me-button"
+          >
+            Assign me ›
+          </button>
+        </form>
+      );
+    }
     return (
       <span
         className="num text-ink-5"
@@ -243,16 +286,18 @@ function ReviewerCell({
   // Render the first 8 chars of the UUID as a compact handle.
   const short = assignedTo.slice(0, 8);
   const ageStr = assignedAt ? relativeAge(assignedAt, now) : null;
+  const isMine = reviewerId !== null && assignedTo === reviewerId;
   return (
     <span
-      className="num text-ink-3"
+      className={cn('num inline-flex items-center gap-1', isMine ? 'text-ink' : 'text-ink-3')}
       style={{ fontSize: 11 }}
       data-testid="reviewer-cell"
       data-row-id={rowId}
       data-assigned-to={assignedTo}
+      data-mine={isMine ? 'true' : 'false'}
       title={`Assigned ${ageStr ?? ''} (${assignedTo})`}
     >
-      {short}…
+      {isMine ? 'Me' : `${short}…`}
     </span>
   );
 }
