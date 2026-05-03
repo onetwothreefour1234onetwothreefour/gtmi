@@ -464,6 +464,41 @@ export const migrationsApplied = pgTable(
   ]
 );
 
+// Phase 3.10d / G.4 — per-tenant Resend digest recipients (migration 00025).
+// Replaces the RESEND_RECIPIENTS env var. Each row carries optional
+// severity + country filters so recipients can subscribe to a slice
+// of the daily policy-change digest. tenant_id is nullable for the
+// pre-ADR-027 era (NULL = global / team-wide recipient).
+export const digestRecipients = pgTable(
+  'digest_recipients',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tenantId: text('tenant_id'),
+    email: text('email').notNull(),
+    active: boolean('active').default(true).notNull(),
+    severityFilter: jsonb('severity_filter'),
+    countryIsoFilter: jsonb('country_iso_filter'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('uq_digest_recipients_tenant_email').on(table.tenantId, table.email),
+    index('idx_digest_recipients_active').on(table.active),
+    pgPolicy('Team members can write digest_recipients', {
+      as: 'permissive',
+      for: 'all',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+    pgPolicy('Service-role read digest_recipients', {
+      as: 'permissive',
+      for: 'select',
+      to: 'authenticated',
+      using: sql`true`,
+    }),
+  ]
+);
+
 // Phase 3.10b.4 — composite-score history (migration 00019).
 // Append-only timeline. scoreProgramFromDb writes here on every run
 // in addition to upserting `scores`. Public-read so the dashboard can

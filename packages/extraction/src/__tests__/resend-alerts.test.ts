@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { renderDigestBody } from '../utils/resend-alerts';
+import { filterEventsForRecipient, renderDigestBody } from '../utils/resend-alerts';
+import type { DigestEvent } from '../utils/resend-alerts';
 
 // Phase 3.10c.6 — render-only tests for the Resend digest. Network +
 // DB-coupled paths (sendDailyDigest, loadDigestEvents) are exercised
@@ -97,5 +98,98 @@ describe('renderDigestBody', () => {
     ]);
     expect(out).toContain('BREAKING (2)');
     expect(out).toContain('MATERIAL (1)');
+  });
+});
+
+// Phase 3.10d / G.4 — per-recipient filtering.
+describe('filterEventsForRecipient', () => {
+  const SAMPLE: DigestEvent[] = [
+    {
+      programName: 'AUS-1',
+      countryIso: 'AUS',
+      fieldKey: 'A.1.1',
+      severity: 'breaking',
+      paqDelta: null,
+      summaryText: null,
+    },
+    {
+      programName: 'AUS-2',
+      countryIso: 'AUS',
+      fieldKey: 'B.1.1',
+      severity: 'material',
+      paqDelta: null,
+      summaryText: null,
+    },
+    {
+      programName: 'GBR-1',
+      countryIso: 'GBR',
+      fieldKey: 'D.1.1',
+      severity: 'breaking',
+      paqDelta: null,
+      summaryText: null,
+    },
+    {
+      programName: 'NLD-1',
+      countryIso: 'NLD',
+      fieldKey: 'A.2.1',
+      severity: 'material',
+      paqDelta: null,
+      summaryText: null,
+    },
+  ];
+
+  it('returns every event when both filters are null (env-fallback recipient)', () => {
+    const out = filterEventsForRecipient(SAMPLE, {
+      email: 'all@example.com',
+      tenantId: null,
+      severityFilter: null,
+      countryIsoFilter: null,
+      source: 'env',
+    });
+    expect(out).toHaveLength(SAMPLE.length);
+  });
+
+  it('honours severityFilter alone', () => {
+    const out = filterEventsForRecipient(SAMPLE, {
+      email: 'breaking@example.com',
+      tenantId: null,
+      severityFilter: ['breaking'],
+      countryIsoFilter: null,
+      source: 'table',
+    });
+    expect(out.map((e) => e.programName)).toEqual(['AUS-1', 'GBR-1']);
+  });
+
+  it('honours countryIsoFilter alone', () => {
+    const out = filterEventsForRecipient(SAMPLE, {
+      email: 'aus@example.com',
+      tenantId: null,
+      severityFilter: null,
+      countryIsoFilter: ['AUS'],
+      source: 'table',
+    });
+    expect(out.map((e) => e.programName)).toEqual(['AUS-1', 'AUS-2']);
+  });
+
+  it('combines both filters with AND', () => {
+    const out = filterEventsForRecipient(SAMPLE, {
+      email: 'aus-breaking@example.com',
+      tenantId: 'tenant-1',
+      severityFilter: ['breaking'],
+      countryIsoFilter: ['AUS'],
+      source: 'table',
+    });
+    expect(out.map((e) => e.programName)).toEqual(['AUS-1']);
+  });
+
+  it('returns [] when filters reject everything', () => {
+    const out = filterEventsForRecipient(SAMPLE, {
+      email: 'omn@example.com',
+      tenantId: null,
+      severityFilter: null,
+      countryIsoFilter: ['OMN'],
+      source: 'table',
+    });
+    expect(out).toEqual([]);
   });
 });
