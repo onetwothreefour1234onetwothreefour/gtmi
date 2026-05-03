@@ -223,5 +223,7 @@ export * from './data/country-departments';
 export * from './data/program-discovery-hints';
 // Phase 3.10c.8 — OECD tax treaty supplementary lookup (Phase 7 prereq).
 export * from './data/oecd-tax-treaties';
+// Phase 3.10d / G.2 — QS World University Rankings reference.
+export * from './data/qs-university-rankings';
 // Phase 3.6.4 / FIX 1 — currency detection (with bare-$ country fallback).
 export { detectCurrency, BARE_DOLLAR_COUNTRY_FALLBACK } from './utils/currency';
