@@ -25,6 +25,30 @@ export function aggregateWeightedMean(items: { score: number; weight: number }[]
 }
 
 /**
+ * Phase 3.10d / B.3 — weighted geometric mean for sensitivity analysis.
+ *
+ *   exp( Σ w_i × ln(score_i) )
+ *
+ * Any zero score collapses the result to 0 (the methodology-aligned
+ * "uniformly bad on a pillar can't be papered over" intent). Items
+ * with weight 0 are skipped. Negative scores are not expected at the
+ * pillar level (range 0–100); we clamp to a tiny epsilon to avoid NaN
+ * if upstream rounding produces a slightly-negative value.
+ */
+export function aggregateWeightedGeometricMean(items: { score: number; weight: number }[]): number {
+  if (items.length === 0) return 0;
+  const totalWeight = items.reduce((s, item) => s + item.weight, 0);
+  if (totalWeight === 0) return 0;
+  let logSum = 0;
+  for (const item of items) {
+    if (item.weight === 0) continue;
+    if (item.score <= 0) return 0; // any zero collapses the geom mean
+    logSum += (item.weight / totalWeight) * Math.log(item.score);
+  }
+  return Math.exp(logSum);
+}
+
+/**
  * Scales the weights of present keys to sum to 1.0.
  * Throws ScoringError if presentKeys is empty — missing all indicators in a
  * sub-factor is a data integrity problem, not a scoring outcome.
@@ -32,7 +56,7 @@ export function aggregateWeightedMean(items: { score: number; weight: number }[]
 export function reNormalizeWeights(
   allWeights: Record<string, number>,
   presentKeys: Set<string>,
-  subFactor: string,
+  subFactor: string
 ): Record<string, number> {
   if (presentKeys.size === 0) {
     throw new ScoringError(`No indicators present for sub-factor ${subFactor} — cannot score`);
@@ -40,7 +64,7 @@ export function reNormalizeWeights(
   const totalWeight = Array.from(presentKeys).reduce((sum, key) => sum + (allWeights[key] ?? 0), 0);
   if (totalWeight === 0) {
     throw new ScoringError(
-      `Present indicators for sub-factor ${subFactor} have total weight 0 — cannot score`,
+      `Present indicators for sub-factor ${subFactor} have total weight 0 — cannot score`
     );
   }
   const result: Record<string, number> = {};

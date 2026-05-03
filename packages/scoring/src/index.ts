@@ -1,4 +1,10 @@
 export { runScoringEngine, scoreSingleIndicator } from './engine';
+export {
+  aggregateWeightedMean,
+  aggregateWeightedGeometricMean,
+  CME_WEIGHT,
+  PAQ_WEIGHT,
+} from './score';
 export { PHASE2_PLACEHOLDER_PARAMS } from './placeholder-params';
 export {
   ACTIVE_FIELD_CODES,

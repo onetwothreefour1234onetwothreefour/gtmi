@@ -24,6 +24,7 @@ import {
   PILLAR_WEIGHTS,
   SUB_FACTOR_WEIGHTS,
   aggregateWeightedMean,
+  aggregateWeightedGeometricMean,
   applyMissingDataPenalty,
   computeDataCoverage,
   reNormalizeWeights,
@@ -347,7 +348,15 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
     score: pillarScores[p] ?? 0,
     weight: pillarWeightSum > 0 ? (PILLAR_WEIGHTS[p] ?? 0) / pillarWeightSum : 0,
   }));
-  const paqScore = aggregateWeightedMean(paqItems);
+  // Phase 3.10d / B.3 — aggregator strategy. 'arithmetic' (default,
+  // methodology-pinned) weighted arithmetic mean. 'geometric' for
+  // sensitivity-analysis use: weighted geometric mean over pillar
+  // scores; any zero pillar collapses PAQ to 0 (the methodology's
+  // intent: "uniformly bad on a pillar can't be papered over").
+  const paqScore =
+    input.aggregator === 'geometric'
+      ? aggregateWeightedGeometricMean(paqItems)
+      : aggregateWeightedMean(paqItems);
 
   // Step 9: Composite score
   const compositeScore = CME_WEIGHT * input.cmeScore + PAQ_WEIGHT * paqScore;

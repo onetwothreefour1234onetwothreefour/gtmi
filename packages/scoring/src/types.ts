@@ -92,6 +92,17 @@ export interface ScoringInput {
    * When omitted, all fieldDefinitions count toward denominators (Phase 3 behavior).
    */
   activeFieldKeys?: string[];
+  /**
+   * Phase 3.10d / B.3 — aggregation strategy at the PAQ level.
+   *   'arithmetic' (default) — methodology-v1 weighted arithmetic mean
+   *                            across pillars.
+   *   'geometric'            — weighted geometric mean across pillars
+   *                            (zero pillar score forces composite=0).
+   *
+   * Sensitivity-analysis use only — production scoring stays
+   * arithmetic per the methodology pin.
+   */
+  aggregator?: 'arithmetic' | 'geometric';
 }
 
 export interface ScoringOutput {

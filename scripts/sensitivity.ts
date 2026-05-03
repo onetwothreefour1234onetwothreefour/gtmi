@@ -34,8 +34,20 @@ import 'dotenv/config';
 import * as dotenv from 'dotenv';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { db, scores, programs, sensitivityRuns } from '@gtmi/db';
-import { eq } from 'drizzle-orm';
+import {
+  db,
+  scores,
+  programs,
+  countries,
+  fieldDefinitions,
+  fieldValues,
+  methodologyVersions,
+  sensitivityRuns,
+} from '@gtmi/db';
+import { and, eq } from 'drizzle-orm';
+import { ACTIVE_FIELD_CODES, PHASE2_PLACEHOLDER_PARAMS, runScoringEngine } from '@gtmi/scoring';
+import type { CategoricalRubric, Direction, NormalizationFn, ScoringInput } from '@gtmi/scoring';
+import { loadCalibratedParams } from '@gtmi/extraction';
 
 dotenv.config({ path: join(__dirname, '../.env') });
 
@@ -185,52 +197,169 @@ function cmePaqSplitPerturbations(baseline: ScoredRow[]): PerturbationResult[] {
 }
 
 /**
- * normalization — perturb composite by ±10% per programme to simulate
- * the swing produced by alternative normalization choices. Stand-in
- * until per-indicator re-normalisation lands.
+ * Load every cohort programme's ScoringInput from the live DB.
+ * Mirrors scoreProgramFromDb's loader; cached per run so the heavy
+ * perturbations (normalization, aggregation, dropout) re-use it.
  */
-function normalizationPerturbations(baseline: ScoredRow[]): PerturbationResult[] {
+let _scoringInputsCache: Map<string, ScoringInput> | null = null;
+
+async function loadScoringInputs(): Promise<Map<string, ScoringInput>> {
+  if (_scoringInputsCache) return _scoringInputsCache;
+  const out = new Map<string, ScoringInput>();
+  const mvRows = await db.select({ id: methodologyVersions.id }).from(methodologyVersions).limit(1);
+  const mvId = mvRows[0]?.id;
+  if (!mvId) return out;
+  const calibrated = await loadCalibratedParams(mvId);
+  const allDefs = await db
+    .select({
+      id: fieldDefinitions.id,
+      key: fieldDefinitions.key,
+      pillar: fieldDefinitions.pillar,
+      subFactor: fieldDefinitions.subFactor,
+      weightWithinSubFactor: fieldDefinitions.weightWithinSubFactor,
+      scoringRubricJsonb: fieldDefinitions.scoringRubricJsonb,
+      normalizationFn: fieldDefinitions.normalizationFn,
+      direction: fieldDefinitions.direction,
+    })
+    .from(fieldDefinitions);
+  const defsTyped = allDefs.map((d) => ({
+    id: d.id,
+    key: d.key,
+    pillar: d.pillar,
+    subFactor: d.subFactor,
+    weightWithinSubFactor: parseFloat(String(d.weightWithinSubFactor)),
+    scoringRubricJsonb: d.scoringRubricJsonb as CategoricalRubric | null,
+    normalizationFn: d.normalizationFn as NormalizationFn,
+    direction: d.direction as Direction,
+  }));
+  const scoredProgs = await db
+    .select({ id: scores.programId, countryIso: programs.countryIso })
+    .from(scores)
+    .innerJoin(programs, eq(programs.id, scores.programId));
+  for (const p of scoredProgs) {
+    const fvs = await db
+      .select({
+        id: fieldValues.id,
+        fieldDefinitionId: fieldValues.fieldDefinitionId,
+        valueNormalized: fieldValues.valueNormalized,
+        status: fieldValues.status,
+      })
+      .from(fieldValues)
+      .where(and(eq(fieldValues.programId, p.id), eq(fieldValues.status, 'approved')));
+    if (fvs.length === 0) continue;
+    const cmeRow = await db
+      .select({ cme: countries.imdAppealScoreCmeNormalized })
+      .from(countries)
+      .where(eq(countries.isoCode, p.countryIso))
+      .limit(1);
+    const cme = cmeRow[0]?.cme ? parseFloat(String(cmeRow[0].cme)) : 0;
+    out.set(p.id, {
+      programId: p.id,
+      methodologyVersionId: mvId,
+      scoredAt: new Date(),
+      cmeScore: cme,
+      fieldValues: fvs.map((fv) => ({
+        id: fv.id,
+        fieldDefinitionId: fv.fieldDefinitionId,
+        valueNormalized: fv.valueNormalized,
+        status: fv.status,
+      })),
+      fieldDefinitions: defsTyped,
+      normalizationParams: calibrated ?? PHASE2_PLACEHOLDER_PARAMS,
+      activeFieldKeys: ACTIVE_FIELD_CODES,
+    });
+  }
+  _scoringInputsCache = out;
+  return out;
+}
+
+function rankFromInputs(
+  inputs: Map<string, ScoringInput>,
+  transform: (i: ScoringInput) => ScoringInput
+): { programId: string; rank: number }[] {
+  const re: ScoredRow[] = [];
+  for (const [programId, input] of inputs) {
+    const out = runScoringEngine(transform(input));
+    re.push({
+      programId,
+      programName: '',
+      countryIso: '',
+      composite: out.compositeScore,
+      paq: out.paqScore,
+      cme: out.cmeScore,
+    });
+  }
+  return rankByComposite(re);
+}
+
+/**
+ * normalization — perturb the calibration params ±10% per field and
+ * re-run the engine for every programme. Real scoring, not a stand-in.
+ */
+async function normalizationPerturbations(_baseline: ScoredRow[]): Promise<PerturbationResult[]> {
+  const inputs = await loadScoringInputs();
+  if (inputs.size === 0) return [];
   const factors = [0.9, 0.95, 1.05, 1.1];
   return factors.map((f) => {
-    const re = baseline.map((r) => ({ ...r, composite: r.composite * f }));
+    const ranking = rankFromInputs(inputs, (i) => ({
+      ...i,
+      normalizationParams: Object.fromEntries(
+        Object.entries(i.normalizationParams).map(([k, p]) => {
+          if ('min' in p && 'max' in p && p.min !== undefined && p.max !== undefined) {
+            return [k, { min: p.min * f, max: p.max * f }];
+          }
+          if ('mean' in p && 'stddev' in p && p.mean !== undefined && p.stddev !== undefined) {
+            return [k, { mean: p.mean * f, stddev: p.stddev * f }];
+          }
+          return [k, p];
+        })
+      ),
+    }));
     return {
-      perturbation: { factor: f, note: 'composite scaling stand-in' },
-      perturbedRanking: rankByComposite(re),
+      perturbation: { factor: f, mode: 'param_scale' },
+      perturbedRanking: ranking,
     };
   });
 }
 
 /**
- * aggregation — geometric mean of pillar scores instead of arithmetic.
- * Stand-in (pillar scores aren't loaded in this runner; we approximate
- * via composite^geomean-vs-arith conversion).
+ * aggregation — re-run the engine with aggregator='geometric'. Real
+ * geometric mean over pillar scores, not an arithmetic stand-in.
  */
-function aggregationPerturbations(baseline: ScoredRow[]): PerturbationResult[] {
-  // Approximation: multiply composite by a factor reflecting the
-  // typical geom-vs-arith gap (~3-5% for evenly distributed pillars).
-  const geom = baseline.map((r) => ({ ...r, composite: r.composite * 0.97 }));
+async function aggregationPerturbations(_baseline: ScoredRow[]): Promise<PerturbationResult[]> {
+  const inputs = await loadScoringInputs();
+  if (inputs.size === 0) return [];
   return [
     {
       perturbation: { aggregator: 'geometric_pillar_mean' },
-      perturbedRanking: rankByComposite(geom),
+      perturbedRanking: rankFromInputs(inputs, (i) => ({ ...i, aggregator: 'geometric' })),
     },
   ];
 }
 
-function indicatorDropoutPerturbations(baseline: ScoredRow[]): PerturbationResult[] {
-  // Stand-in: simulate dropping each pillar by removing 20% of PAQ
-  // (each pillar weights 15-28% of PAQ; 20% is the average).
+/**
+ * indicator_dropout — drop one PILLAR at a time by filtering the
+ * fieldDefinitions through the engine and letting the engine's
+ * pillar-weight re-normalisation handle the rest. Real scoring.
+ */
+async function indicatorDropoutPerturbations(
+  _baseline: ScoredRow[]
+): Promise<PerturbationResult[]> {
+  const inputs = await loadScoringInputs();
+  if (inputs.size === 0) return [];
   const pillars = ['A', 'B', 'C', 'D', 'E'];
-  return pillars.map((p) => {
-    const re = baseline.map((r) => ({
-      ...r,
-      composite: 0.7 * r.paq * 0.8 + 0.3 * r.cme,
-    }));
-    return {
-      perturbation: { dropped_pillar: p, note: 'simulated as -20% PAQ' },
-      perturbedRanking: rankByComposite(re),
-    };
-  });
+  return pillars.map((dropPillar) => ({
+    perturbation: { dropped_pillar: dropPillar, mode: 'pillar_dropout' },
+    perturbedRanking: rankFromInputs(inputs, (i) => ({
+      ...i,
+      fieldDefinitions: i.fieldDefinitions.filter((d) => d.pillar !== dropPillar),
+      // Filter field_values to match — the engine ignores unmatched FVs.
+      fieldValues: i.fieldValues.filter((fv) => {
+        const def = i.fieldDefinitions.find((d) => d.id === fv.fieldDefinitionId);
+        return def && def.pillar !== dropPillar;
+      }),
+    })),
+  }));
 }
 
 function weightMonteCarloPerturbations(baseline: ScoredRow[], n = 50): PerturbationResult[] {
@@ -287,7 +416,11 @@ function correlationPerturbations(baseline: ScoredRow[]): PerturbationResult[] {
   ];
 }
 
-const ANALYSIS_RUNNERS: Record<AnalysisType, (baseline: ScoredRow[]) => PerturbationResult[]> = {
+type AnalysisRunner = (
+  baseline: ScoredRow[]
+) => PerturbationResult[] | Promise<PerturbationResult[]>;
+
+const ANALYSIS_RUNNERS: Record<AnalysisType, AnalysisRunner> = {
   weight_monte_carlo: weightMonteCarloPerturbations,
   normalization: normalizationPerturbations,
   aggregation: aggregationPerturbations,
@@ -303,7 +436,7 @@ async function runAnalysis(
   runId: string,
   execute: boolean
 ): Promise<void> {
-  const perturbations = ANALYSIS_RUNNERS[analysis](baseline);
+  const perturbations = await ANALYSIS_RUNNERS[analysis](baseline);
   console.log(
     `\n=== ${analysis} (${perturbations.length} perturbation${perturbations.length === 1 ? '' : 's'}) ===`
   );
