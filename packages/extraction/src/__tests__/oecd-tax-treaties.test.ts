@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { OECD_TAX_TREATIES, getTaxTreaty, listTreatiesForCountry } from '../data/oecd-tax-treaties';
+import {
+  OECD_TAX_TREATIES,
+  getTaxTreaty,
+  getTreatyCoverage,
+  listTreatiesForCountry,
+} from '../data/oecd-tax-treaties';
 
-// Phase 3.10c.8 — scaffold tests. The full 30×30 matrix lands in
-// Phase 7; today's stub covers six demonstration pairs.
+// Phase 3.10c.8 / G.1 — expanded reference covering ~50 cohort pairs.
 
 describe('OECD_TAX_TREATIES seed', () => {
   it('every entry has a non-empty sourceUrl', () => {
@@ -51,6 +55,63 @@ describe('getTaxTreaty', () => {
 
   it('returns null when self-pair (no treaty with self)', () => {
     expect(getTaxTreaty('AUS', 'AUS')).toBeNull();
+  });
+});
+
+describe('getTreatyCoverage', () => {
+  const COHORT_30 = [
+    'CHE',
+    'NLD',
+    'IRL',
+    'LUX',
+    'ISL',
+    'DEU',
+    'CAN',
+    'SWE',
+    'SGP',
+    'BEL',
+    'AUT',
+    'ARE',
+    'AUS',
+    'JPN',
+    'NOR',
+    'TWN',
+    'LTU',
+    'USA',
+    'FIN',
+    'HKG',
+    'MYS',
+    'CHL',
+    'SAU',
+    'NAM',
+    'FRA',
+    'GBR',
+    'EST',
+    'NZL',
+    'BHR',
+    'OMN',
+  ];
+
+  it('reports the cohort size and total possible pairs', () => {
+    const c = getTreatyCoverage(COHORT_30);
+    expect(c.cohortSize).toBe(30);
+    expect(c.totalPairs).toBe((30 * 29) / 2); // 435
+  });
+
+  it('reports modelled vs unmodelled pair counts that sum to totalPairs', () => {
+    const c = getTreatyCoverage(COHORT_30);
+    expect(c.modelledPairs + c.unmodelledPairs).toBe(c.totalPairs);
+    expect(c.modelledPairs).toBeGreaterThan(0);
+    // We expect ≤ activePairs; some entries are inactive (e.g. SGP-HKG).
+    expect(c.activePairs).toBeLessThanOrEqual(c.modelledPairs);
+  });
+
+  it('only counts entries where both ISOs are in the cohort', () => {
+    const tinyCohort = ['AUS', 'GBR'];
+    const c = getTreatyCoverage(tinyCohort);
+    expect(c.totalPairs).toBe(1);
+    expect(c.modelledPairs).toBe(1);
+    expect(c.activePairs).toBe(1);
   });
 });
 
