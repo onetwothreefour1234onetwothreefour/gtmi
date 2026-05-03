@@ -4,6 +4,15 @@ export {
   MODEL_EXTRACTION,
   MODEL_VALIDATION,
 } from './clients/anthropic';
+
+// Phase 3.10d / C.1 — Exa news-signal client.
+export {
+  exaSearch,
+  exaSearchPublicationWindow,
+  isExaConfigured,
+  ExaError,
+} from './utils/exa-client';
+export type { ExaSearchOptions, ExaSearchResponse, ExaResult } from './utils/exa-client';
 export type { ExtractionModel } from './clients/anthropic';
 
 export type {

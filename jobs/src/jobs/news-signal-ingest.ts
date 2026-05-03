@@ -16,6 +16,7 @@
 
 import { schedules } from '@trigger.dev/sdk/v3';
 import { db, newsSignals, newsSources } from '@gtmi/db';
+import { ExaError, exaSearchPublicationWindow, isExaConfigured } from '@gtmi/extraction';
 import { eq } from 'drizzle-orm';
 
 interface IngestHit {
@@ -28,16 +29,79 @@ interface IngestHit {
   countryIso: string | null;
 }
 
+const SEVERITY_KEYWORDS: { regex: RegExp; severity: IngestHit['severityHint'] }[] = [
+  // Order matters — first match wins. "breaking" is the strongest cue.
+  { regex: /\b(suspend|abolish|repeal|terminat|shut down|closes?)\b/i, severity: 'breaking' },
+  { regex: /\b(announce|launch|expand|cap|quota|cut|raise|introduc)\b/i, severity: 'material' },
+  { regex: /\b(extend|renew|update|revise|amend)\b/i, severity: 'minor' },
+];
+
+function classifySeverity(text: string): IngestHit['severityHint'] {
+  for (const { regex, severity } of SEVERITY_KEYWORDS) {
+    if (regex.test(text)) return severity;
+  }
+  return 'unknown';
+}
+
 /**
- * Stub Exa client. When EXA_API_KEY is set, swap for the real client.
- * The contract: take a publication URL + a 24h window, return zero or
- * more hits in the IngestHit shape. Real implementation will live in
- * a separate exa-client.ts under @gtmi/extraction.
+ * Phase 3.10d / C.1 — call Exa for the last 24h of coverage at this
+ * publication and project Exa's results onto the IngestHit shape.
+ *
+ * No-config branch (no EXA_API_KEY): returns [] so the cron's wrapper
+ * stays happy in dev. ExaError branch: log + return []; one failing
+ * publication shouldn't take down the whole batch.
  */
-async function exaSearch(_publication: string, _windowHours: number): Promise<IngestHit[]> {
-  if (!process.env['EXA_API_KEY']) return [];
-  // TODO(Phase 6): implement against https://exa.ai/api
-  return [];
+async function exaSearch(publication: string, windowHours: number): Promise<IngestHit[]> {
+  if (!isExaConfigured()) return [];
+
+  const domain = extractDomain(publication);
+  if (!domain) return [];
+
+  let response;
+  try {
+    response = await exaSearchPublicationWindow(domain, windowHours);
+  } catch (err) {
+    if (err instanceof ExaError) {
+      console.warn(
+        `[news-signal-ingest] Exa call failed for ${publication}: ${err.message} (status=${err.statusCode ?? 'n/a'})`
+      );
+    } else {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[news-signal-ingest] Exa call threw for ${publication}: ${msg}`);
+    }
+    return [];
+  }
+
+  return response.results.map<IngestHit>((r) => {
+    const headlineSource = r.title ?? '';
+    const summarySource = r.summary ?? r.highlights?.join(' ') ?? null;
+    return {
+      sourceUrl: r.url,
+      publication,
+      headline: headlineSource,
+      publishedAt: r.publishedDate ? new Date(r.publishedDate) : null,
+      aiSummary: summarySource,
+      severityHint: classifySeverity(`${headlineSource} ${summarySource ?? ''}`),
+      // Country routing is deferred to the policy-change job (Phase 6) —
+      // we don't have a domain → ISO map here, so we leave it null and
+      // let downstream reviewers tag manually.
+      countryIso: null,
+    };
+  });
+}
+
+function extractDomain(urlOrDomain: string): string | null {
+  const trimmed = urlOrDomain.trim();
+  if (!trimmed) return null;
+  if (!trimmed.includes('://')) {
+    return trimmed.replace(/\/.*$/, '').toLowerCase();
+  }
+  try {
+    const u = new URL(trimmed);
+    return u.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
 }
 
 async function loadActiveSources(): Promise<{ id: string; url: string; publication: string }[]> {
@@ -81,7 +145,7 @@ export const newsSignalIngest = schedules.task({
     hitsFound: number;
     hitsWritten: number;
   }> => {
-    const mode: 'stub' | 'live' = process.env['EXA_API_KEY'] ? 'live' : 'stub';
+    const mode: 'stub' | 'live' = isExaConfigured() ? 'live' : 'stub';
     console.log(`[news-signal-ingest] starting in ${mode} mode`);
 
     const sources = await loadActiveSources();
