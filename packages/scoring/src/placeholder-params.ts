@@ -23,14 +23,13 @@ export const PHASE2_PLACEHOLDER_PARAMS: NormalizationParams = {
   'A.2.1': { min: 1, max: 10 }, // number of mandatory qualifying criteria — min_max
   'A.2.3': { min: 1, max: 10 }, // number of distinct qualifying tracks — min_max
 
-  // B — Process & Cost
-  'B.1.1': { min: 1, max: 365 }, // SLA processing days — min_max
-  'B.1.3': { min: 1, max: 10 }, // number of application steps — min_max
-  'B.2.1': { mean: 2500, stddev: 2000 }, // principal applicant fees USD — z_score
-  'B.2.2': { mean: 1200, stddev: 900 }, // per-dependant fees USD — z_score
-  // B.2.3 / B.2.4 were z_score in v1; restructured to boolean_with_annotation
-  // in Phase 3.5 / ADR-014, so numeric calibration no longer applies.
-  'B.3.2': { min: 0, max: 5 }, // in-person / biometric visit count — min_max
+  // B — Process Design (methodology v3.0.0 / ADR-029)
+  'B.1.1': { min: 1, max: 365 }, // standard SLA days — min_max
+  // B.1.2 is boolean — no params.
+  'B.2.1': { min: 1, max: 50 }, // number of mandatory application steps — min_max
+  'B.2.2': { min: 0, max: 20 }, // mandatory in-person touchpoints — min_max
+  'B.3.1': { min: 0, max: 50_000 }, // total applicant cost USD (principal + 1 spouse + 2 children) — min_max
+  // B.4.1 / B.4.2 are categorical — no params.
 
   // C — Conditions
   'C.2.2': { min: 0, max: 25 }, // dependent child age cap — min_max

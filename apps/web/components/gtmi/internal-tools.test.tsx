@@ -92,7 +92,7 @@ describe('ReviewQueueTable', () => {
       mkReviewRow({ id: 'fv-1', fieldKey: 'A.1.1' }),
       mkReviewRow({
         id: 'fv-2',
-        fieldKey: 'B.2.3',
+        fieldKey: 'B.4.1',
         provenance: { ...COMPLETE_PROVENANCE, extractionConfidence: 0.65 },
       }),
     ];

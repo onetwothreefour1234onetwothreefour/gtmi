@@ -45,7 +45,7 @@ describe('Phase 3.6 — canary country-substitute dispatch (commit 2 verificatio
 
   it('country-substitute branch is not accidentally triggered by other normalization fns', () => {
     const defs: FieldDef[] = [
-      { key: 'B.2.3', normalizationFn: 'boolean_with_annotation' },
+      { key: 'D.1.3', normalizationFn: 'boolean_with_annotation' },
       { key: 'D.1.4', normalizationFn: 'boolean_with_annotation' },
       { key: 'C.2.1', normalizationFn: 'categorical' },
       { key: 'E.3.2', normalizationFn: 'categorical' },

@@ -68,11 +68,10 @@ export const NUMERIC_SANITY_RANGES: Record<string, { min: number; max: number }>
   'A.1.5': { min: 0, max: 999 }, // applicant age cap (999 = "no cap" sentinel)
   'A.2.1': { min: 0, max: 20 }, // number of mandatory qualifying criteria
   'A.2.3': { min: 0, max: 20 }, // number of distinct qualifying tracks
-  'B.1.1': { min: 0, max: 3650 }, // SLA processing days (~10 years)
-  'B.1.3': { min: 0, max: 50 }, // application steps
-  'B.2.1': { min: 0, max: 100_000 }, // principal applicant fees
-  'B.2.2': { min: 0, max: 100_000 }, // per-dependant fees
-  'B.3.2': { min: 0, max: 20 }, // in-person visits
+  'B.1.1': { min: 0, max: 3650 }, // standard SLA days (~10 years)
+  'B.2.1': { min: 0, max: 50 }, // mandatory application steps
+  'B.2.2': { min: 0, max: 20 }, // mandatory in-person touchpoints
+  'B.3.1': { min: 0, max: 1_000_000 }, // total applicant cost USD (principal + 1 spouse + 2 children)
   'C.2.2': { min: 0, max: 999 }, // dependent child age cap
   'D.1.2': { min: 0, max: 50 }, // years to PR
   'D.2.2': { min: 0, max: 99 }, // years to citizenship

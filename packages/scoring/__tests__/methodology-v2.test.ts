@@ -53,8 +53,8 @@ describe('Methodology V2 — arithmetic invariants (must match V1)', () => {
     expect(approxEqual(sum, 1.0)).toBe(true);
   });
 
-  it('total indicator count is exactly 48 (unchanged from v1)', () => {
-    expect(methodologyV2.indicators.length).toBe(48);
+  it('total indicator count is exactly 45 (unchanged from v1; methodology v3.0.0)', () => {
+    expect(methodologyV2.indicators.length).toBe(45);
   });
 
   it('every v1 indicator weight is preserved in v2 (Phase 3.5 changes data-type only)', () => {
@@ -69,12 +69,12 @@ describe('Methodology V2 — arithmetic invariants (must match V1)', () => {
 });
 
 describe('Methodology V2 — Phase 3.5 indicator restructures', () => {
-  it('PHASE_3_5_RESTRUCTURED_KEYS contains exactly 5 entries', () => {
-    expect(PHASE_3_5_RESTRUCTURED_KEYS).toEqual(['B.2.3', 'B.2.4', 'D.1.3', 'D.1.4', 'C.3.2']);
+  it('PHASE_3_5_RESTRUCTURED_KEYS contains exactly 3 entries (methodology v3.0.0; B.2.3/B.2.4 retired)', () => {
+    expect(PHASE_3_5_RESTRUCTURED_KEYS).toEqual(['D.1.3', 'D.1.4', 'C.3.2']);
   });
 
-  it('B.2.3 / B.2.4 / D.1.3 / D.1.4 use boolean_with_annotation + lower_is_better', () => {
-    for (const k of ['B.2.3', 'B.2.4', 'D.1.3', 'D.1.4']) {
+  it('D.1.3 / D.1.4 use boolean_with_annotation + lower_is_better', () => {
+    for (const k of ['D.1.3', 'D.1.4']) {
       const ind = methodologyV2.indicators.find((i) => i.key === k);
       expect(ind).toBeDefined();
       expect(ind!.normalizationFn).toBe('boolean_with_annotation');

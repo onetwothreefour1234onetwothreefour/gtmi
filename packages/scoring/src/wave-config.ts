@@ -3,8 +3,8 @@
  * Trigger.dev extraction pipeline + the public scoring engine.
  *
  * Wave 1 was the original 27 sub-factors used to validate the end-to-end
- * pipeline on the AUS canary. Wave 2 covers the remaining 21 sub-factors
- * needed for full methodology coverage (48 fields total).
+ * pipeline on the AUS canary. Wave 2 covers the remaining sub-factors
+ * needed for full methodology coverage (45 fields total under v3.0.0).
  *
  * Consumers MUST import `ACTIVE_FIELD_CODES` rather than `WAVE_1_FIELD_CODES`
  * directly so a single flag flip changes scope across canary, Trigger.dev,
@@ -31,9 +31,11 @@ export const WAVE_1_FIELD_CODES: string[] = [
   'A.3.1',
   'B.1.1',
   'B.1.2',
-  'B.1.3',
   'B.2.1',
   'B.2.2',
+  'B.3.1',
+  'B.4.1',
+  'B.4.2',
   'C.1.1',
   'C.1.2',
   'C.1.4',
@@ -52,14 +54,11 @@ export const WAVE_1_FIELD_CODES: string[] = [
   'E.3.2',
 ];
 
-// Remaining sub-factors required for full 48-field methodology coverage.
+// Remaining sub-factors required for full 45-field methodology coverage.
 // Methodology v2.0.0: all Pillar A indicators were flattened into WAVE_1.
+// Methodology v3.0.0 (ADR-029): all Pillar B indicators flattened into
+// WAVE_1 — no derived field remains in B (B.2.4 was the only one).
 export const WAVE_2_FIELD_CODES: string[] = [
-  'B.2.3',
-  'B.2.4',
-  'B.3.1',
-  'B.3.2',
-  'B.3.3',
   'C.1.3',
   'C.2.4',
   'D.1.3',

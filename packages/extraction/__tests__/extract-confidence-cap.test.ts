@@ -47,55 +47,55 @@ const SCRAPE: ScrapeResult = {
 describe('executeAllFields confidenceCap option (Phase 3-recanary-prep)', () => {
   it('without cap, returns the original confidence', async () => {
     const stub = new Map([
-      ['B.3.3', makeOutput('B.3.3', 0.92, PROGRAM_ID)],
+      ['B.4.1', makeOutput('B.4.1', 0.92, PROGRAM_ID)],
       ['C.2.4', makeOutput('C.2.4', 0.78, PROGRAM_ID)],
     ]);
     const ext = new StubExtract(stub);
     const out = await ext.executeAllFields(
       [SCRAPE],
       [
-        { key: 'B.3.3', label: 'Appeal', promptMd: 'p1' },
+        { key: 'B.4.1', label: 'Appeal', promptMd: 'p1' },
         { key: 'C.2.4', label: 'Same-sex', promptMd: 'p2' },
       ],
       PROGRAM_ID,
       'Test program',
       'AUS'
     );
-    expect(out.get('B.3.3')!.output.extractionConfidence).toBe(0.92);
+    expect(out.get('B.4.1')!.output.extractionConfidence).toBe(0.92);
     expect(out.get('C.2.4')!.output.extractionConfidence).toBe(0.78);
   });
 
   it('cap=0.85 clips a 0.92 result down to 0.85', async () => {
-    const stub = new Map([['B.3.3', makeOutput('B.3.3', 0.92, PROGRAM_ID)]]);
+    const stub = new Map([['B.4.1', makeOutput('B.4.1', 0.92, PROGRAM_ID)]]);
     const ext = new StubExtract(stub);
     const out = await ext.executeAllFields(
       [SCRAPE],
-      [{ key: 'B.3.3', label: 'Appeal', promptMd: 'p1' }],
+      [{ key: 'B.4.1', label: 'Appeal', promptMd: 'p1' }],
       PROGRAM_ID,
       'Test program',
       'AUS',
       { confidenceCap: 0.85 }
     );
-    expect(out.get('B.3.3')!.output.extractionConfidence).toBe(0.85);
+    expect(out.get('B.4.1')!.output.extractionConfidence).toBe(0.85);
   });
 
   it('cap=0.85 leaves a 0.50 result UNCHANGED (below cap)', async () => {
-    const stub = new Map([['B.3.3', makeOutput('B.3.3', 0.5, PROGRAM_ID)]]);
+    const stub = new Map([['B.4.1', makeOutput('B.4.1', 0.5, PROGRAM_ID)]]);
     const ext = new StubExtract(stub);
     const out = await ext.executeAllFields(
       [SCRAPE],
-      [{ key: 'B.3.3', label: 'Appeal', promptMd: 'p1' }],
+      [{ key: 'B.4.1', label: 'Appeal', promptMd: 'p1' }],
       PROGRAM_ID,
       'Test program',
       'AUS',
       { confidenceCap: 0.85 }
     );
-    expect(out.get('B.3.3')!.output.extractionConfidence).toBe(0.5);
+    expect(out.get('B.4.1')!.output.extractionConfidence).toBe(0.5);
   });
 
   it('cap=0.85 with mixed confidences caps only those above the cap', async () => {
     const stub = new Map([
-      ['B.3.3', makeOutput('B.3.3', 0.95, PROGRAM_ID)],
+      ['B.4.1', makeOutput('B.4.1', 0.95, PROGRAM_ID)],
       ['C.2.4', makeOutput('C.2.4', 0.82, PROGRAM_ID)],
       ['D.2.3', makeOutput('D.2.3', 0.85, PROGRAM_ID)], // exactly at cap; not capped
     ]);
@@ -103,7 +103,7 @@ describe('executeAllFields confidenceCap option (Phase 3-recanary-prep)', () => 
     const out = await ext.executeAllFields(
       [SCRAPE],
       [
-        { key: 'B.3.3', label: 'a', promptMd: 'p1' },
+        { key: 'B.4.1', label: 'a', promptMd: 'p1' },
         { key: 'C.2.4', label: 'b', promptMd: 'p2' },
         { key: 'D.2.3', label: 'c', promptMd: 'p3' },
       ],
@@ -112,24 +112,24 @@ describe('executeAllFields confidenceCap option (Phase 3-recanary-prep)', () => 
       'AUS',
       { confidenceCap: 0.85 }
     );
-    expect(out.get('B.3.3')!.output.extractionConfidence).toBe(0.85); // capped
+    expect(out.get('B.4.1')!.output.extractionConfidence).toBe(0.85); // capped
     expect(out.get('C.2.4')!.output.extractionConfidence).toBe(0.82); // unchanged
     expect(out.get('D.2.3')!.output.extractionConfidence).toBe(0.85); // unchanged (=cap)
   });
 
   it('preserves other fields on the output (only confidence is capped)', async () => {
-    const original = makeOutput('B.3.3', 0.95, PROGRAM_ID);
-    const stub = new Map([['B.3.3', original]]);
+    const original = makeOutput('B.4.1', 0.95, PROGRAM_ID);
+    const stub = new Map([['B.4.1', original]]);
     const ext = new StubExtract(stub);
     const out = await ext.executeAllFields(
       [SCRAPE],
-      [{ key: 'B.3.3', label: 'a', promptMd: 'p1' }],
+      [{ key: 'B.4.1', label: 'a', promptMd: 'p1' }],
       PROGRAM_ID,
       'Test program',
       'AUS',
       { confidenceCap: 0.85 }
     );
-    const capped = out.get('B.3.3')!.output;
+    const capped = out.get('B.4.1')!.output;
     expect(capped.valueRaw).toBe(original.valueRaw);
     expect(capped.sourceSentence).toBe(original.sourceSentence);
     expect(capped.fieldDefinitionKey).toBe(original.fieldDefinitionKey);
@@ -137,30 +137,30 @@ describe('executeAllFields confidenceCap option (Phase 3-recanary-prep)', () => 
   });
 
   it('invalid cap (negative) is ignored (treated as no cap)', async () => {
-    const stub = new Map([['B.3.3', makeOutput('B.3.3', 0.92, PROGRAM_ID)]]);
+    const stub = new Map([['B.4.1', makeOutput('B.4.1', 0.92, PROGRAM_ID)]]);
     const ext = new StubExtract(stub);
     const out = await ext.executeAllFields(
       [SCRAPE],
-      [{ key: 'B.3.3', label: 'a', promptMd: 'p1' }],
+      [{ key: 'B.4.1', label: 'a', promptMd: 'p1' }],
       PROGRAM_ID,
       'Test program',
       'AUS',
       { confidenceCap: -0.5 }
     );
-    expect(out.get('B.3.3')!.output.extractionConfidence).toBe(0.92);
+    expect(out.get('B.4.1')!.output.extractionConfidence).toBe(0.92);
   });
 
   it('invalid cap (>1) is ignored', async () => {
-    const stub = new Map([['B.3.3', makeOutput('B.3.3', 0.92, PROGRAM_ID)]]);
+    const stub = new Map([['B.4.1', makeOutput('B.4.1', 0.92, PROGRAM_ID)]]);
     const ext = new StubExtract(stub);
     const out = await ext.executeAllFields(
       [SCRAPE],
-      [{ key: 'B.3.3', label: 'a', promptMd: 'p1' }],
+      [{ key: 'B.4.1', label: 'a', promptMd: 'p1' }],
       PROGRAM_ID,
       'Test program',
       'AUS',
       { confidenceCap: 1.5 }
     );
-    expect(out.get('B.3.3')!.output.extractionConfidence).toBe(0.92);
+    expect(out.get('B.4.1')!.output.extractionConfidence).toBe(0.92);
   });
 });

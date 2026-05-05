@@ -141,8 +141,6 @@ export interface DeriveStageInputs {
   /** Phase 3.6.1 / FIX 6 — D.2.3 dual citizenship derive. Optional for
    * backwards compatibility with callers that don't pass it. */
   d23?: import('../stages/derive').DerivedD23Input;
-  /** Phase 3.6.2 / ITEM 2 — B.2.4 mandatory non-government costs. */
-  b24?: import('../stages/derive').DerivedB24Input;
   /** Phase 3.6.2 / ITEM 2 — D.1.3 physical presence during PR accrual. */
   d13?: import('../stages/derive').DerivedD13Input;
   /** Phase 3.6.2 / ITEM 2 — D.1.4 PR retention rules. */

@@ -12,47 +12,10 @@ import { ScoringError } from '../src/types';
 // and country_substitute_regional.
 
 describe('Phase 3.5 — normalizeBooleanWithAnnotation', () => {
-  // B.2.3 / B.2.4 / D.1.3 / D.1.4 all use direction='lower_is_better'
-  // (presence of levy / cost / requirement is a penalty), so true → 0
-  // and false → 100.
-
-  it('B.2.3 hasLevy=true → 0 (lower_is_better)', () => {
-    const score = normalizeBooleanWithAnnotation(
-      { hasLevy: true, notes: 'SAF AUD 1,800/yr small employer' },
-      'B.2.3',
-      'lower_is_better'
-    );
-    expect(score).toBe(0);
-  });
-
-  it('B.2.3 hasLevy=false → 100 (lower_is_better; no levy is best case)', () => {
-    const score = normalizeBooleanWithAnnotation(
-      { hasLevy: false, notes: 'no employer sponsorship requirement' },
-      'B.2.3',
-      'lower_is_better'
-    );
-    expect(score).toBe(100);
-  });
-
-  it('B.2.4 hasMandatoryNonGovCosts=true → 0', () => {
-    expect(
-      normalizeBooleanWithAnnotation(
-        { hasMandatoryNonGovCosts: true, notes: 'medical exam, police certificate' },
-        'B.2.4',
-        'lower_is_better'
-      )
-    ).toBe(0);
-  });
-
-  it('B.2.4 hasMandatoryNonGovCosts=false → 100', () => {
-    expect(
-      normalizeBooleanWithAnnotation(
-        { hasMandatoryNonGovCosts: false, notes: null },
-        'B.2.4',
-        'lower_is_better'
-      )
-    ).toBe(100);
-  });
+  // D.1.3 / D.1.4 use direction='lower_is_better' (presence of a
+  // physical-presence requirement is a penalty), so true → 0 and
+  // false → 100. (B.2.3 and B.2.4 were retired in methodology v3.0.0
+  // / ADR-029.)
 
   it('D.1.3 required=true (with daysPerYear) → 0', () => {
     expect(
@@ -96,10 +59,18 @@ describe('Phase 3.5 — normalizeBooleanWithAnnotation', () => {
 
   it('respects higher_is_better direction (sanity check)', () => {
     expect(
-      normalizeBooleanWithAnnotation({ hasLevy: true, notes: null }, 'B.2.3', 'higher_is_better')
+      normalizeBooleanWithAnnotation(
+        { required: true, daysPerYear: null, notes: null },
+        'D.1.3',
+        'higher_is_better'
+      )
     ).toBe(100);
     expect(
-      normalizeBooleanWithAnnotation({ hasLevy: false, notes: null }, 'B.2.3', 'higher_is_better')
+      normalizeBooleanWithAnnotation(
+        { required: false, daysPerYear: null, notes: null },
+        'D.1.3',
+        'higher_is_better'
+      )
     ).toBe(0);
   });
 
@@ -111,14 +82,18 @@ describe('Phase 3.5 — normalizeBooleanWithAnnotation', () => {
 
   it('throws when the registered boolean key is missing from the parsed object', () => {
     expect(() =>
-      normalizeBooleanWithAnnotation({ notes: 'orphan' }, 'B.2.3', 'lower_is_better')
-    ).toThrow(/expects "hasLevy: boolean"/);
+      normalizeBooleanWithAnnotation({ notes: 'orphan' }, 'D.1.3', 'lower_is_better')
+    ).toThrow(/expects "required: boolean"/);
   });
 
   it('throws when the registered boolean key is non-boolean', () => {
     expect(() =>
-      normalizeBooleanWithAnnotation({ hasLevy: 'yes', notes: null }, 'B.2.3', 'lower_is_better')
-    ).toThrow(/expects "hasLevy: boolean"/);
+      normalizeBooleanWithAnnotation(
+        { required: 'yes', daysPerYear: null, notes: null },
+        'D.1.3',
+        'lower_is_better'
+      )
+    ).toThrow(/expects "required: boolean"/);
   });
 });
 
@@ -171,8 +146,11 @@ describe('Phase 3.5 — getRegionalSubstitute (C.3.2)', () => {
 
 describe('Phase 3.5 — parseIndicatorValue type-narrowing', () => {
   it('boolean_with_annotation accepts a JSON object', () => {
-    const v = parseIndicatorValue({ hasLevy: true, notes: 'x' }, 'boolean_with_annotation');
-    expect(v).toEqual({ hasLevy: true, notes: 'x' });
+    const v = parseIndicatorValue(
+      { required: true, daysPerYear: null, notes: 'x' },
+      'boolean_with_annotation'
+    );
+    expect(v).toEqual({ required: true, daysPerYear: null, notes: 'x' });
   });
 
   it('boolean_with_annotation rejects non-objects', () => {

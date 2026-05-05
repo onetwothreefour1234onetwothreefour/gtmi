@@ -9,7 +9,6 @@ import {
   captureException,
   formatRunCostSummary,
   resetRunCostAggregate,
-  deriveB24,
   deriveD12,
   deriveD13,
   deriveD14,
@@ -33,7 +32,6 @@ import {
   scoreProgramFromDb,
   COUNTRY_CIVIC_TEST_POLICY,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
-  COUNTRY_NON_GOV_COSTS_POLICY,
   COUNTRY_PR_PRESENCE_POLICY,
   COUNTRY_PR_TIMELINE,
   COUNTRY_TAX_BASIS,
@@ -720,9 +718,10 @@ async function main() {
     // D.2.2 and the country/policy-derived rows are computed by the derive
     // stage (Phase 3.6 / ADR-016) — exclude them too so the LLM doesn't
     // produce a competing low-confidence row that would overwrite the
-    // derived row. Pillar A no longer has a derived field (methodology v2.0.0).
+    // derived row. Pillar A and Pillar B no longer have derived fields
+    // (methodology v2.0.0 / v3.0.0; ADR-028 / ADR-029).
     const e31HandledByVdemPath = PHASE3_VDEM_ENABLED && vdemResult !== null;
-    const DERIVED_FIELD_KEYS = new Set(['D.1.2', 'D.2.2', 'D.2.3', 'B.2.4', 'D.1.3', 'D.1.4']);
+    const DERIVED_FIELD_KEYS = new Set(['D.1.2', 'D.2.2', 'D.2.3', 'D.1.3', 'D.1.4']);
     // Phase 3.9 / W12 — modeFieldSet supersedes the legacy
     // targetedMissingSet. Both `narrow` and the gate-failed /
     // rubric-changed / field modes restrict the LLM batch.
@@ -1022,13 +1021,8 @@ async function main() {
         policy: COUNTRY_DUAL_CITIZENSHIP_POLICY[countryIso] ?? null,
       });
 
-      // Phase 3.6.2 / ITEM 2 — B.2.4 / D.1.3 / D.1.4 country-level derives.
-      const b24Result = deriveB24({
-        programId,
-        countryIso,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: COUNTRY_NON_GOV_COSTS_POLICY[countryIso] ?? null,
-      });
+      // Phase 3.6.2 / ITEM 2 — D.1.3 / D.1.4 country-level derives.
+      // (B.2.4 was retired in methodology v3.0.0 / ADR-029.)
       const prPresence = COUNTRY_PR_PRESENCE_POLICY[countryIso] ?? null;
       const d13Result = deriveD13({
         programId,
@@ -1084,7 +1078,6 @@ async function main() {
         d12DerivedResult,
         d22Result,
         d23Result,
-        b24Result,
         d13Result,
         d14Result,
         d24Result,

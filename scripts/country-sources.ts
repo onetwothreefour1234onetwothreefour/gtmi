@@ -109,8 +109,8 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     url: 'https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/apply-permanent-residence/fees.html',
     tier: 1,
     geographicLevel: 'national',
-    reason: 'Express Entry fee schedule — B.2.1 (principal fees)',
-    fieldKeys: ['B.2.1', 'B.2.2'],
+    reason: 'Express Entry fee schedule — B.3.1 (total applicant cost USD)',
+    fieldKeys: ['B.3.1'],
     country: 'CAN',
   },
   {
@@ -144,8 +144,9 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     url: 'https://www.gov.uk/skilled-worker-visa/fees',
     tier: 1,
     geographicLevel: 'national',
-    reason: 'Skilled Worker visa fees and Immigration Health Surcharge — B.2.1, B.2.2',
-    fieldKeys: ['B.2.1', 'B.2.2'],
+    reason:
+      'Skilled Worker visa fees and Immigration Health Surcharge — B.3.1 (total applicant cost USD)',
+    fieldKeys: ['B.3.1'],
     country: 'GBR',
   },
   {
@@ -197,16 +198,16 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     url: 'https://www.mom.gov.sg/passes-and-permits/s-pass/quota-and-levy',
     tier: 1,
     geographicLevel: 'national',
-    reason: 'S Pass employer levy and quota — employer cost proxy for B.2.2',
-    fieldKeys: ['B.2.2'],
+    reason: 'S Pass employer levy and quota — applicant-cost proxy for B.3.1',
+    fieldKeys: ['B.3.1'],
     country: 'SGP',
   },
   {
     url: 'https://www.iras.gov.sg/taxes/individual-income-tax/basics-of-individual-income-tax/tax-residency-and-tax-rates/individual-income-tax-rates',
     tier: 1,
     geographicLevel: 'national',
-    reason: 'Singapore personal income tax rates — B.2.1 (effective tax burden)',
-    fieldKeys: ['B.2.1'],
+    reason: 'Singapore personal income tax rates — B.3.1 (applicant cost burden context)',
+    fieldKeys: ['B.3.1'],
     country: 'SGP',
   },
   {

@@ -48,9 +48,10 @@ test('Methodology V1 Arithmetic Constraints', async (t) => {
     }
   });
 
-  await t.test('Total indicator count is exactly 48', () => {
-    // Note: The prompt requested 49, but METHODOLOGY.md explicitly defines 48 indicators.
-    assert.strictEqual(methodologyV1.indicators.length, 48);
+  await t.test('Total indicator count is exactly 45', () => {
+    // Methodology v3.0.0 (ADR-029): Pillar B reduced from 10 to 7
+    // indicators across 4 sub-factors. 9 (A) + 7 (B) + 10 (C) + 11 (D) + 8 (E) = 45.
+    assert.strictEqual(methodologyV1.indicators.length, 45);
   });
 
   await t.test('cme_paq_split sums to 1.0', () => {

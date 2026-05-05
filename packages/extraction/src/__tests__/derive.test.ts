@@ -4,16 +4,11 @@ import {
   DERIVE_EXTRACTION_MODEL,
   DERIVE_KNOWLEDGE_CONFIDENCE,
   DERIVE_KNOWLEDGE_MODEL,
-  deriveB24,
   deriveD13,
   deriveD14,
   deriveD22,
 } from '../stages/derive';
-import type {
-  CitizenshipResidenceEntry,
-  NonGovCostsPolicyEntry,
-  PrPresencePolicyEntry,
-} from '../stages/derive';
+import type { CitizenshipResidenceEntry, PrPresencePolicyEntry } from '../stages/derive';
 import { checkProvenanceRow } from '@gtmi/shared';
 
 // Phase 3.6 / Fix D / ADR-016 — derive stage unit tests.
@@ -143,16 +138,8 @@ describe('Derived row provenance shape (ADR-016 invariants)', () => {
   });
 });
 
-// Phase 3.6.2 / ITEM 2 — B.2.4 / D.1.3 / D.1.4 country-level derives.
-
-const B24_AUS: NonGovCostsPolicyEntry = {
-  iso3: 'AUS',
-  hasMandatoryNonGovCosts: true,
-  notes: 'Mandatory health insurance and skills assessment fees apply.',
-  sourceUrl:
-    'https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skill-in-demand-482',
-  sourceYear: 2025,
-};
+// Phase 3.6.2 / ITEM 2 — D.1.3 / D.1.4 country-level derives.
+// (B.2.4 / deriveB24 was retired in methodology v3.0.0 / ADR-029.)
 
 const PR_PRESENCE_AUS: PrPresencePolicyEntry = {
   iso3: 'AUS',
@@ -169,59 +156,6 @@ const PR_PRESENCE_GCC_NULL: PrPresencePolicyEntry = {
   sourceUrl: 'https://www.mohre.gov.ae/',
   sourceYear: 2025,
 };
-
-describe('deriveB24 — mandatory non-gov costs', () => {
-  it('returns null when policy is null', () => {
-    expect(
-      deriveB24({
-        programId: 'p1',
-        countryIso: 'XYZ',
-        methodologyVersion: '1.0.0',
-        policy: null,
-      })
-    ).toBeNull();
-  });
-
-  it('returns null when hasMandatoryNonGovCosts is null (unknown)', () => {
-    expect(
-      deriveB24({
-        programId: 'p1',
-        countryIso: 'AUS',
-        methodologyVersion: '1.0.0',
-        policy: { ...B24_AUS, hasMandatoryNonGovCosts: null },
-      })
-    ).toBeNull();
-  });
-
-  it('produces a derived-knowledge row at confidence 0.7', () => {
-    const r = deriveB24({
-      programId: 'p1',
-      countryIso: 'AUS',
-      methodologyVersion: '1.0.0',
-      policy: B24_AUS,
-    });
-    expect(r).not.toBeNull();
-    expect(r!.extraction.fieldDefinitionKey).toBe('B.2.4');
-    expect(r!.extraction.extractionConfidence).toBe(DERIVE_KNOWLEDGE_CONFIDENCE);
-    expect(r!.extraction.extractionModel).toBe(DERIVE_KNOWLEDGE_MODEL);
-    const parsed = JSON.parse(r!.extraction.valueRaw);
-    expect(parsed).toEqual({
-      hasMandatoryNonGovCosts: true,
-      notes: B24_AUS.notes,
-    });
-  });
-
-  it('confidence forces /review (below 0.85 auto-approve threshold)', () => {
-    const r = deriveB24({
-      programId: 'p1',
-      countryIso: 'AUS',
-      methodologyVersion: '1.0.0',
-      policy: B24_AUS,
-    });
-    expect(r!.provenance.extractionConfidence).toBeLessThan(0.85);
-    expect(r!.provenance.sourceTier).toBeNull();
-  });
-});
 
 describe('deriveD13 / deriveD14 — PR presence', () => {
   it('returns null when policy is null (no entry for country)', () => {

@@ -7,7 +7,6 @@ import {
   PublishStageImpl,
   ScrapeStageImpl,
   ValidateStageImpl,
-  deriveB24,
   deriveD12,
   deriveD13,
   deriveD14,
@@ -30,7 +29,6 @@ import {
   scoreProgramFromDb,
   COUNTRY_CIVIC_TEST_POLICY,
   COUNTRY_DUAL_CITIZENSHIP_POLICY,
-  COUNTRY_NON_GOV_COSTS_POLICY,
   COUNTRY_PR_PRESENCE_POLICY,
   COUNTRY_PR_TIMELINE,
   COUNTRY_TAX_BASIS,
@@ -400,10 +398,9 @@ export const extractSingleProgram = task({
 
     // --- Stage 2: Batch extract LLM fields. Exclude E.3.2 (always API),
     // E.3.1 (when V-Dem-handled), and the Pillar D / E derived fields
-    // (Phase 3.6 derive stage owns these — see ADR-016 + the methodology
-    // v2.0.0 superseding ADR). Pillar A no longer has a derived field. ---
+    // (Phase 3.6 derive stage owns these — see ADR-016 + ADR-028 + ADR-029).
+    // Pillar A and Pillar B no longer have derived fields. ---
     const DERIVED_FIELD_KEYS = new Set([
-      'B.2.4',
       'D.1.2',
       'D.1.3',
       'D.1.4',
@@ -565,13 +562,8 @@ export const extractSingleProgram = task({
         policy: COUNTRY_DUAL_CITIZENSHIP_POLICY[country] ?? null,
       });
 
-      // Phase 3.6.2 / ITEM 2 — B.2.4 / D.1.3 / D.1.4 country-level derives.
-      const b24Result = deriveB24({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: COUNTRY_NON_GOV_COSTS_POLICY[country] ?? null,
-      });
+      // Phase 3.6.2 / ITEM 2 — D.1.3 / D.1.4 country-level derives.
+      // (B.2.4 was retired in methodology v3.0.0 / ADR-029.)
       const prPresence = COUNTRY_PR_PRESENCE_POLICY[country] ?? null;
       const d13Result = deriveD13({
         programId,
@@ -633,7 +625,6 @@ export const extractSingleProgram = task({
         d12DerivedResult,
         d22Result,
         d23Result,
-        b24Result,
         d13Result,
         d14Result,
         d24Result,

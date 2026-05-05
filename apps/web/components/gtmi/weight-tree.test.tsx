@@ -60,11 +60,12 @@ const PILLARS_V1: MethodologyPillar[] = [
   {
     key: 'B',
     weightWithinPaq: 0.15,
-    indicatorCount: 10,
+    indicatorCount: 7,
     subFactors: [
-      { code: 'B.1', weightWithinPillar: 0.4, indicators: [] },
-      { code: 'B.2', weightWithinPillar: 0.4, indicators: [] },
-      { code: 'B.3', weightWithinPillar: 0.2, indicators: [] },
+      { code: 'B.1', weightWithinPillar: 0.3, indicators: [] },
+      { code: 'B.2', weightWithinPillar: 0.2, indicators: [] },
+      { code: 'B.3', weightWithinPillar: 0.3, indicators: [] },
+      { code: 'B.4', weightWithinPillar: 0.2, indicators: [] },
     ],
   },
   {
@@ -138,7 +139,7 @@ describe('WeightTree', () => {
     const b = screen
       .getByTestId('weight-tree-pillar-B')
       .querySelector('[role="treeitem"]') as HTMLElement;
-    expect(b).toHaveAttribute('aria-label', expect.stringContaining('10 indicators'));
+    expect(b).toHaveAttribute('aria-label', expect.stringContaining('7 indicators'));
   });
 
   it('renders sub-factor nodes for each pillar', () => {

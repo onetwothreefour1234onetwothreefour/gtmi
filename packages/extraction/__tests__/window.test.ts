@@ -84,7 +84,7 @@ describe('selectContentWindow', () => {
       content,
       [
         { key: 'A.1.1', label: 'Salary threshold' },
-        { key: 'B.2.1', label: 'Visa application fee' },
+        { key: 'B.3.1', label: 'Visa application fee' },
       ],
       30000
     );

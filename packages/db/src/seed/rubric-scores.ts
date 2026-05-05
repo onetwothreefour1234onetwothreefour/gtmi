@@ -35,24 +35,15 @@ export const RUBRIC_SCORES: Record<string, Record<string, number>> = {
     tight_quota: 20,
     quota_undisclosed: 30,
   },
-  'B.1.2': {
+  'B.4.1': {
     none: 0,
-    available_slow: 50,
-    available_fast: 100,
-    available_undisclosed_sla: 30,
+    partial: 50,
+    full: 100,
   },
-  'B.3.1': {
-    fully_online: 100,
-    mostly_online: 70,
-    hybrid: 40,
-    offline_only: 0,
-  },
-  'B.3.3': {
-    comprehensive: 100,
-    substantive: 75,
-    basic: 50,
-    limited: 25,
-    absent: 0,
+  'B.4.2': {
+    none: 0,
+    email_only: 50,
+    online_portal: 100,
   },
   'C.1.1': {
     not_required: 100,

@@ -28,9 +28,10 @@ export const methodologyV1 = {
       'A.3': ['A.3.1'],
     },
     B: {
-      'B.1': ['B.1.1', 'B.1.2', 'B.1.3'],
-      'B.2': ['B.2.1', 'B.2.2', 'B.2.3', 'B.2.4'],
-      'B.3': ['B.3.1', 'B.3.2', 'B.3.3'],
+      'B.1': ['B.1.1', 'B.1.2'],
+      'B.2': ['B.2.1', 'B.2.2'],
+      'B.3': ['B.3.1'],
+      'B.4': ['B.4.1', 'B.4.2'],
     },
     C: {
       'C.1': ['C.1.1', 'C.1.2', 'C.1.3', 'C.1.4'],
@@ -53,9 +54,10 @@ export const methodologyV1 = {
     'A.1': 0.5,
     'A.2': 0.3,
     'A.3': 0.2,
-    'B.1': 0.4,
-    'B.2': 0.35,
-    'B.3': 0.25,
+    'B.1': 0.3,
+    'B.2': 0.2,
+    'B.3': 0.3,
+    'B.4': 0.2,
     'C.1': 0.45,
     'C.2': 0.35,
     'C.3': 0.2,
@@ -76,16 +78,13 @@ export const methodologyV1 = {
     'A.2.2': 0.4,
     'A.2.3': 0.25,
     'A.3.1': 1.0,
-    'B.1.1': 0.5,
+    'B.1.1': 0.7,
     'B.1.2': 0.3,
-    'B.1.3': 0.2,
-    'B.2.1': 0.4,
-    'B.2.2': 0.25,
-    'B.2.3': 0.2,
-    'B.2.4': 0.15,
-    'B.3.1': 0.4,
-    'B.3.2': 0.35,
-    'B.3.3': 0.25,
+    'B.2.1': 0.5,
+    'B.2.2': 0.5,
+    'B.3.1': 1.0,
+    'B.4.1': 0.5,
+    'B.4.2': 0.5,
     'C.1.1': 0.3,
     'C.1.2': 0.3,
     'C.1.3': 0.25,
@@ -127,15 +126,12 @@ export const methodologyV1 = {
     'A.2.3': 'min_max',
     'A.3.1': 'categorical',
     'B.1.1': 'min_max',
-    'B.1.2': 'categorical',
-    'B.1.3': 'min_max',
-    'B.2.1': 'z_score',
-    'B.2.2': 'z_score',
-    'B.2.3': 'z_score',
-    'B.2.4': 'z_score',
-    'B.3.1': 'categorical',
-    'B.3.2': 'min_max',
-    'B.3.3': 'categorical',
+    'B.1.2': 'boolean',
+    'B.2.1': 'min_max',
+    'B.2.2': 'min_max',
+    'B.3.1': 'min_max',
+    'B.4.1': 'categorical',
+    'B.4.2': 'categorical',
     'C.1.1': 'categorical',
     'C.1.2': 'categorical',
     'C.1.3': 'categorical',
@@ -167,7 +163,7 @@ export const methodologyV1 = {
     'E.3.2': 'min_max',
   },
   cme_paq_split: { cme: 0.3, paq: 0.7 },
-  version_tag: '2.0.0',
+  version_tag: '3.0.0',
   indicators: [
     {
       key: 'A.1.1',
@@ -496,21 +492,29 @@ If the document is silent on quotas entirely, return the universal "not found in
     },
     {
       key: 'B.1.1',
-      label: 'Published SLA processing time (days)',
+      label: 'Standard SLA (days)',
       dataType: 'numeric',
       pillar: 'B',
       subFactor: 'B.1',
-      weightWithinSubFactor: 0.5,
+      weightWithinSubFactor: 0.7,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: B.1.1 — Published SLA processing time (days)
-Question: What is the official published service level agreement for processing a complete application on this program, in calendar days from submission to decision?
+        `Extraction Task: B.1.1 — Standard SLA (days)
+Question: What is the standard published processing time for this program, in calendar days from a complete application's submission to a decision being issued?
+
+Recall hints:
+
+Extract the numeric figure verbatim. If stated in weeks, multiply by 7. If stated in months, multiply by 30 (and note "month → 30 days conversion" in notes).
+If the page gives a range ("4–6 weeks", "60 to 90 days"), report the midpoint (rounded to the nearest day) and capture the original range in notes.
+If the page expresses the SLA as a percentile ("90% of applications decided within 30 days"), report that point estimate and note the percentile framing.
+If expressed in business days, convert to calendar days (× 7/5, round up) and note the conversion.
+
 Edge cases:
 
-If SLA is expressed as a range or percentile ("90% within 30 days"), report the median/point estimate and describe the original framing.
-If expressed in business days, convert to calendar days (multiply by 7/5, round up) and note the conversion.
-If no published SLA, return null with notes "no published SLA".`,
+If the page is genuinely silent on processing time, return null with notes "no published SLA". Do NOT infer; the scoring engine treats "not published" as the cohort-worst observed value at score time.
+"Currently experiencing delays" disclaimers do not override the published SLA; report the published figure.
+Fast-track / priority routes are extracted separately at B.1.2 — only the standard SLA goes here.`,
       scoringRubricJsonb: null,
       normalizationFn: 'min_max',
       direction: 'lower_is_better',
@@ -518,201 +522,168 @@ If no published SLA, return null with notes "no published SLA".`,
     },
     {
       key: 'B.1.2',
-      label: 'Fast-track option availability and SLA',
-      dataType: 'categorical',
+      label: 'Fast track availability',
+      dataType: 'boolean',
       pillar: 'B',
       subFactor: 'B.1',
       weightWithinSubFactor: 0.3,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: B.1.2 — Fast-track option availability and SLA
-Question: Does this program offer a fast-track option, and if so how fast?
-Allowed values:
+        `Extraction Task: B.1.2 — Fast track availability
+Question: Does this program offer any expedited or priority processing track, regardless of name?
 
-"none": no fast-track available.
-"available_slow": fast-track available, SLA 15-30 days.
-"available_fast": fast-track available, SLA under 15 days.
-"available_undisclosed_sla": fast-track exists but SLA not published.
+Return value: a boolean — true if any expedited / priority / premium / fast-track / accelerated processing route exists for the program; false if none is published.
+
+Recall hints:
+
+Names to look for: "priority service", "premium processing", "fast track", "express stream", "expedited", "accelerated", "ultra fast", "super priority", "Tier 1 priority", "platinum service".
+The fast-track does NOT need to be free or universally available — sponsor-only or fee-paying fast tracks count as true.
+"In-flight upgrade to priority" options that an applicant can pay for after submission count as true.
 
 Edge cases:
 
-Fast-track must be a formal option with a stated accelerated SLA, not merely "priority handling".
-If employer-initiated only, note that.`,
-      scoringRubricJsonb: {
-        categories: [
-          { value: 'none', description: 'no fast-track available.' },
-          { value: 'available_slow', description: 'fast-track available, SLA 15-30 days.' },
-          { value: 'available_fast', description: 'fast-track available, SLA under 15 days.' },
-          {
-            value: 'available_undisclosed_sla',
-            description: 'fast-track exists but SLA not published.',
-          },
-        ],
-      },
-      normalizationFn: 'categorical',
+A general "we are processing faster than usual right now" notice is NOT a fast track — return false.
+Fast-track for specific occupation lists (e.g. shortage-occupation streams) counts as true.
+If the page is silent on processing tracks at all, return false with notes "no fast-track mentioned" — never null.`,
+      scoringRubricJsonb: null,
+      normalizationFn: 'boolean',
       direction: 'higher_is_better',
       sourceTierRequired: 1,
     },
     {
-      key: 'B.1.3',
-      label: 'Number of application steps',
-      dataType: 'numeric',
-      pillar: 'B',
-      subFactor: 'B.1',
-      weightWithinSubFactor: 0.2,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: B.1.3 — Number of application steps
-Question: How many discrete formal steps must an applicant complete to obtain the visa?
-Edge cases:
-
-Count distinct procedural milestones from applicant's perspective (sponsorship request, skills assessment, visa application, biometrics, health check, decision).
-Do not count sub-forms within a single step.
-Include pre-arrival steps and required post-arrival activations.
-Do not count optional steps.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'min_max',
-      direction: 'lower_is_better',
-      sourceTierRequired: 1,
-    },
-    {
       key: 'B.2.1',
-      label: 'Principal applicant fees (USD)',
+      label: 'Number of mandatory application steps',
       dataType: 'numeric',
       pillar: 'B',
       subFactor: 'B.2',
-      weightWithinSubFactor: 0.4,
+      weightWithinSubFactor: 0.5,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: B.2.1 — Principal applicant fees
-Question: What is the total government fee a principal applicant must pay to the issuing authority for a standard application?
+        `Extraction Task: B.2.1 — Number of mandatory application steps
+Question: How many discrete, named stages must the applicant traverse from submission to visa-in-hand, as published in the official application guide?
+
+Counting rules:
+
+Count each named stage where the applicant must take a distinct action as 1 step.
+Typical countable stages: sponsorship request, skills assessment, online application form, document upload, payment, biometrics appointment, medical exam, interview, decision, visa collection, post-arrival registration.
+Do NOT count sub-forms or sub-screens within a single named stage (e.g., the form's individual pages).
+Do NOT count optional stages or stages the program merely "may require" — only mandatory.
+Do NOT count stages the visa authority performs internally (e.g., "background check" if the applicant has no action).
+
 Edge cases:
 
-Include application fee, issuance fee, and mandatory levies to the issuing authority.
-Exclude employer-borne levies (see B.2.3) and non-government costs (see B.2.4).
-If fees vary by stream or duration, report the standard 2-4 year visa case and note variations.`,
+If the page has no enumerated guide, count from the procedure narrative.
+If the page is silent on the application procedure entirely, return null with notes "no procedure described".
+Pre-arrival visa stamping at a consulate counts. Post-arrival biometric residence permit collection counts.`,
       scoringRubricJsonb: null,
-      normalizationFn: 'z_score',
+      normalizationFn: 'min_max',
       direction: 'lower_is_better',
       sourceTierRequired: 1,
     },
     {
       key: 'B.2.2',
-      label: 'Per-dependant fees (USD)',
+      label: 'Mandatory in-person touchpoints',
       dataType: 'numeric',
       pillar: 'B',
       subFactor: 'B.2',
-      weightWithinSubFactor: 0.25,
+      weightWithinSubFactor: 0.5,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: B.2.2 — Per-dependant fees
-Question: What is the government fee per accompanying dependant paid to the issuing authority?
+        `Extraction Task: B.2.2 — Mandatory in-person touchpoints
+Question: Across the full application process, in how many distinct stages must the applicant be physically present at a government office, consulate, visa application centre, panel-physician clinic, or other in-person location?
+
+Counting rules:
+
+Count each mandatory in-person touchpoint as 1: biometrics, medical exam, interview, document verification visit, in-person submission, in-person visa collection, post-arrival registration.
+Remote / waived stages count as 0. If biometrics can be waived for an enrolled applicant, do not count it.
+A single visit that combines multiple steps (e.g., biometrics + interview at the same VAC appointment) counts as 1.
+
 Edge cases:
 
-If spouse and child fees differ, report the higher (common adult dependant case) and note the other.
-If dependants not permitted, return null with notes "no dependants permitted".`,
+If the page describes the process as "fully online" without enumerating offline steps, return 0 unless biometrics are explicitly required (then 1).
+"Couriered passport return" is NOT an in-person touchpoint.
+If the page is silent on procedure, return null with notes "no procedure described".`,
       scoringRubricJsonb: null,
-      normalizationFn: 'z_score',
-      direction: 'lower_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'B.2.3',
-      label: 'Employer-borne levies and skill charges (USD)',
-      dataType: 'numeric',
-      pillar: 'B',
-      subFactor: 'B.2',
-      weightWithinSubFactor: 0.2,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: B.2.3 — Employer-borne levies and skill charges
-Question: What government levies or charges are paid by the sponsoring employer for this program?
-Edge cases:
-
-Include skills levies, training charges, immigration skills charges, similar employer-only government fees.
-If per-year, report annual cost. If one-off, report total.
-If no employer sponsorship requirement, return 0.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'z_score',
-      direction: 'lower_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'B.2.4',
-      label: 'Mandatory non-government costs (agents, translation, medicals)',
-      dataType: 'numeric',
-      pillar: 'B',
-      subFactor: 'B.2',
-      weightWithinSubFactor: 0.15,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: B.2.4 — Mandatory non-government costs
-Question: What is the approximate total cost of mandatory non-government requirements (medical exam, translation, health insurance during application) for a standard principal applicant?
-Edge cases:
-
-Exclude optional agent/lawyer fees.
-Include only program-required expenses.
-If source does not quantify (common), report a conservative standard-case estimate and describe the basis; flag confidence below 0.5 if estimated.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'z_score',
+      normalizationFn: 'min_max',
       direction: 'lower_is_better',
       sourceTierRequired: 1,
     },
     {
       key: 'B.3.1',
-      label: 'Online application availability',
-      dataType: 'categorical',
+      label: 'Total applicant cost (USD; principal + 1 spouse + 2 children)',
+      dataType: 'numeric',
       pillar: 'B',
       subFactor: 'B.3',
-      weightWithinSubFactor: 0.4,
+      weightWithinSubFactor: 1.0,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: B.3.1 — Online application availability
-Question: How digital-native is the application process?
-Allowed values:
+        `Extraction Task: B.3.1 — Total applicant cost (USD; principal + 1 spouse + 2 children)
+Question: What is the total approximate cost in USD-equivalent for a standard family of 4 (principal applicant, 1 spouse, 2 children) to obtain this visa, summing government fees and any mandatory non-government costs explicitly stated on official sources?
 
-"fully_online": application, document upload, payment, and status tracking all online.
-"mostly_online": application and payment online, but one step requires in-person or paper.
-"hybrid": online initiation but substantial in-person or paper steps remain.
-"offline_only": primarily paper-based or requires in-person submission.
+Components to sum:
 
-Recall hints:
+Principal applicant government fee (application + issuance + mandatory levies to the issuing authority).
+Spouse fee × 1.
+Child fee × 2 (if a separate child fee is published; otherwise treat children as additional dependants at the published per-dependant rate).
+Mandatory non-government costs ONLY where explicitly itemised on official sources: biometrics service charge (if separate), medical exam fee (if a published official rate exists), skills-assessment fee, statutory translation fee.
+Do NOT include: optional agent/lawyer fees, immigration health surcharges already counted as government fees, employer-borne levies, post-arrival residency-card fees outside the visa application.
 
-If the source describes applying through a named online portal (e.g., ImmiAccount, GOV.UK, USCIS online, MOM EP Online, IRCC portal, ICA myICA) and does not mention any paper-only or in-person submission step, treat that as evidence for "fully_online".
-If the source says "apply online" with no caveat, that is "fully_online".
-A required biometrics or in-person identity check is allowed under "fully_online" — do not downgrade for that alone.
-Document upload and online payment being supported counts as positive evidence even if not enumerated as separate steps.
+Currency handling (IMPORTANT):
+
+Capture the original currency on each component, sum within currency, convert to USD inline using a single date-stamped rate. Report the USD total as the value, and quote the source currency, the conversion rate used, and the rate's date in notes.
+If the page lists fees in multiple currencies (e.g., a USD-equivalent in parentheses), prefer the source local currency for the component, then convert.
+The downstream scoring engine treats this value as opaque USD — do NOT defer conversion to score time.
 
 Edge cases:
 
-Biometrics appointments do not count against "fully_online" (inherently in-person).
-Paper-only requirements for specific document types (e.g., couriered sworn translations) reduce to "mostly_online".
-If the source is silent on application channel, return empty.`,
+If non-government costs are NOT disclosed on official sources, sum government fees only and set extractionConfidence ≤ 0.7. Add notes "non-gov costs not disclosed on official source — government fees only".
+If dependants are not permitted on this program, sum principal-only and note "no dependants permitted; principal-only total".
+If a published fee covers the whole family unit (single all-inclusive figure), report it as-is and note the all-inclusive framing.`,
+      scoringRubricJsonb: null,
+      normalizationFn: 'min_max',
+      direction: 'lower_is_better',
+      sourceTierRequired: 1,
+    },
+    {
+      key: 'B.4.1',
+      label: 'Appeal and refusal process clarity',
+      dataType: 'categorical',
+      pillar: 'B',
+      subFactor: 'B.4',
+      weightWithinSubFactor: 0.5,
+      extractionPromptMd:
+        SHARED_PREAMBLE +
+        '\n\n' +
+        `Extraction Task: B.4.1 — Appeal and refusal process clarity
+Question: How clearly does the official program page document what happens on refusal and what appeal or reconsideration mechanism, if any, is available?
+
+Allowed values:
+
+"none": no information about refusal or appeal is published.
+"partial": the page mentions refusal or appeal exists, but the procedure, grounds, or timeframes are not clearly published.
+"full": an explicit appeal or reconsideration process is documented, including at least one of: steps to lodge the appeal, deadlines, grounds for review, decision-maker.
+
+Edge cases:
+
+A blanket "decisions are final" statement with no review mechanism is "none" if it does not explain why refusals occur or what the applicant can do; "partial" if it explains refusal grounds.
+Generic ministerial-discretion or ombudsman-route mentions without process detail are "partial".
+Judicial review alone, without an administrative appeal/reconsideration, is "partial" unless the page explicitly documents the judicial route.`,
       scoringRubricJsonb: {
         categories: [
+          { value: 'none', description: 'no information about refusal or appeal is published.' },
           {
-            value: 'fully_online',
-            description: 'application, document upload, payment, and status tracking all online.',
-          },
-          {
-            value: 'mostly_online',
+            value: 'partial',
             description:
-              'application and payment online, but one step requires in-person or paper.',
+              'refusal or appeal mentioned, but procedure, grounds, or timeframes are not clearly published.',
           },
           {
-            value: 'hybrid',
-            description: 'online initiation but substantial in-person or paper steps remain.',
-          },
-          {
-            value: 'offline_only',
-            description: 'primarily paper-based or requires in-person submission.',
+            value: 'full',
+            description:
+              'explicit appeal or reconsideration process documented with steps, deadlines, grounds, or decision-maker.',
           },
         ],
       },
@@ -721,73 +692,40 @@ If the source is silent on application channel, return empty.`,
       sourceTierRequired: 1,
     },
     {
-      key: 'B.3.2',
-      label: 'In-person / biometric requirement (count of visits)',
-      dataType: 'numeric',
-      pillar: 'B',
-      subFactor: 'B.3',
-      weightWithinSubFactor: 0.35,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: B.3.2 — In-person / biometric visits required
-Question: How many in-person visits (consulate, visa application center, government office) are required during application?
-Edge cases:
-
-Single biometrics = 1.
-Pre-submission document verification visits count.
-Visa collection counts only if it requires in-person visit (not if emailed/couriered).
-Post-arrival registration required to activate the visa counts.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'min_max',
-      direction: 'lower_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'B.3.3',
-      label: 'Appeal and refusal process clarity',
+      key: 'B.4.2',
+      label: 'Application status tracking',
       dataType: 'categorical',
       pillar: 'B',
-      subFactor: 'B.3',
-      weightWithinSubFactor: 0.25,
+      subFactor: 'B.4',
+      weightWithinSubFactor: 0.5,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: B.3.3 — Appeal and refusal process clarity
-Question: How clearly does this program document its appeal and refusal process?
+        `Extraction Task: B.4.2 — Application status tracking
+Question: After submission, can the applicant track the status of their application?
+
 Allowed values:
 
-"comprehensive": appeal rights, grounds, deadlines, procedures clearly documented; refusal reasons provided in writing.
-"substantive": appeal rights and procedures documented; refusal reasons provided but less detailed.
-"basic": appeal exists but procedure/deadlines unclear in this source.
-"limited": appeal is discretionary, narrow, or not clearly available.
-"absent": no appeal right or not addressed.
+"none": no published method of checking status; applicant waits for the final decision letter.
+"email_only": the program publishes that applicants will receive email updates at key stages (received, under review, decided), but no self-service lookup is offered.
+"online_portal": the program offers a self-service portal where the applicant can log in and view current status at any time.
 
 Edge cases:
 
-Administrative review for specific categories (e.g., in-country refusals) should be noted.
-Judicial review alone, without administrative appeal, is "limited".`,
+A general government contact number / helpline used to ask "what's happening" is NOT status tracking — that is "none".
+SMS/text notifications without an online portal map to "email_only".
+A portal that only shows "submitted" / "decided" with no intermediate stages still counts as "online_portal".`,
       scoringRubricJsonb: {
         categories: [
+          { value: 'none', description: 'no published method of checking status.' },
           {
-            value: 'comprehensive',
-            description:
-              'appeal rights, grounds, deadlines, procedures clearly documented; refusal reasons provided in writing.',
+            value: 'email_only',
+            description: 'email updates at key stages; no self-service lookup.',
           },
           {
-            value: 'substantive',
-            description:
-              'appeal rights and procedures documented; refusal reasons provided but less detailed.',
+            value: 'online_portal',
+            description: 'self-service portal where the applicant can view current status.',
           },
-          {
-            value: 'basic',
-            description: 'appeal exists but procedure/deadlines unclear in this source.',
-          },
-          {
-            value: 'limited',
-            description: 'appeal is discretionary, narrow, or not clearly available.',
-          },
-          { value: 'absent', description: 'no appeal right or not addressed.' },
         ],
       },
       normalizationFn: 'categorical',

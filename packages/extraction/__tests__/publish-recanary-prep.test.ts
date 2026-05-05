@@ -11,30 +11,29 @@ import { checkProvenanceRow } from '@gtmi/shared';
 //   2. country-substitute synthetic provenance shape (must pass verify-provenance)
 
 describe('validateBooleanWithAnnotationShape', () => {
-  it('B.2.3 accepts { hasLevy: boolean, notes: string|null }', () => {
-    expect(() =>
-      validateBooleanWithAnnotationShape('B.2.3', { hasLevy: true, notes: 'SAF AUD 1,800/yr' })
-    ).not.toThrow();
-    expect(() =>
-      validateBooleanWithAnnotationShape('B.2.3', { hasLevy: false, notes: null })
-    ).not.toThrow();
-  });
-
-  it('B.2.4 accepts { hasMandatoryNonGovCosts: boolean, notes: string|null }', () => {
-    expect(() =>
-      validateBooleanWithAnnotationShape('B.2.4', {
-        hasMandatoryNonGovCosts: true,
-        notes: 'medical exam, police certificate',
-      })
-    ).not.toThrow();
-  });
-
-  it('D.1.3 / D.1.4 accept { required: boolean, daysPerYear: number|null, notes: string|null }', () => {
+  it('D.1.3 accepts { required: boolean, daysPerYear: number|null, notes: string|null }', () => {
     expect(() =>
       validateBooleanWithAnnotationShape('D.1.3', {
         required: true,
         daysPerYear: 219,
         notes: '1,095 days in 5 years',
+      })
+    ).not.toThrow();
+    expect(() =>
+      validateBooleanWithAnnotationShape('D.1.3', {
+        required: false,
+        daysPerYear: null,
+        notes: null,
+      })
+    ).not.toThrow();
+  });
+
+  it('D.1.4 accepts { required: boolean, daysPerYear: number|null, notes: string|null }', () => {
+    expect(() =>
+      validateBooleanWithAnnotationShape('D.1.4', {
+        required: true,
+        daysPerYear: 730,
+        notes: '730 days in 5 years (PR retention)',
       })
     ).not.toThrow();
     expect(() =>
@@ -53,20 +52,29 @@ describe('validateBooleanWithAnnotationShape', () => {
   });
 
   it('throws when the registered boolean key is missing', () => {
-    expect(() => validateBooleanWithAnnotationShape('B.2.3', { notes: 'orphan' })).toThrow(
-      /expects "hasLevy: boolean"/
+    expect(() => validateBooleanWithAnnotationShape('D.1.3', { notes: 'orphan' })).toThrow(
+      /expects "required: boolean"/
     );
   });
 
   it('throws when the registered boolean key is non-boolean', () => {
     expect(() =>
-      validateBooleanWithAnnotationShape('B.2.3', { hasLevy: 'yes', notes: null })
-    ).toThrow(/expects "hasLevy: boolean"/);
+      validateBooleanWithAnnotationShape('D.1.3', {
+        required: 'yes',
+        daysPerYear: null,
+        notes: null,
+      })
+    ).toThrow(/expects "required: boolean"/);
   });
 
   it('throws when an unexpected property is present', () => {
     expect(() =>
-      validateBooleanWithAnnotationShape('B.2.3', { hasLevy: true, notes: null, secret: 'evil' })
+      validateBooleanWithAnnotationShape('D.1.3', {
+        required: true,
+        daysPerYear: null,
+        notes: null,
+        secret: 'evil',
+      })
     ).toThrow(/unexpected property "secret"/);
   });
 });

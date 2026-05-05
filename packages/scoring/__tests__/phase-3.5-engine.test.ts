@@ -53,31 +53,31 @@ describe('runScoringEngine — boolean_with_annotation (Phase 3.5)', () => {
     ],
   };
 
-  it('B.2.3 hasLevy=true (lower_is_better) → indicator score 0', () => {
+  it('D.1.3 required=true (lower_is_better) → indicator score 0', () => {
     const input = buildInput({
-      defKey: 'B.2.3',
+      defKey: 'D.1.3',
       fn: 'boolean_with_annotation',
       direction: 'lower_is_better',
       rubric: STRUCTURED_RUBRIC,
-      valueNormalized: { hasLevy: true, notes: 'SAF AUD 1,800/yr' },
+      valueNormalized: { required: true, daysPerYear: 219, notes: '1,095 days in 5 years' },
     });
     const out = runScoringEngine(input);
     expect(out.subFactorScores['B.2']).toBe(0);
   });
 
-  it('B.2.3 hasLevy=false → 100', () => {
+  it('D.1.3 required=false → 100', () => {
     const input = buildInput({
-      defKey: 'B.2.3',
+      defKey: 'D.1.3',
       fn: 'boolean_with_annotation',
       direction: 'lower_is_better',
       rubric: STRUCTURED_RUBRIC,
-      valueNormalized: { hasLevy: false, notes: null },
+      valueNormalized: { required: false, daysPerYear: null, notes: null },
     });
     const out = runScoringEngine(input);
     expect(out.subFactorScores['B.2']).toBe(100);
   });
 
-  it('D.1.3 required=true with daysPerYear annotation → 0 (annotation does not affect score)', () => {
+  it('D.1.3 with daysPerYear annotation → score uses required boolean only (annotation does not affect score)', () => {
     const input = buildInput({
       defKey: 'D.1.3',
       fn: 'boolean_with_annotation',

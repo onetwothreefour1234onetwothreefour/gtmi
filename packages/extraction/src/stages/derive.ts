@@ -100,20 +100,18 @@ export interface DerivedD23Input {
   policy: DualCitizenshipPolicyEntry | null;
 }
 
-/** Phase 3.6.2 / ITEM 2 — B.2.4 derive input. */
+/**
+ * Phase 3.6.2 / ITEM 2 — country-level non-government costs policy entry.
+ * Methodology v3.0.0 (ADR-029): the deriveB24 stage was deleted; this
+ * interface is retained only because the COUNTRY_NON_GOV_COSTS_POLICY
+ * data module continues to be exported as analyst reference.
+ */
 export interface NonGovCostsPolicyEntry {
   iso3: string;
   hasMandatoryNonGovCosts: boolean | null;
   notes: string;
   sourceUrl: string;
   sourceYear: number;
-}
-
-export interface DerivedB24Input {
-  programId: string;
-  countryIso: string;
-  methodologyVersion: string;
-  policy: NonGovCostsPolicyEntry | null;
 }
 
 /** Phase 3.6.2 / ITEM 2 — D.1.3 / D.1.4 derive inputs. */
@@ -336,83 +334,6 @@ export function deriveD23(input: DerivedD23Input): DerivedRow | null {
   const extraction: ExtractionOutput = {
     programId: input.programId,
     fieldDefinitionKey: 'D.2.3',
-    valueRaw,
-    sourceSentence,
-    characterOffsets: { start: 0, end: 0 },
-    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
-    extractionModel: DERIVE_KNOWLEDGE_MODEL,
-    extractedAt: new Date(),
-  };
-
-  return { extraction, provenance, numericValue: 0 };
-}
-
-/**
- * Phase 3.6.2 / ITEM 2 — Compute B.2.4 (mandatory non-government costs).
- *
- * Same pattern as deriveD23 — country-level derived-knowledge lookup.
- * Writes a `boolean_with_annotation` shape `{hasMandatoryNonGovCosts, notes}`
- * matching the methodology-v2 rubric. The publish layer's
- * `BOOLEAN_WITH_ANNOTATION_KEYS` already maps B.2.4 → `'hasMandatoryNonGovCosts'`.
- */
-export function deriveB24(input: DerivedB24Input): DerivedRow | null {
-  if (input.policy === null) {
-    console.log(
-      `  [B.2.4] derived skip — no COUNTRY_NON_GOV_COSTS_POLICY entry for ${input.countryIso}`
-    );
-    return null;
-  }
-  if (input.policy.hasMandatoryNonGovCosts === null) {
-    console.log(
-      `  [B.2.4] derived skip — ${input.countryIso} non-gov-costs policy is unknown/null`
-    );
-    return null;
-  }
-
-  const valueRaw = JSON.stringify({
-    hasMandatoryNonGovCosts: input.policy.hasMandatoryNonGovCosts,
-    notes: input.policy.notes,
-  });
-  const sourceSentence = input.policy.notes;
-
-  const derivedInputs = {
-    'B.2.4': {
-      hasMandatoryNonGovCosts: input.policy.hasMandatoryNonGovCosts,
-      sourceUrl: input.policy.sourceUrl,
-      sourceYear: input.policy.sourceYear,
-    },
-  };
-
-  const crossCheckResult: CrossCheckOutcome = 'not_checked';
-  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
-    sourceUrl: input.policy.sourceUrl,
-    geographicLevel: 'national',
-    sourceTier: null,
-    scrapeTimestamp: new Date().toISOString(),
-    contentHash: createHash('sha256')
-      .update(
-        `derived-knowledge:B.2.4:${input.programId}:${input.countryIso}:${input.policy.hasMandatoryNonGovCosts}`,
-        'utf8'
-      )
-      .digest('hex'),
-    sourceSentence,
-    characterOffsets: { start: 0, end: 0 },
-    extractionModel: DERIVE_KNOWLEDGE_MODEL,
-    extractionConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
-    validationModel: DERIVE_KNOWLEDGE_MODEL,
-    validationConfidence: DERIVE_KNOWLEDGE_CONFIDENCE,
-    crossCheckResult,
-    crossCheckUrl: null,
-    reviewedBy: null,
-    reviewedAt: null,
-    methodologyVersion: input.methodologyVersion,
-    reviewDecision: 'approve',
-    derivedInputs,
-  };
-
-  const extraction: ExtractionOutput = {
-    programId: input.programId,
-    fieldDefinitionKey: 'B.2.4',
     valueRaw,
     sourceSentence,
     characterOffsets: { start: 0, end: 0 },
@@ -1054,10 +975,6 @@ export class DeriveStageImpl implements DeriveStage {
     if (inputs.d23) {
       const d23 = deriveD23(inputs.d23);
       if (d23) out.push(d23);
-    }
-    if (inputs.b24) {
-      const b24 = deriveB24(inputs.b24);
-      if (b24) out.push(b24);
     }
     if (inputs.d13) {
       const d13 = deriveD13(inputs.d13);

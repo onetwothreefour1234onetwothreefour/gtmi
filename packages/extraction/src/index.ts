@@ -75,7 +75,6 @@ export {
   DERIVE_KNOWLEDGE_CONFIDENCE,
   DERIVE_KNOWLEDGE_MODEL,
   DeriveStageImpl,
-  deriveB24,
   deriveD12,
   deriveD13,
   deriveD14,
@@ -90,7 +89,6 @@ export {
 export type {
   CitizenshipResidenceEntry,
   CivicTestPolicyEntry,
-  DerivedB24Input,
   DerivedD12Input,
   DerivedD13Input,
   DerivedD14Input,

@@ -195,7 +195,7 @@ async function checkScored(sql: Sql): Promise<void> {
 }
 
 async function checkRubrics(sql: Sql): Promise<void> {
-  const SAMPLE = ['A.2.1', 'A.3.1', 'C.1.1', 'C.2.1', 'C.3.1', 'B.1.2'];
+  const SAMPLE = ['A.2.1', 'A.3.1', 'C.1.1', 'C.2.1', 'C.3.1', 'B.4.1'];
   const rows = await sql<
     { key: string; scoring_rubric_jsonb: unknown; extraction_prompt_md: string }[]
   >`
