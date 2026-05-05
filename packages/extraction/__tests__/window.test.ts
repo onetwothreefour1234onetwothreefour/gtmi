@@ -43,7 +43,7 @@ describe('selectContentWindow', () => {
 
     const window = selectContentWindow(
       content,
-      [{ key: 'A.1.1', label: 'Salary threshold for principal applicant' }],
+      [{ key: 'A.1.1', label: 'Salary threshold as % of local median wage' }],
       30000
     );
 
@@ -58,7 +58,7 @@ describe('selectContentWindow', () => {
 
     const window = selectContentWindow(
       content,
-      [{ key: 'A.1.1', label: 'Salary threshold for principal applicant' }],
+      [{ key: 'A.1.1', label: 'Salary threshold as % of local median wage' }],
       30000
     );
 

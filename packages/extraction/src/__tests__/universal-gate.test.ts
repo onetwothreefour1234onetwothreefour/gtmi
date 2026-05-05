@@ -14,9 +14,10 @@ describe('NUMERIC_SANITY_RANGES coverage', () => {
     // looks correct.
     const expectedKeys = [
       'A.1.1',
-      'A.1.2',
-      'A.2.2',
-      'A.3.3',
+      'A.1.3',
+      'A.1.5',
+      'A.2.1',
+      'A.2.3',
       'B.1.1',
       'B.1.3',
       'B.2.1',
@@ -50,7 +51,7 @@ describe('isNumericInSanityRange', () => {
     expect(isNumericInSanityRange('A.1.1', r.max)).toBe(true);
   });
 
-  it('rejects a negative salary (A.1.1)', () => {
+  it('rejects a negative % of median (A.1.1)', () => {
     expect(isNumericInSanityRange('A.1.1', -1)).toBe(false);
   });
 
@@ -64,8 +65,8 @@ describe('isNumericInSanityRange', () => {
     expect(isNumericInSanityRange('E.3.1', 0)).toBe(true);
   });
 
-  it('accepts the no-cap sentinel 999 for fields that opt in (A.3.3, C.2.2)', () => {
-    expect(isNumericInSanityRange('A.3.3', 999)).toBe(true);
+  it('accepts the no-cap sentinel 999 for fields that opt in (A.1.5, C.2.2)', () => {
+    expect(isNumericInSanityRange('A.1.5', 999)).toBe(true);
     expect(isNumericInSanityRange('C.2.2', 999)).toBe(true);
   });
 

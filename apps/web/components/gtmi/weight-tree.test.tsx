@@ -32,30 +32,28 @@ const PILLARS_V1: MethodologyPillar[] = [
     subFactors: [
       {
         code: 'A.1',
-        weightWithinPillar: 0.4,
+        weightWithinPillar: 0.5,
         indicators: [
-          makeIndicator('A.1.1', 'Salary floor', 0.5, 'A', 'A.1'),
-          makeIndicator('A.1.2', 'Salary as % of median', 0.5, 'A', 'A.1'),
+          makeIndicator('A.1.1', 'Salary as % of median', 0.25, 'A', 'A.1'),
+          makeIndicator('A.1.2', 'Education floor', 0.2, 'A', 'A.1'),
+          makeIndicator('A.1.3', 'Experience floor', 0.2, 'A', 'A.1'),
+          makeIndicator('A.1.4', 'Language test', 0.2, 'A', 'A.1'),
+          makeIndicator('A.1.5', 'Age cap', 0.15, 'A', 'A.1'),
         ],
       },
       {
         code: 'A.2',
         weightWithinPillar: 0.3,
         indicators: [
-          makeIndicator('A.2.1', 'Education floor', 0.5, 'A', 'A.2'),
-          makeIndicator('A.2.2', 'Experience floor', 0.5, 'A', 'A.2'),
-          makeIndicator('A.2.3', 'Language test', 1, 'A', 'A.2'),
+          makeIndicator('A.2.1', 'Mandatory criteria count', 0.35, 'A', 'A.2'),
+          makeIndicator('A.2.2', 'System type', 0.4, 'A', 'A.2'),
+          makeIndicator('A.2.3', 'Track count', 0.25, 'A', 'A.2'),
         ],
       },
       {
         code: 'A.3',
-        weightWithinPillar: 0.3,
-        indicators: [
-          makeIndicator('A.3.1', 'Quota', 0.25, 'A', 'A.3'),
-          makeIndicator('A.3.2', 'Occupation list', 0.25, 'A', 'A.3'),
-          makeIndicator('A.3.3', 'Labour-market test', 0.25, 'A', 'A.3'),
-          makeIndicator('A.3.4', 'Levies', 0.25, 'A', 'A.3'),
-        ],
+        weightWithinPillar: 0.2,
+        indicators: [makeIndicator('A.3.1', 'Quota', 1.0, 'A', 'A.3')],
       },
     ],
   },
@@ -158,7 +156,7 @@ describe('WeightTree', () => {
   it('renders indicator leaves when showIndicators=true', () => {
     render(<WeightTree cmePaqSplit={{ cme: 0.3, paq: 0.7 }} pillars={PILLARS_V1} showIndicators />);
     expect(screen.getByTestId('weight-tree-indicator-A.1.1')).toBeInTheDocument();
-    expect(screen.getByTestId('weight-tree-indicator-A.3.4')).toBeInTheDocument();
+    expect(screen.getByTestId('weight-tree-indicator-A.3.1')).toBeInTheDocument();
   });
 
   it('emits a treeitem with aria-level for each level (root=1, branch=2, pillar=3, subfactor=4)', () => {

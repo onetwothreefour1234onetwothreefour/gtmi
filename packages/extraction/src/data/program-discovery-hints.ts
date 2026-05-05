@@ -40,9 +40,9 @@ export interface ProgramDiscoveryHint {
 
 export const PROGRAM_DISCOVERY_HINTS: Record<string, ProgramDiscoveryHint> = {
   // NLD — Highly Skilled Migrant (HSM) Permit
-  // 2026-05-01 update: post PRs F-I the gap is 4/48 (A.1.1, A.1.2,
-  // B.2.2, D.3.1). D.3.1 is structurally null (NLD uses facts-and-
-  // circumstances residency, no day-count). The remaining three need
+  // 2026-05-01 update: post PRs F-I the gap had A.1.x salary indicators,
+  // B.2.2, D.3.1. D.3.1 is structurally null (NLD uses facts-and-
+  // circumstances residency, no day-count). The salary indicators need
   // sharper steering to specific IND sub-pages that DID load thin in
   // the last run despite already being mentioned in the hint.
   '668cec08-4b78-4cd2-b215-3047c551ce6e': {
@@ -58,7 +58,8 @@ export const PROGRAM_DISCOVERY_HINTS: Record<string, ProgramDiscoveryHint> = {
       'government.nl/topics/new-in-the-netherlands/highly-skilled-migrants. For ' +
       'tax residency / 30%-ruling background, ' +
       'belastingdienst.nl/wps/wcm/connect/EN/Content_Areas/Individuals/30_facility ' +
-      'is canonical. CBS publishes the median wage data backing A.1.2 derivation.',
+      'is canonical. CBS publishes the median wage data the LLM should compare ' +
+      'against when extracting A.1.1 (% of median).',
     curatorNote: 'Updated 2026-05-01: split out the salary threshold + fees URLs.',
   },
 

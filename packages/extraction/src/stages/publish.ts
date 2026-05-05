@@ -63,10 +63,11 @@ const COUNTRY_SUBSTITUTE_MODEL = 'country-substitute-regional';
 // Exported for testing.
 // ────────────────────────────────────────────────────────────────────
 export const NUMERIC_SANITY_RANGES: Record<string, { min: number; max: number }> = {
-  'A.1.1': { min: 0, max: 1_000_000 }, // salary threshold (local currency, USD-equiv)
-  'A.1.2': { min: 0, max: 1000 }, // salary as % of median
-  'A.2.2': { min: 0, max: 30 }, // minimum years of work experience
-  'A.3.3': { min: 0, max: 999 }, // applicant age cap (999 = "no cap" sentinel)
+  'A.1.1': { min: 0, max: 1000 }, // salary threshold as % of local median wage
+  'A.1.3': { min: 0, max: 30 }, // minimum years of work experience
+  'A.1.5': { min: 0, max: 999 }, // applicant age cap (999 = "no cap" sentinel)
+  'A.2.1': { min: 0, max: 20 }, // number of mandatory qualifying criteria
+  'A.2.3': { min: 0, max: 20 }, // number of distinct qualifying tracks
   'B.1.1': { min: 0, max: 3650 }, // SLA processing days (~10 years)
   'B.1.3': { min: 0, max: 50 }, // application steps
   'B.2.1': { min: 0, max: 100_000 }, // principal applicant fees
@@ -206,7 +207,7 @@ export function validateBooleanWithAnnotationShape(
 // normalisationFn-aware: boolean_with_annotation rows JSON-parse valueRaw
 // into the structured object; boolean rows map the "permitted" /
 // "not_permitted" rubric strings to true / false. min_max / z_score
-// fields keep the numeric path (used by deriveA12 / deriveD22).
+// fields keep the numeric path (used by deriveD22).
 function normalizeDerivedValueRaw(
   valueRaw: string,
   normalizationFn: string

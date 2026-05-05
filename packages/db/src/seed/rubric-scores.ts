@@ -8,13 +8,7 @@
  * For `lower_is_better` rubrics: best (least burdensome) category → 100, worst → 0.
  */
 export const RUBRIC_SCORES: Record<string, Record<string, number>> = {
-  'A.1.3': {
-    salary_only: 0,
-    salary_plus_one: 50,
-    salary_plus_multiple: 100,
-    no_salary_route: 75,
-  },
-  'A.2.1': {
+  'A.1.2': {
     none: 100,
     secondary: 80,
     vocational: 60,
@@ -22,20 +16,19 @@ export const RUBRIC_SCORES: Record<string, Record<string, number>> = {
     master: 20,
     doctorate: 0,
   },
-  'A.2.3': {
+  'A.1.4': {
     none: 100,
     basic: 75,
     intermediate: 50,
     upper_intermediate: 25,
     advanced: 0,
   },
-  'A.3.1': {
-    open: 100,
-    broad_list: 75,
-    restricted_list: 40,
-    shortage_list_only: 15,
+  'A.2.2': {
+    conjunctive: 0,
+    hybrid: 60,
+    compensatory: 100,
   },
-  'A.3.2': {
+  'A.3.1': {
     no_quota: 100,
     large_quota: 80,
     moderate_quota: 50,

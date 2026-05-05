@@ -1,10 +1,15 @@
-// Phase 3.6 / Fix D / ADR-016 — Stage 6.5: Derive.
+// Phase 3.6 / Fix D / ADR-016 (superseded for Pillar A by methodology v2.0.0)
+// — Stage 6.5: Derive.
 //
-// Pure deterministic computation of two PAQ indicators that cannot be
-// sourced as a literal sentence on any government page:
+// Pure deterministic computation of PAQ indicators that cannot be sourced
+// as a literal sentence on any government page:
 //
-//   A.1.2 — Salary threshold as % of local median wage
 //   D.2.2 — Total minimum years from initial visa entry to citizenship eligibility
+//   plus the Pillar D / E knowledge-derived rows below.
+//
+// The Pillar A derive (A.1.2 % of median) was removed in methodology
+// v2.0.0 — % of median is now extracted directly as A.1.1 by the LLM
+// stage. See the superseding ADR for ADR-016.
 //
 // THIS FILE CONTAINS ZERO LLM CALLS. Same inputs → same output, byte-
 // identical across runs. extractionModel is hard-coded to the literal
@@ -60,39 +65,9 @@ export interface CitizenshipResidenceEntry {
   notes?: string;
 }
 
-export interface DerivedA12Input {
-  programId: string;
-  countryIso: string;
-  methodologyVersion: string;
-  /** A.1.1 raw value from field_values (e.g. "AUD 73,150" or "73150"). null if A.1.1 is not POPULATED. */
-  a11ValueRaw: string | null;
-  /** A.1.1 ISO 4217 currency from provenance.valueCurrency. null if absent. */
-  a11ValueCurrency: string | null;
-  /** A.1.1 source URL from provenance (recorded in derivedInputs for /review audit). */
-  a11SourceUrl: string | null;
-  /**
-   * Phase 3.6.5 — A.1.1 source sentence from provenance. Used to
-   * disambiguate monthly vs annual salary thresholds (immigration
-   * pages routinely state monthly figures, e.g. SGP S Pass S$3,300/mo,
-   * while COUNTRY_MEDIAN_WAGE is annual). Optional for backwards
-   * compatibility; missing → ambiguous → annualised (safe default).
-   */
-  a11SourceSentence?: string | null;
-  /**
-   * Phase 3.6.6 / FIX 1 — A.1.3 raw value from field_values. When the
-   * programme is points-based ("no_salary_route" / "points_only" /
-   * "not_required") OR A.1.1 was extracted as "0", deriveA12 emits a
-   * `not_applicable` derived-knowledge row instead of attempting the
-   * percentage calculation. Country-agnostic — applies to CAN Express
-   * Entry FSW, NZL SMC, AUT RWR Card, AUS 189 Points Tested, and any
-   * future points-based programme. Optional for backwards compatibility.
-   */
-  a13ValueRaw?: string | null;
-  /** Median-wage table entry for this country, null if missing. */
-  medianWage: MedianWageEntry | null;
-  /** FX rate for the A.1.1 currency, null if missing or currency null. */
-  fxRate: FxRateEntry | null;
-}
+// Methodology v2.0.0 — DerivedA12Input removed. Pillar A no longer has a
+// derived field: % of median is now extracted directly as A.1.1 by the
+// LLM stage. See ADR superseding ADR-016.
 
 export interface DerivedD22Input {
   programId: string;
@@ -176,7 +151,7 @@ export interface DerivedRow {
   /** Pre-built ProvenanceRecord (passes checkProvenanceRow). */
   provenance: ProvenanceRecord;
   /**
-   * Convenience: the numeric output for arithmetic derives (A.1.2 / D.2.2)
+   * Convenience: the numeric output for arithmetic derives (D.2.2)
    * or 0 for non-numeric derives (D.2.3 — categorical 'permitted'/'not_permitted').
    */
   numericValue: number;
@@ -186,47 +161,8 @@ export interface DerivedRow {
 // Pure functions: zero side effects, return null on any skip condition.
 // ────────────────────────────────────────────────────────────────────
 
-/** Strip non-numeric chars (currency codes, commas, whitespace) and parse. */
-function parseNumeric(raw: string): number | null {
-  const cleaned = raw.replace(/[^0-9.\-]/g, '');
-  if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
-  const n = Number.parseFloat(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
-/**
- * Phase 3.6.5 — detect whether an A.1.1 salary value is monthly or annual
- * by scanning the provenance source sentence for cue words. Country-
- * agnostic.
- *
- * Returns 'monthly' / 'annual' / 'ambiguous'. Ambiguous resolves to
- * monthly upstream (the safe default — most immigration salary
- * thresholds are stated monthly; an annualised value 12× too small is
- * obvious at /review, while a monthly value 12× too large is plausible
- * for high-end visas and harder to catch).
- */
-export function detectSalaryUnit(
-  sourceSentence: string | null | undefined
-): 'monthly' | 'annual' | 'ambiguous' {
-  if (!sourceSentence) return 'ambiguous';
-  const lower = sourceSentence.toLowerCase();
-  // Test annual cues first — "year"/"annual" tokens appear in some
-  // monthly-context strings ("…per month, equivalent to 39600 per year"),
-  // but in those cases the EXTRACTED valueRaw is the monthly figure and
-  // the annualised reference is parenthetical. We bias to monthly when
-  // BOTH cues appear to avoid double-counting.
-  const monthlyCue = /\bmonth\b|\bmonthly\b|per\s*month|\/\s*month|\bp\.?\s*m\.?\b/i.test(lower);
-  const annualCue =
-    /\byear\b|\bannual\b|\bannually\b|\bper\s*annum\b|\bp\.?\s*a\.?\b|\/\s*year|\byr\b/i.test(
-      lower
-    );
-  if (monthlyCue) return 'monthly';
-  if (annualCue) return 'annual';
-  return 'ambiguous';
-}
-
 function buildBaseProvenance(args: {
-  fieldKey: 'A.1.2' | 'D.2.2';
+  fieldKey: 'D.2.2';
   contentHashSeed: string;
   sourceSentence: string;
   methodologyVersion: string;
@@ -254,209 +190,6 @@ function buildBaseProvenance(args: {
     derivedInputs: args.derivedInputs,
   };
   return provenance;
-}
-
-/**
- * Phase 3.6.6 / FIX 1 — A.1.3 categorical values that signal a
- * points-based or salary-free pathway. Country-agnostic.
- */
-const POINTS_BASED_A13_VALUES: ReadonlySet<string> = new Set([
-  'no_salary_route',
-  'points_only',
-  'not_required',
-]);
-
-/**
- * Phase 3.6.6 / FIX 1 — emit A.1.2 as a `not_applicable` derived-
- * knowledge row. Used when the programme has no minimum salary
- * threshold (points-based selection or zero-floor pathways).
- */
-function buildA12NotApplicableRow(input: DerivedA12Input): DerivedRow {
-  const sourceSentence =
-    'This programme uses a points-based selection system with no minimum salary threshold requirement.';
-  const valueRaw = 'not_applicable';
-
-  const derivedInputs = {
-    'A.1.1': {
-      valueRaw: input.a11ValueRaw,
-      valueCurrency: input.a11ValueCurrency,
-      sourceUrl: input.a11SourceUrl,
-    },
-    'A.1.3': {
-      valueRaw: input.a13ValueRaw ?? null,
-    },
-    rule: 'points_based_no_salary_threshold',
-  };
-
-  const crossCheckResult: CrossCheckOutcome = 'not_checked';
-  const provenance: ProvenanceRecord & { derivedInputs?: Record<string, unknown> } = {
-    sourceUrl: 'derived:points-based-program-type',
-    geographicLevel: 'global',
-    sourceTier: null,
-    scrapeTimestamp: new Date().toISOString(),
-    contentHash: createHash('sha256')
-      .update(
-        `derived-knowledge:A.1.2:not_applicable:${input.programId}:${input.countryIso}`,
-        'utf8'
-      )
-      .digest('hex'),
-    sourceSentence,
-    characterOffsets: { start: 0, end: 0 },
-    extractionModel: DERIVE_KNOWLEDGE_MODEL,
-    extractionConfidence: 0.9,
-    validationModel: DERIVE_KNOWLEDGE_MODEL,
-    validationConfidence: 0.9,
-    crossCheckResult,
-    crossCheckUrl: null,
-    reviewedBy: null,
-    reviewedAt: null,
-    methodologyVersion: input.methodologyVersion,
-    reviewDecision: 'approve',
-    derivedInputs,
-  };
-
-  const extraction: ExtractionOutput = {
-    programId: input.programId,
-    fieldDefinitionKey: 'A.1.2',
-    valueRaw,
-    sourceSentence,
-    characterOffsets: { start: 0, end: 0 },
-    extractionConfidence: 0.9,
-    extractionModel: DERIVE_KNOWLEDGE_MODEL,
-    extractedAt: new Date(),
-  };
-
-  return { extraction, provenance, numericValue: 0 };
-}
-
-/**
- * Compute A.1.2 (salary as % of local median wage). Pure. Returns null
- * on any skip condition. Skips emit a one-line console.log.
- */
-export function deriveA12(input: DerivedA12Input): DerivedRow | null {
-  // Phase 3.6.6 / FIX 1 — points-based / salary-free programmes get a
-  // derived-knowledge `not_applicable` row instead of skipping. Triggers:
-  //   - A.1.1 valueRaw === "0" (no salary threshold, e.g. CAN Express
-  //     Entry FSW where the LLM correctly returns 0 + "no salary route"),
-  //   - A.1.3 in {"no_salary_route", "points_only", "not_required"}.
-  // Country-agnostic. Runs BEFORE the currency/median-wage gates so
-  // points-based programmes never get classified ABSENT for A.1.2.
-  const a11IsZero = input.a11ValueRaw !== null && input.a11ValueRaw.trim() === '0';
-  const a13Trimmed = (input.a13ValueRaw ?? '').trim().toLowerCase();
-  const a13IsPointsBased = POINTS_BASED_A13_VALUES.has(a13Trimmed);
-  if (a11IsZero || a13IsPointsBased) {
-    console.log(
-      `  [A.1.2] derived not_applicable — points-based programme for ${input.countryIso} (a11Zero=${a11IsZero}, a13="${a13Trimmed}")`
-    );
-    return buildA12NotApplicableRow(input);
-  }
-
-  if (input.a11ValueRaw === null || input.a11ValueRaw === '') {
-    console.log(`  [A.1.2] derived skip — A.1.1 not POPULATED for ${input.countryIso}`);
-    return null;
-  }
-  if (input.a11ValueCurrency === null || input.a11ValueCurrency === '') {
-    console.log(`  [A.1.2] derived skip — A.1.1 has no valueCurrency for ${input.countryIso}`);
-    return null;
-  }
-  if (input.medianWage === null) {
-    console.log(`  [A.1.2] derived skip — no COUNTRY_MEDIAN_WAGE entry for ${input.countryIso}`);
-    return null;
-  }
-  if (input.fxRate === null) {
-    console.log(
-      `  [A.1.2] derived skip — no FX_RATES entry for currency ${input.a11ValueCurrency}`
-    );
-    return null;
-  }
-
-  const a11Numeric = parseNumeric(input.a11ValueRaw);
-  if (a11Numeric === null || a11Numeric <= 0) {
-    console.log(
-      `  [A.1.2] derived skip — A.1.1 valueRaw "${input.a11ValueRaw}" did not parse to a positive number`
-    );
-    return null;
-  }
-
-  // Phase 3.6.5 — monthly vs annual detection. COUNTRY_MEDIAN_WAGE is
-  // annual; if A.1.1 was extracted as a monthly figure (typical for
-  // immigration salary thresholds), multiply by 12 before the percent
-  // calculation. Ambiguous → monthly (safe default — see detectSalaryUnit
-  // doc comment).
-  const detectedUnit = detectSalaryUnit(input.a11SourceSentence ?? null);
-  const annualisationFactor = detectedUnit === 'annual' ? 1 : 12;
-  const a11Annualised = a11Numeric * annualisationFactor;
-  if (detectedUnit === 'annual') {
-    console.log(`  [A.1.2 derive] A.1.1 unit: annual → used as-is ${a11Annualised}`);
-  } else if (detectedUnit === 'monthly') {
-    console.log(`  [A.1.2 derive] A.1.1 unit: monthly → annualised to ${a11Annualised} (×12)`);
-  } else {
-    console.log(
-      `  [A.1.2 derive] A.1.1 unit: ambiguous → annualised to ${a11Annualised} (×12, safe default)`
-    );
-  }
-
-  const amountUsd =
-    input.a11ValueCurrency.toUpperCase() === 'USD'
-      ? a11Annualised
-      : a11Annualised / input.fxRate.lcuPerUsd;
-
-  const percent = Math.round((amountUsd / input.medianWage.medianWageUsd) * 1000) / 10;
-
-  const unitLabel =
-    detectedUnit === 'annual'
-      ? 'annual'
-      : detectedUnit === 'monthly'
-        ? 'monthly × 12'
-        : 'ambiguous → assumed monthly × 12';
-  const sourceSentence =
-    `Derived from A.1.1 (${input.a11ValueCurrency} ${a11Numeric.toLocaleString('en-US')} [${unitLabel}] = ${a11Annualised.toLocaleString('en-US')} annual) ` +
-    `÷ ${input.countryIso} median wage USD ${input.medianWage.medianWageUsd.toLocaleString('en-US')} ` +
-    `(${input.medianWage.source} ${input.medianWage.usdYear}) × 100 = ${percent}%`;
-
-  const derivedInputs = {
-    'A.1.1': {
-      valueRaw: input.a11ValueRaw,
-      valueCurrency: input.a11ValueCurrency,
-      sourceUrl: input.a11SourceUrl,
-      detectedUnit,
-      annualisationFactor,
-    },
-    medianWage: {
-      value: input.medianWage.medianWageUsd,
-      year: input.medianWage.usdYear,
-      source: input.medianWage.source,
-      sourceUrl: input.medianWage.sourceUrl,
-    },
-    fxRate: {
-      code: input.fxRate.code,
-      year: input.fxRate.year,
-      lcuPerUsd: input.fxRate.lcuPerUsd,
-      sourceUrl: input.fxRate.sourceUrl,
-    },
-  };
-
-  const valueRaw = String(percent);
-  const provenance = buildBaseProvenance({
-    fieldKey: 'A.1.2',
-    contentHashSeed: `derived-computation:A.1.2:${input.programId}:${input.a11ValueRaw}:${input.a11ValueCurrency}:${input.medianWage.medianWageUsd}:${input.fxRate.lcuPerUsd}`,
-    sourceSentence,
-    methodologyVersion: input.methodologyVersion,
-    derivedInputs,
-  });
-
-  const extraction: ExtractionOutput = {
-    programId: input.programId,
-    fieldDefinitionKey: 'A.1.2',
-    valueRaw,
-    sourceSentence,
-    characterOffsets: { start: 0, end: 0 },
-    extractionConfidence: DERIVE_CONFIDENCE,
-    extractionModel: DERIVE_EXTRACTION_MODEL,
-    extractedAt: new Date(),
-  };
-
-  return { extraction, provenance, numericValue: percent };
 }
 
 /**
@@ -1316,8 +1049,6 @@ import type { DeriveStage, DeriveStageInputs } from '../types/pipeline';
 export class DeriveStageImpl implements DeriveStage {
   execute(inputs: DeriveStageInputs): DerivedRow[] {
     const out: DerivedRow[] = [];
-    const a12 = deriveA12(inputs.a12);
-    if (a12) out.push(a12);
     const d22 = deriveD22(inputs.d22);
     if (d22) out.push(d22);
     if (inputs.d23) {

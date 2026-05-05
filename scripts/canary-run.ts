@@ -9,7 +9,6 @@ import {
   captureException,
   formatRunCostSummary,
   resetRunCostAggregate,
-  deriveA12,
   deriveB24,
   deriveD12,
   deriveD13,
@@ -60,11 +59,7 @@ import {
   fetchWgiScore,
   ISO3_TO_ISO2,
 } from './country-sources';
-import {
-  COUNTRY_MEDIAN_WAGE,
-  COUNTRY_CITIZENSHIP_RESIDENCE_YEARS,
-  FX_RATES,
-} from '@gtmi/extraction';
+import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from '@gtmi/extraction';
 import { and } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import { createHash } from 'crypto';
@@ -722,21 +717,12 @@ async function main() {
 
     // E.3.2 (WGI GE.EST) and E.3.1 (WGI RL.EST when PHASE3_VDEM_ENABLED) are
     // handled via direct World Bank API — exclude both from the LLM batch.
-    // A.1.2 and D.2.2 are computed by the derive stage (Phase 3.6 / ADR-016)
-    // — exclude them too so the LLM doesn't produce a competing low-
-    // confidence row that would overwrite the derived row.
+    // D.2.2 and the country/policy-derived rows are computed by the derive
+    // stage (Phase 3.6 / ADR-016) — exclude them too so the LLM doesn't
+    // produce a competing low-confidence row that would overwrite the
+    // derived row. Pillar A no longer has a derived field (methodology v2.0.0).
     const e31HandledByVdemPath = PHASE3_VDEM_ENABLED && vdemResult !== null;
-    // Phase 3.6.1 / FIX 6 — D.2.3 added to derived field keys (handled by
-    // deriveD23 against the country dual-citizenship policy lookup).
-    const DERIVED_FIELD_KEYS = new Set([
-      'A.1.2',
-      'D.1.2',
-      'D.2.2',
-      'D.2.3',
-      'B.2.4',
-      'D.1.3',
-      'D.1.4',
-    ]);
+    const DERIVED_FIELD_KEYS = new Set(['D.1.2', 'D.2.2', 'D.2.3', 'B.2.4', 'D.1.3', 'D.1.4']);
     // Phase 3.9 / W12 — modeFieldSet supersedes the legacy
     // targetedMissingSet. Both `narrow` and the gate-failed /
     // rubric-changed / field modes restrict the LLM batch.
@@ -945,15 +931,16 @@ async function main() {
       }
     }
 
-    // ── Stage 6.5 — Derive (Phase 3.6 / ADR-016). Pure arithmetic; no LLM.
-    // Computes A.1.2 and D.2.2 from already-extracted inputs + static
-    // lookup tables. Skip conditions return null and emit a one-line log.
-    // Successful derived rows are written to field_values with
+    // ── Stage 6.5 — Derive (Phase 3.6 / ADR-016, Pillar A portion superseded
+    // by methodology v2.0.0). Pure arithmetic; no LLM. Computes D.2.2 and
+    // the country/policy-derived rows from already-extracted inputs +
+    // static lookup tables. Skip conditions return null and emit a one-
+    // line log. Successful derived rows are written to field_values with
     // status='pending_review' (confidence 0.6, never auto-approves).
     {
-      // Resolve A.1.1 / D.1.1 / D.1.2 from the extraction map first; fall
-      // back to existing approved field_values rows if the current run
-      // didn't re-extract them.
+      // Resolve D.1.1 / D.1.2 from the extraction map first; fall back to
+      // existing approved field_values rows if the current run didn't
+      // re-extract them.
       const lookupExtraction = (key: string) => {
         const r = allExtractionResults.get(key);
         return r && r.output.valueRaw !== '' ? r : null;
@@ -996,32 +983,6 @@ async function main() {
         };
       }
 
-      // A.1.1 — prefer this run's extraction; fall back to DB.
-      const a11Live = lookupExtraction('A.1.1');
-      const a11Db = a11Live ? null : await readApprovedFieldValue('A.1.1');
-      const a11ValueRaw = a11Live?.output.valueRaw ?? a11Db?.valueRaw ?? null;
-      // The live extraction map doesn't carry valueCurrency directly; the
-      // currency is detected at publish-time. For derive's purposes we read
-      // it from the DB row when available; if A.1.1 was just freshly
-      // extracted this run and has not yet been published, fall back to
-      // string-prefix detection on the raw value.
-      let a11ValueCurrency: string | null = a11Db?.valueCurrency ?? null;
-      if (a11ValueCurrency === null && a11ValueRaw) {
-        const m = a11ValueRaw.match(/^([A-Z]{3})\b/);
-        if (m && m[1]) a11ValueCurrency = m[1];
-      }
-      const a11SourceUrl = a11Live?.sourceUrl ?? a11Db?.sourceUrl ?? null;
-      // Phase 3.6.5 — A.1.1 source sentence drives monthly/annual unit
-      // detection in deriveA12.
-      const a11SourceSentence: string | null =
-        a11Live?.output.sourceSentence ?? a11Db?.sourceSentence ?? null;
-
-      // Phase 3.6.6 / FIX 1 — A.1.3 raw value, country-agnostic gate
-      // for the points-based not_applicable branch in deriveA12.
-      const a13Live = lookupExtraction('A.1.3');
-      const a13Db = a13Live ? null : await readApprovedFieldValue('A.1.3');
-      const a13ValueRaw: string | null = a13Live?.output.valueRaw ?? a13Db?.valueRaw ?? null;
-
       // D.1.1 — boolean.
       const d11Live = lookupExtraction('D.1.1');
       const d11Db = d11Live ? null : await readApprovedFieldValue('D.1.1');
@@ -1043,18 +1004,6 @@ async function main() {
       const d12Years: number | null = d12DerivedResult?.numericValue ?? null;
       const d12SourceUrl: string | null = d12PolicyEntry?.sourceUrl ?? null;
 
-      const a12Result = deriveA12({
-        programId,
-        countryIso,
-        methodologyVersion: METHODOLOGY_VERSION,
-        a11ValueRaw,
-        a11ValueCurrency,
-        a11SourceUrl,
-        a11SourceSentence,
-        a13ValueRaw,
-        medianWage: COUNTRY_MEDIAN_WAGE[countryIso] ?? null,
-        fxRate: a11ValueCurrency ? (FX_RATES[a11ValueCurrency.toUpperCase()] ?? null) : null,
-      });
       const d22Result = deriveD22({
         programId,
         countryIso,
@@ -1132,7 +1081,6 @@ async function main() {
       });
 
       for (const derived of [
-        a12Result,
         d12DerivedResult,
         d22Result,
         d23Result,

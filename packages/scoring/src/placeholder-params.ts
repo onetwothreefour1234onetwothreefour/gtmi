@@ -16,11 +16,12 @@
 import type { NormalizationParams } from './types';
 
 export const PHASE2_PLACEHOLDER_PARAMS: NormalizationParams = {
-  // A — Access & Eligibility
-  'A.1.1': { mean: 65000, stddev: 35000 }, // salary threshold USD — z_score
-  'A.1.2': { min: 50, max: 300 }, // salary as % of median — min_max
-  'A.2.2': { min: 0, max: 10 }, // minimum work experience years — min_max
-  'A.3.3': { min: 0, max: 100 }, // applicant age cap — min_max
+  // A — Access & Eligibility (methodology v2.0.0)
+  'A.1.1': { min: 50, max: 300 }, // salary threshold as % of local median wage — min_max
+  'A.1.3': { min: 0, max: 10 }, // minimum work experience years — min_max
+  'A.1.5': { min: 0, max: 100 }, // applicant age cap — min_max
+  'A.2.1': { min: 1, max: 10 }, // number of mandatory qualifying criteria — min_max
+  'A.2.3': { min: 1, max: 10 }, // number of distinct qualifying tracks — min_max
 
   // B — Process & Cost
   'B.1.1': { min: 1, max: 365 }, // SLA processing days — min_max

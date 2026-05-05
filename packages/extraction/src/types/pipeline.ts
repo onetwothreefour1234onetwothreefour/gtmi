@@ -128,14 +128,15 @@ export interface PublishStage {
   executeDerived(extraction: ExtractionOutput, provenance: ProvenanceRecord): Promise<string>;
 }
 
-// Phase 3.6 / ADR-016 — Stage 6.5: Derive.
+// Phase 3.6 / ADR-016 (superseded by methodology v2.0.0 ADR) — Stage 6.5: Derive.
 //
-// Pure deterministic computation of A.1.2 and D.2.2 from already-extracted
-// inputs plus static lookup tables. No LLM calls. Inputs are resolved by
-// the caller (canary-run.ts / extract-single-program.ts) from the
-// extraction map and the static tables in `scripts/`.
+// Pure deterministic computation of D.2.2 (and other downstream derived
+// fields) from already-extracted inputs plus static lookup tables. No
+// LLM calls. Inputs are resolved by the caller (canary-run.ts /
+// extract-single-program.ts) from the extraction map and the static
+// tables in `scripts/`. The Pillar A derive (A.1.2 % of median) was
+// removed in methodology v2.0.0 — A.1.1 is now extracted directly.
 export interface DeriveStageInputs {
-  a12: import('../stages/derive').DerivedA12Input;
   d22: import('../stages/derive').DerivedD22Input;
   /** Phase 3.6.1 / FIX 6 — D.2.3 dual citizenship derive. Optional for
    * backwards compatibility with callers that don't pass it. */

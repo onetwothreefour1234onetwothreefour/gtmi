@@ -23,9 +23,9 @@ Do not interpret beyond what the document states. If the document says "typicall
 export const methodologyV1 = {
   framework_structure: {
     A: {
-      'A.1': ['A.1.1', 'A.1.2', 'A.1.3'],
+      'A.1': ['A.1.1', 'A.1.2', 'A.1.3', 'A.1.4', 'A.1.5'],
       'A.2': ['A.2.1', 'A.2.2', 'A.2.3'],
-      'A.3': ['A.3.1', 'A.3.2', 'A.3.3'],
+      'A.3': ['A.3.1'],
     },
     B: {
       'B.1': ['B.1.1', 'B.1.2', 'B.1.3'],
@@ -50,9 +50,9 @@ export const methodologyV1 = {
   },
   pillar_weights: { A: 0.28, B: 0.15, C: 0.2, D: 0.22, E: 0.15 },
   sub_factor_weights: {
-    'A.1': 0.4,
-    'A.2': 0.35,
-    'A.3': 0.25,
+    'A.1': 0.5,
+    'A.2': 0.3,
+    'A.3': 0.2,
     'B.1': 0.4,
     'B.2': 0.35,
     'B.3': 0.25,
@@ -67,15 +67,15 @@ export const methodologyV1 = {
     'E.3': 0.2,
   },
   indicator_weights: {
-    'A.1.1': 0.5,
-    'A.1.2': 0.3,
+    'A.1.1': 0.25,
+    'A.1.2': 0.2,
     'A.1.3': 0.2,
+    'A.1.4': 0.2,
+    'A.1.5': 0.15,
     'A.2.1': 0.35,
-    'A.2.2': 0.35,
-    'A.2.3': 0.3,
-    'A.3.1': 0.4,
-    'A.3.2': 0.35,
-    'A.3.3': 0.25,
+    'A.2.2': 0.4,
+    'A.2.3': 0.25,
+    'A.3.1': 1.0,
     'B.1.1': 0.5,
     'B.1.2': 0.3,
     'B.1.3': 0.2,
@@ -117,15 +117,15 @@ export const methodologyV1 = {
     'E.3.2': 0.5,
   },
   normalization_choices: {
-    'A.1.1': 'z_score',
-    'A.1.2': 'min_max',
-    'A.1.3': 'categorical',
-    'A.2.1': 'categorical',
-    'A.2.2': 'min_max',
-    'A.2.3': 'categorical',
+    'A.1.1': 'min_max',
+    'A.1.2': 'categorical',
+    'A.1.3': 'min_max',
+    'A.1.4': 'categorical',
+    'A.1.5': 'min_max',
+    'A.2.1': 'min_max',
+    'A.2.2': 'categorical',
+    'A.2.3': 'min_max',
     'A.3.1': 'categorical',
-    'A.3.2': 'categorical',
-    'A.3.3': 'min_max',
     'B.1.1': 'min_max',
     'B.1.2': 'categorical',
     'B.1.3': 'min_max',
@@ -167,61 +167,41 @@ export const methodologyV1 = {
     'E.3.2': 'min_max',
   },
   cme_paq_split: { cme: 0.3, paq: 0.7 },
-  version_tag: '1.0.0',
+  version_tag: '2.0.0',
   indicators: [
     {
       key: 'A.1.1',
-      label: 'Minimum salary threshold (USD-equivalent)',
-      dataType: 'numeric',
-      pillar: 'A',
-      subFactor: 'A.1',
-      weightWithinSubFactor: 0.5,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: A.1.1 — Minimum salary threshold
-Question: What is the minimum annual salary, in the local currency as stated in the source, that a principal applicant must earn to qualify for this program?
-Edge cases:
-
-If the program has multiple salary tiers, report the standard/core threshold and describe alternatives in notes.
-Report raw local-currency figure; USD normalization happens downstream.
-If the threshold is expressed only as a multiple of median wage, return value: null and notes: "expressed as multiple of median — see A.1.2".`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'z_score',
-      direction: 'lower_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'A.1.2',
       label: 'Salary threshold as % of local median wage',
       dataType: 'numeric',
       pillar: 'A',
       subFactor: 'A.1',
-      weightWithinSubFactor: 0.3,
+      weightWithinSubFactor: 0.25,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: A.1.2 — Salary threshold as % of local median wage
-Question: Is the salary threshold for this program defined or benchmarked as a percentage of the local median wage or equivalent statistical reference?
+        `Extraction Task: A.1.1 — Salary threshold as % of local median wage
+Question: What is the minimum salary required of a principal applicant, expressed as a percentage of the local median wage (or the equivalent national statistical reference cited by the program)?
+
 Recall hints:
 
-If the source explicitly states the threshold is calibrated against, set at, derived from, or matched to a percentage of national/local median earnings — even alongside an absolute amount — report that percentage.
-Examples that should yield a value: "TSMIT is set at the median earnings for full-time workers", "salary equal to 80% of full-time median", "matched annually to ABS earnings data".
+If the source explicitly states the threshold is calibrated against, set at, derived from, or matched to a percentage of national/local median earnings — even alongside an absolute amount — report that percentage as a number (e.g. 100, 80, 150).
+Examples that should yield a value: "TSMIT is set at the median earnings for full-time workers" → 100; "salary equal to 80% of full-time median" → 80; "matched annually to ABS earnings data" → 100; "indexed to the going rate" → 100.
+"Going rate" / "prevailing wage" methodologies (UK Skilled Worker, US H-1B style) are explicit median-anchor references — extract whatever percentage the page assigns to the threshold. If the page states a threshold AND a contemporaneous median figure for the same labour market, compute the implied percentage to one decimal place.
+If expressed as a multiple (e.g. "1.5x median"), convert to a percentage (150).
 
 Edge cases:
 
-If the threshold is purely a fixed amount with no percentage anchor stated anywhere, return empty (no value).
-If the source gives both (e.g., "the greater of X or Y% of median"), report the percentage.
-If expressed as a multiple (e.g., "1.5x median"), convert to a percentage (150).
-If only a benchmarking statement is given without a numeric percentage, do not infer; return empty.`,
+If the threshold is purely a fixed amount with no percentage anchor stated anywhere AND no median figure is cited on the page to compute against, return null with notes "no median anchor".
+If the source gives both (e.g. "the greater of X or Y% of median"), report the percentage.
+For points-based programs with no fixed salary floor, return null with notes "points-based; no salary threshold".`,
       scoringRubricJsonb: null,
       normalizationFn: 'min_max',
       direction: 'lower_is_better',
       sourceTierRequired: 1,
     },
     {
-      key: 'A.1.3',
-      label: 'Alternative qualification pathways (points, capital, patent)',
+      key: 'A.1.2',
+      label: 'Minimum educational requirement',
       dataType: 'categorical',
       pillar: 'A',
       subFactor: 'A.1',
@@ -229,51 +209,7 @@ If only a benchmarking statement is given without a numeric percentage, do not i
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: A.1.3 — Alternative qualification pathways
-Question: Besides salary, how many alternative qualifying routes does this program offer?
-Allowed values:
-
-"salary_only": only qualifying route is the salary threshold.
-"salary_plus_one": salary plus one alternative (points, investment, patent).
-"salary_plus_multiple": salary plus two or more alternatives.
-"no_salary_route": qualification does not require a salary threshold at all.
-
-Edge cases:
-
-A "fast-track" for high salaries is NOT an alternative pathway; it's a salary-based variant.
-Alternative must be a genuinely different criterion (points, investment, patent, extraordinary ability, endorsement).`,
-      scoringRubricJsonb: {
-        categories: [
-          { value: 'salary_only', description: 'only qualifying route is the salary threshold.' },
-          {
-            value: 'salary_plus_one',
-            description: 'salary plus one alternative (points, investment, patent).',
-          },
-          {
-            value: 'salary_plus_multiple',
-            description: 'salary plus two or more alternatives.',
-          },
-          {
-            value: 'no_salary_route',
-            description: 'qualification does not require a salary threshold at all.',
-          },
-        ],
-      },
-      normalizationFn: 'categorical',
-      direction: 'higher_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'A.2.1',
-      label: 'Minimum educational requirement',
-      dataType: 'categorical',
-      pillar: 'A',
-      subFactor: 'A.2',
-      weightWithinSubFactor: 0.35,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: A.2.1 — Minimum educational requirement
+        `Extraction Task: A.1.2 — Minimum educational requirement
 Question: What is the minimum formal educational qualification a principal applicant must hold?
 Allowed values:
 
@@ -286,7 +222,8 @@ Allowed values:
 
 Edge cases:
 
-If "equivalent work experience in lieu of degree" is accepted, report the formal floor (what is required if one cannot substitute) and note the substitution option.`,
+If "equivalent work experience in lieu of degree" is accepted, report the formal floor (what is required if one cannot substitute) and note the substitution option.
+If the program is points-based and education contributes points without a hard floor, report the lowest education level at which any points are awarded.`,
       scoringRubricJsonb: {
         categories: [
           { value: 'none', description: 'no minimum education stated.' },
@@ -305,38 +242,39 @@ If "equivalent work experience in lieu of degree" is accepted, report the formal
       sourceTierRequired: 1,
     },
     {
-      key: 'A.2.2',
+      key: 'A.1.3',
       label: 'Minimum work experience (years)',
       dataType: 'numeric',
       pillar: 'A',
-      subFactor: 'A.2',
-      weightWithinSubFactor: 0.35,
+      subFactor: 'A.1',
+      weightWithinSubFactor: 0.2,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: A.2.2 — Minimum work experience (years)
+        `Extraction Task: A.1.3 — Minimum work experience (years)
 Question: What is the minimum years of relevant professional work experience required of a principal applicant?
 Edge cases:
 
 If experience is required only in the absence of a degree, report the experience floor that applies when the degree IS held (often 0).
 If there is no experience requirement, return 0.
-If experience varies by occupation, report the standard/core requirement and describe variation in notes.`,
+If experience varies by occupation, report the standard/core requirement and describe variation in notes.
+For points-based programs where experience contributes points without a hard floor, return 0 and describe the points scaling in notes.`,
       scoringRubricJsonb: null,
       normalizationFn: 'min_max',
       direction: 'lower_is_better',
       sourceTierRequired: 1,
     },
     {
-      key: 'A.2.3',
-      label: 'Language proficiency requirement (level + acceptance list)',
+      key: 'A.1.4',
+      label: 'Language proficiency requirement',
       dataType: 'categorical',
       pillar: 'A',
-      subFactor: 'A.2',
-      weightWithinSubFactor: 0.3,
+      subFactor: 'A.1',
+      weightWithinSubFactor: 0.2,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: A.2.3 — Language proficiency requirement
+        `Extraction Task: A.1.4 — Language proficiency requirement
 Question: What is the language proficiency level required of a principal applicant?
 Allowed values:
 
@@ -350,7 +288,8 @@ Edge cases:
 
 If components have different minima, report the highest required.
 Note degree-taught-in-local-language exemptions.
-Report the strictest standard scenario.`,
+Report the strictest standard scenario.
+For points-based programs where language contributes points without a hard floor, report the lowest level at which any points are awarded.`,
       scoringRubricJsonb: {
         categories: [
           { value: 'none', description: 'no language requirement.' },
@@ -368,41 +307,104 @@ Report the strictest standard scenario.`,
       sourceTierRequired: 1,
     },
     {
-      key: 'A.3.1',
-      label: 'Occupation list constraint (open / restricted list / shortage list)',
+      key: 'A.1.5',
+      label: 'Applicant age cap',
+      dataType: 'numeric',
+      pillar: 'A',
+      subFactor: 'A.1',
+      weightWithinSubFactor: 0.15,
+      extractionPromptMd:
+        SHARED_PREAMBLE +
+        '\n\n' +
+        `Extraction Task: A.1.5 — Applicant age cap
+Question: What is the maximum age at which a principal applicant can qualify for this program?
+
+Recall hints:
+
+If the source describes a points table where age points decline to zero at a specific age, that age is the effective cap.
+Example: Canada Express Entry CRS — age points 0 at age 45 → effective cap 45.
+Example: Australia 189/190 — age points 0 from 45 → effective cap 45.
+Example: NZ SMV — age cap explicitly 55.
+Look for phrases: "minimum age", "maximum age", "must be under [X]", "applicants aged X to Y", "age points table", "no age points awarded after [X]".
+
+Edge cases:
+
+If no age cap exists, return 999 and note "no age cap".
+If points decline gradually after a certain age, return the age at which points reach zero (effective cap) and describe the curve.
+Return null only if age is not addressed at all on the page.`,
+      scoringRubricJsonb: null,
+      normalizationFn: 'min_max',
+      direction: 'higher_is_better',
+      sourceTierRequired: 1,
+    },
+    {
+      key: 'A.2.1',
+      label: 'Number of mandatory qualifying criteria',
+      dataType: 'numeric',
+      pillar: 'A',
+      subFactor: 'A.2',
+      weightWithinSubFactor: 0.35,
+      extractionPromptMd:
+        SHARED_PREAMBLE +
+        '\n\n' +
+        `Extraction Task: A.2.1 — Number of mandatory qualifying criteria
+Question: How many distinct mandatory criteria must a principal applicant satisfy simultaneously to qualify for this program (i.e. the number of "must meet" gates, not the number of points categories)?
+
+Counting rules:
+
+Count each independent gate that the applicant MUST satisfy (a failure on any one disqualifies them) as 1.
+Typical gates to count: salary threshold, education floor, work experience floor, language floor, age cap, occupation eligibility, sponsorship/employer requirement, character/health, points-test minimum score.
+Do NOT count optional bonus criteria, tie-breakers, or sub-stream-specific add-ons that don't apply to the standard pathway.
+Do NOT count administrative requirements (fees, application format, biometrics) — only substantive eligibility gates.
+A points-test minimum total counts as 1 gate, regardless of how many sub-categories feed into it.
+
+Edge cases:
+
+If the program publishes an explicit numbered list of "eligibility requirements", use that count when each item is a hard gate.
+For purely points-based programs with only a points-floor and no other hard gates, return 1.`,
+      scoringRubricJsonb: null,
+      normalizationFn: 'min_max',
+      direction: 'lower_is_better',
+      sourceTierRequired: 1,
+    },
+    {
+      key: 'A.2.2',
+      label: 'System type: compensatory vs. conjunctive',
       dataType: 'categorical',
       pillar: 'A',
-      subFactor: 'A.3',
+      subFactor: 'A.2',
       weightWithinSubFactor: 0.4,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: A.3.1 — Occupation list constraint
-Question: How restrictive is the occupation list governing this program?
+        `Extraction Task: A.2.2 — System type: compensatory vs. conjunctive
+Question: How does this program combine its qualifying criteria — does it allow strong scores on one criterion to compensate for weak scores on another (compensatory), or must every gate be cleared independently (conjunctive)?
 Allowed values:
 
-"open": any occupation accepted.
-"broad_list": broad published list covering most skilled occupations (hundreds).
-"restricted_list": narrower list (under 100 occupations), targeted at specific sectors.
-"shortage_list_only": only occupations on a periodically updated shortage/critical list.
+"conjunctive": every mandatory criterion must be satisfied independently; failure on any one disqualifies (e.g. UK Skilled Worker, EU Blue Card with hard floors on all of salary/education/contract).
+"compensatory": a points/score system where a high score on one factor can offset a low score on another (e.g. Canada Express Entry CRS, Australia points test, NZ SMV).
+"hybrid": a small set of hard gates (e.g. age cap, language floor) PLUS a compensatory points score across the remaining factors (most modern points-tested programs that retain absolute floors).
 
 Edge cases:
 
-If the program has multiple streams with different constraints, report for the stream targeted by this extraction and note others.`,
+If the source describes a points test with a minimum total score AND no separate hard floors, that is "compensatory".
+If every requirement is described as "must" / "required" / "mandatory" with no points trade-off language, that is "conjunctive".
+If the program has a points test PLUS one or more independent hard gates that cannot be compensated for (typical age cap, language floor), that is "hybrid".`,
       scoringRubricJsonb: {
         categories: [
-          { value: 'open', description: 'any occupation accepted.' },
           {
-            value: 'broad_list',
-            description: 'broad published list covering most skilled occupations (hundreds).',
+            value: 'conjunctive',
+            description: 'every mandatory criterion must be satisfied independently.',
           },
           {
-            value: 'restricted_list',
-            description: 'narrower list (under 100 occupations), targeted at specific sectors.',
+            value: 'compensatory',
+            description:
+              'points/score system; strong scores on one factor offset weak scores on another.',
           },
           {
-            value: 'shortage_list_only',
-            description: 'only occupations on a periodically updated shortage/critical list.',
+            value: 'hybrid',
+            description:
+              'small set of hard gates plus a compensatory points score across remaining factors.',
           },
         ],
       },
@@ -411,16 +413,46 @@ If the program has multiple streams with different constraints, report for the s
       sourceTierRequired: 1,
     },
     {
-      key: 'A.3.2',
+      key: 'A.2.3',
+      label: 'Number of distinct qualifying tracks',
+      dataType: 'numeric',
+      pillar: 'A',
+      subFactor: 'A.2',
+      weightWithinSubFactor: 0.25,
+      extractionPromptMd:
+        SHARED_PREAMBLE +
+        '\n\n' +
+        `Extraction Task: A.2.3 — Number of distinct qualifying tracks
+Question: How many genuinely distinct sub-streams or qualifying tracks does this program offer to a principal applicant (each with its own eligibility criteria)?
+
+Counting rules:
+
+Count each named sub-stream the source describes as a separate qualifying track if it has its own independent set of eligibility criteria.
+Examples that yield a count: Canada Express Entry — 3 (FSW + CEC + FST); UK Global Talent — typically 2 (exceptional talent + exceptional promise) per endorsing body; Australia Skilled — 3 (189/190/491) per page; Singapore Tech.Pass / EP / ONE Pass each count as 1 if covered separately.
+A "fast-track for high salary" within an otherwise single-track program is NOT a separate track; it is a variant of the same track.
+Tie-breaker bonus categories are NOT tracks.
+
+Edge cases:
+
+If the program is a single visa with no sub-streams, return 1.
+If the source enumerates streams in a list/table, prefer that count.
+If the source is silent on stream count, return 1 with notes "single track inferred — no sub-streams described".`,
+      scoringRubricJsonb: null,
+      normalizationFn: 'min_max',
+      direction: 'higher_is_better',
+      sourceTierRequired: 1,
+    },
+    {
+      key: 'A.3.1',
       label: 'Annual quota presence and size',
       dataType: 'categorical',
       pillar: 'A',
       subFactor: 'A.3',
-      weightWithinSubFactor: 0.35,
+      weightWithinSubFactor: 1.0,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: A.3.2 — Annual quota presence and size
+        `Extraction Task: A.3.1 — Annual quota presence and size
 Question: Does this program have an annual numerical cap, and how restrictive is it?
 Allowed values:
 
@@ -459,28 +491,6 @@ If the document is silent on quotas entirely, return the universal "not found in
         ],
       },
       normalizationFn: 'categorical',
-      direction: 'higher_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'A.3.3',
-      label: 'Applicant age cap',
-      dataType: 'numeric',
-      pillar: 'A',
-      subFactor: 'A.3',
-      weightWithinSubFactor: 0.25,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: A.3.3 — Applicant age cap
-Question: What is the maximum age at which a principal applicant can qualify for this program?
-Edge cases:
-
-If no age cap exists, return 999 and note "no age cap".
-If points decline after a certain age, return the age at which points reach zero (effective cap) and describe the curve.
-Return null only if age is not addressed at all.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'min_max',
       direction: 'higher_is_better',
       sourceTierRequired: 1,
     },

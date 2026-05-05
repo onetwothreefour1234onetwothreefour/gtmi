@@ -178,29 +178,36 @@ Normalization formula: `CME = 100 × (score − 53.08) / (93.07 − 53.08)`
 
 ### Pillar A — Access (28% of PAQ)
 
-**A.1 Economic access (40% of pillar)**
+Restructured in methodology v2.0.0 (2026-05-05) — see ADR-028. The
+v1 indicators were reorganised under three new sub-factors
+(qualification thresholds, system design, volume & selectivity);
+"% of local median wage" is now extracted directly rather than derived
+from an absolute salary, and the v1 keys for occupation-list constraint
+and alternative-qualification-pathways were dropped.
 
-| Indicator                                        | Weight | Normalization | Direction          |
-| ------------------------------------------------ | ------ | ------------- | ------------------ |
-| A.1.1 Minimum salary threshold (USD-equivalent)  | 50%    | z-score       | lower is better    |
-| A.1.2 Salary threshold as % of local median wage | 30%    | min-max       | lower is better    |
-| A.1.3 Alternative qualification pathways         | 20%    | categorical   | more flex = better |
+**A.1 Qualification thresholds (50% of pillar)**
 
-**A.2 Human capital requirements (35% of pillar)**
+| Indicator                                        | Weight | Normalization | Direction                 |
+| ------------------------------------------------ | ------ | ------------- | ------------------------- |
+| A.1.1 Salary threshold as % of local median wage | 25%    | min-max       | lower is better           |
+| A.1.2 Minimum educational requirement            | 20%    | categorical   | lower is better           |
+| A.1.3 Minimum work experience (years)            | 20%    | min-max       | lower is better           |
+| A.1.4 Language proficiency requirement           | 20%    | categorical   | less onerous = better     |
+| A.1.5 Applicant age cap                          | 15%    | min-max       | no cap or higher = better |
 
-| Indicator                              | Weight | Normalization | Direction             |
-| -------------------------------------- | ------ | ------------- | --------------------- |
-| A.2.1 Minimum educational requirement  | 35%    | categorical   | lower is better       |
-| A.2.2 Minimum work experience (years)  | 35%    | min-max       | lower is better       |
-| A.2.3 Language proficiency requirement | 30%    | categorical   | less onerous = better |
+**A.2 System design (30% of pillar)**
 
-**A.3 Structural selectivity (25% of pillar)**
+| Indicator                                       | Weight | Normalization | Direction                  |
+| ----------------------------------------------- | ------ | ------------- | -------------------------- |
+| A.2.1 Number of mandatory qualifying criteria   | 35%    | min-max       | fewer = better             |
+| A.2.2 System type: compensatory vs. conjunctive | 40%    | categorical   | compensatory/hybrid better |
+| A.2.3 Number of distinct qualifying tracks      | 25%    | min-max       | more = better              |
 
-| Indicator                            | Weight | Normalization | Direction                 |
-| ------------------------------------ | ------ | ------------- | ------------------------- |
-| A.3.1 Occupation list constraint     | 40%    | categorical   | more open = better        |
-| A.3.2 Annual quota presence and size | 35%    | categorical   | no quota = better         |
-| A.3.3 Applicant age cap              | 25%    | min-max       | no cap or higher = better |
+**A.3 Volume & selectivity (20% of pillar)**
+
+| Indicator                            | Weight | Normalization | Direction         |
+| ------------------------------------ | ------ | ------------- | ----------------- |
+| A.3.1 Annual quota presence and size | 100%   | categorical   | no quota = better |
 
 ### Pillar B — Process (15% of PAQ)
 

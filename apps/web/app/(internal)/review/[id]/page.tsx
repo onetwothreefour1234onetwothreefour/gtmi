@@ -76,10 +76,11 @@ function readRubricCategories(rubric: unknown): RubricCategory[] | null {
 // drift, the publish-time gate is still authoritative — the UI hints
 // are advisory only.
 const NUMERIC_HINTS: Record<string, { min: number; max: number; unit?: string }> = {
-  'A.1.1': { min: 0, max: 1_000_000, unit: 'local currency' },
-  'A.1.2': { min: 0, max: 1000, unit: '% of median' },
-  'A.2.2': { min: 0, max: 30, unit: 'years' },
-  'A.3.3': { min: 0, max: 999, unit: 'years (999 = no cap)' },
+  'A.1.1': { min: 0, max: 1000, unit: '% of local median wage' },
+  'A.1.3': { min: 0, max: 30, unit: 'years (work experience)' },
+  'A.1.5': { min: 0, max: 999, unit: 'years (999 = no cap)' },
+  'A.2.1': { min: 0, max: 20, unit: 'mandatory criteria' },
+  'A.2.3': { min: 0, max: 20, unit: 'qualifying tracks' },
   'B.1.1': { min: 0, max: 3650, unit: 'days' },
   'B.1.3': { min: 0, max: 50, unit: 'steps' },
   'B.2.1': { min: 0, max: 100_000, unit: 'fee (currency)' },

@@ -91,103 +91,10 @@ export function withRubricVocab(
  */
 export const PHASE_3_3_PROMPT_OVERRIDES: Record<string, string> = {
   // ────────────────────────────────────────────────────────────────────
-  // A.1.1 — Negative-match: model returns empty when programme has no
-  // fixed salary threshold (Express Entry FSW: CRS points-based, not
-  // salary-gated). Fix: explicit "return 0 with notes" path.
-  // ────────────────────────────────────────────────────────────────────
-  'A.1.1': withPreamble(
-    `Extraction Task: A.1.1 — Minimum salary threshold
-Question: What is the minimum annual salary, in the local currency as stated in the source, that a principal applicant must earn to qualify for this program?
-
-Recall hints:
-
-If the program qualifies via a points-based system (Canada Express Entry CRS, NZ Skilled Migrant Points, AU points test) where salary contributes points but is not a hard threshold, return value: 0 and notes: "no fixed salary threshold; points-based system".
-If the program has multiple named tiers (Core / Specialist / Talent), report the standard/core threshold and describe alternatives in notes.
-Salary thresholds are sometimes published as "above the [TSMIT/CIW/median wage] threshold" — extract the numeric figure if any is given anywhere on the page (TSMIT for Australia 482; CIW high-skilled threshold for Canada).
-
-Edge cases:
-
-Report raw local-currency figure; USD normalization happens downstream.
-If the threshold is expressed only as a multiple of median wage, return value: null and notes: "expressed as multiple of median — see A.1.2".
-"Proof of funds" requirements are NOT salary thresholds — they are the funds you must show on hand. Do not extract those.`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // A.1.2 — Recall: weak by design (% of median rarely stated explicitly
-  // on government pages). Strengthen with explicit "implied %" pathway
-  // when both the absolute amount AND a contemporaneous median figure
-  // appear in the same page.
-  // ────────────────────────────────────────────────────────────────────
-  'A.1.2': withPreamble(
-    `Extraction Task: A.1.2 — Salary threshold as % of local median wage
-Question: Is the salary threshold for this program defined or benchmarked as a percentage of the local median wage or equivalent statistical reference?
-
-Recall hints:
-
-If the source explicitly states the threshold is calibrated against, set at, derived from, or matched to a percentage of national/local median earnings — even alongside an absolute amount — report that percentage.
-Examples that should yield a value: "TSMIT is set at the median earnings for full-time workers", "salary equal to 80% of full-time median", "matched annually to ABS earnings data", "indexed to the going rate", "tracks the prevailing wage".
-If the page states an absolute threshold AND also cites the relevant median (e.g., "minimum salary £38,700 — the median for skilled jobs is £38,400"), compute the implied percentage to one decimal place and report it.
-"Going rate" / "prevailing wage" methodologies (UK Skilled Worker, US H-1B style) are explicit median-anchor references — extract whatever percentage value the page assigns to the threshold.
-
-Edge cases:
-
-If the threshold is purely a fixed amount with no percentage anchor stated anywhere AND no median figure is cited on the page, return empty (no value).
-If the source gives both (e.g., "the greater of X or Y% of median"), report the percentage.
-If expressed as a multiple (e.g., "1.5x median"), convert to a percentage (150).
-If only a benchmarking statement is given without a numeric percentage and no nearby median figure to compute against, do not infer; return empty.`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // A.1.3 — Recall: points-based programmes don't fit the salary_only/
-  // salary_plus_one taxonomy cleanly. Fix: name the points-only case.
-  // ────────────────────────────────────────────────────────────────────
-  'A.1.3': withPreamble(
-    `Extraction Task: A.1.3 — Alternative qualification pathways
-Question: Besides salary, how many alternative qualifying routes does this program offer?
-Allowed values:
-
-"salary_only": only qualifying route is the salary threshold.
-"salary_plus_one": salary plus one alternative (points, investment, patent).
-"salary_plus_multiple": salary plus two or more alternatives.
-"no_salary_route": qualification does not require a salary threshold at all.
-
-Recall hints:
-
-Points-based programmes where salary contributes to a points score but is not a hard floor (Canada Express Entry CRS, NZ Skilled Migrant Visa, AU Skilled Independent 189 points test) → "no_salary_route".
-"Distinguished talent" / "exceptional ability" / "global talent" / "endorsement-based" sub-streams that bypass salary entirely count as alternative routes.
-"Investor" sub-streams within an otherwise salary-based program count as one alternative.
-
-Edge cases:
-
-A "fast-track" for high salaries is NOT an alternative pathway; it's a salary-based variant.
-Alternative must be a genuinely different criterion (points, investment, patent, extraordinary ability, endorsement).
-"Public-interest exemption" or ministerial discretion is NOT an alternative pathway.`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // A.3.3 — Recall: Express Entry CRS age-points decline isn't always
-  // labelled "age cap" on the source page. Add explicit known patterns.
-  // ────────────────────────────────────────────────────────────────────
-  'A.3.3': withPreamble(
-    `Extraction Task: A.3.3 — Applicant age cap
-Question: What is the maximum age at which a principal applicant can qualify for this program?
-
-Recall hints:
-
-If the source describes a points table where age points decline to zero at a specific age, that age is the effective cap.
-Example: Canada Express Entry CRS — age points 0 at age 45 (single applicant) → effective cap 45.
-Example: Australia 189/190 — age points 0 from 45 → effective cap 45.
-Example: NZ SMV — age cap explicitly 55.
-The "cap" can be implicit: "Applicants over [X] receive no age points and rarely meet the CRS cutoff" → still 45 if 45 is the zero-point age.
-Look for phrases: "minimum age", "maximum age", "must be under [X]", "applicants aged X to Y", "age points table", "no age points awarded after [X]".
-
-Edge cases:
-
-If no age cap exists, return 999 and note "no age cap".
-If points decline gradually after a certain age, return the age at which points reach zero (effective cap) and describe the curve in notes.
-Return null only if age is not addressed at all on the page.`
-  ),
-
+  // Pillar A overrides removed in methodology v2.0.0 — the entire
+  // Pillar A indicator set has been restructured. The prompts in
+  // methodology-v1.ts are now the canonical source of truth for every
+  // Pillar A field (no Phase 3.3 overlay). See ADR superseding ADR-016.
   // ────────────────────────────────────────────────────────────────────
   // B.2.1 — Phase 3.6.6 / FIX 3: multi-currency acceptance. Country-agnostic.
   // The original v1 prompt asked for USD-denominated values, but

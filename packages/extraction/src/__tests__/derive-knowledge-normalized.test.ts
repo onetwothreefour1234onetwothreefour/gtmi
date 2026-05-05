@@ -79,7 +79,7 @@ describe('derive-knowledge value_normalized — FIX 5', () => {
   it('D.2.3 (boolean) maps "not_permitted" → false', () => {
     expect(normalizeDerivedValueRaw('not_permitted', 'boolean')).toBe(false);
   });
-  it('A.1.2 / D.2.2 (min_max) parse a numeric valueRaw', () => {
+  it('D.2.2 (min_max) parses a numeric valueRaw', () => {
     expect(normalizeDerivedValueRaw('80', 'min_max')).toBe(80);
     expect(normalizeDerivedValueRaw('6', 'min_max')).toBe(6);
   });

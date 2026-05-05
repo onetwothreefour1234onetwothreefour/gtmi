@@ -82,16 +82,16 @@ describe('groupFieldsByPillar', () => {
     const make = (k: string, p: string, s: string): FieldDefinitionInput =>
       makeField({ key: k, pillar: p, subFactor: s });
     const fields: FieldDefinitionInput[] = [
-      // Pillar A — 9 indicators across A.1, A.2, A.3
+      // Pillar A — 9 indicators across A.1 (5), A.2 (3), A.3 (1) under methodology v2.0.0
       make('A.1.1', 'A', 'A.1'),
       make('A.1.2', 'A', 'A.1'),
       make('A.1.3', 'A', 'A.1'),
+      make('A.1.4', 'A', 'A.1'),
+      make('A.1.5', 'A', 'A.1'),
       make('A.2.1', 'A', 'A.2'),
       make('A.2.2', 'A', 'A.2'),
       make('A.2.3', 'A', 'A.2'),
       make('A.3.1', 'A', 'A.3'),
-      make('A.3.2', 'A', 'A.3'),
-      make('A.3.3', 'A', 'A.3'),
       // Pillar B — 10
       make('B.1.1', 'B', 'B.1'),
       make('B.1.2', 'B', 'B.1'),

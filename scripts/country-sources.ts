@@ -92,8 +92,9 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     url: 'https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/eligibility/federal-skilled-workers.html',
     tier: 1,
     geographicLevel: 'national',
-    reason: 'FSW eligibility: salary, points, experience requirements — A.1.1, A.2.2, A.2.3',
-    fieldKeys: ['A.1.1', 'A.2.2', 'A.2.3'],
+    reason:
+      'FSW eligibility: salary (% of median), experience, language requirements — A.1.1, A.1.3, A.1.4',
+    fieldKeys: ['A.1.1', 'A.1.3', 'A.1.4'],
     country: 'CAN',
   },
   {
@@ -134,8 +135,9 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     url: 'https://www.gov.uk/skilled-worker-visa/your-job',
     tier: 1,
     geographicLevel: 'national',
-    reason: 'Skilled Worker salary thresholds and job eligibility — A.1.1, A.2.1, A.2.3',
-    fieldKeys: ['A.1.1', 'A.2.1', 'A.2.3'],
+    reason:
+      'Skilled Worker salary thresholds (% of median), education floor, language — A.1.1, A.1.2, A.1.4',
+    fieldKeys: ['A.1.1', 'A.1.2', 'A.1.4'],
     country: 'GBR',
   },
   {
@@ -178,8 +180,8 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     tier: 1,
     geographicLevel: 'national',
     reason:
-      'S Pass eligibility: min salary SGD 3,150/mo, diploma-equivalent qualifications — A.1.1, A.2.2, A.3.2, B.1.1',
-    fieldKeys: ['A.1.1', 'A.2.2', 'A.3.2', 'B.1.1'],
+      'S Pass eligibility: min salary (% of median), experience, quota — A.1.1, A.1.3, A.3.1, B.1.1',
+    fieldKeys: ['A.1.1', 'A.1.3', 'A.3.1', 'B.1.1'],
     country: 'SGP',
   },
   {

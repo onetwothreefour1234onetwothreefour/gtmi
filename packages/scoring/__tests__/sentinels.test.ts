@@ -73,24 +73,24 @@ describe('normalizeRawValue — sentinel handling for min_max / z_score', () => 
 
 describe('runScoringEngine — sentinel short-circuits min_max', () => {
   const ageDef: FieldDefinitionRecord = {
-    id: 'def-a33',
-    key: 'A.3.3',
+    id: 'def-a15',
+    key: 'A.1.5',
     pillar: 'A',
-    subFactor: 'A.3',
+    subFactor: 'A.1',
     normalizationFn: 'min_max',
     direction: 'higher_is_better',
-    weightWithinSubFactor: 0.25,
+    weightWithinSubFactor: 0.15,
     scoringRubricJsonb: null,
   };
   const realAgeFv: FieldValueRecord = {
     id: 'fv-real',
-    fieldDefinitionId: 'def-a33',
+    fieldDefinitionId: 'def-a15',
     valueNormalized: 45,
     status: 'approved',
   };
   const sentinelFv: FieldValueRecord = {
     id: 'fv-no-cap',
-    fieldDefinitionId: 'def-a33',
+    fieldDefinitionId: 'def-a15',
     valueNormalized: { __noLimit: true },
     status: 'approved',
   };
@@ -104,8 +104,8 @@ describe('runScoringEngine — sentinel short-circuits min_max', () => {
       scoredAt: new Date(),
       cmeScore: 50,
       fieldDefinitions: [{ ...ageDef, direction }],
-      normalizationParams: { 'A.3.3': { min: 25, max: 65 } },
-      activeFieldKeys: ['A.3.3'],
+      normalizationParams: { 'A.1.5': { min: 25, max: 65 } },
+      activeFieldKeys: ['A.1.5'],
       fieldValues,
     };
   }

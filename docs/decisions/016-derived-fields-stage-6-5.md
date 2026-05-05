@@ -1,6 +1,11 @@
 # ADR-016 — Derived fields (Stage 6.5: deterministic computation for A.1.2 and D.2.2)
 
-**Status:** Approved (Phase 3.6 / Fix D)
+**Status:** Partially superseded by ADR-028 (2026-05-05). The Pillar A
+portion (A.1.2 % of median) is removed under methodology v2.0.0;
+% of median is now extracted directly as A.1.1. The D.2.2 derivation
+and the other Pillar D / E derivations described below remain in force.
+
+**Original status:** Approved (Phase 3.6 / Fix D)
 **Date:** 2026-04-28
 **Authors:** Szabi (drafted via Phase 3.6 plan, analyst pre-approval required per Q4 decision before commit 6 ships).
 

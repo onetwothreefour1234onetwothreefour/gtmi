@@ -21,11 +21,14 @@ export const WAVE_2_ENABLED = true;
 
 export const WAVE_1_FIELD_CODES: string[] = [
   'A.1.1',
+  'A.1.2',
+  'A.1.3',
+  'A.1.4',
+  'A.1.5',
   'A.2.1',
   'A.2.2',
   'A.2.3',
   'A.3.1',
-  'A.3.2',
   'B.1.1',
   'B.1.2',
   'B.1.3',
@@ -49,11 +52,9 @@ export const WAVE_1_FIELD_CODES: string[] = [
   'E.3.2',
 ];
 
-// Remaining 21 sub-factors required for full 48-field methodology coverage.
+// Remaining sub-factors required for full 48-field methodology coverage.
+// Methodology v2.0.0: all Pillar A indicators were flattened into WAVE_1.
 export const WAVE_2_FIELD_CODES: string[] = [
-  'A.1.2',
-  'A.1.3',
-  'A.3.3',
   'B.2.3',
   'B.2.4',
   'B.3.1',

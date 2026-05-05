@@ -7,7 +7,6 @@ import {
   PublishStageImpl,
   ScrapeStageImpl,
   ValidateStageImpl,
-  deriveA12,
   deriveB24,
   deriveD12,
   deriveD13,
@@ -56,11 +55,7 @@ import {
   fetchVdemRuleOfLawScore,
   fetchWgiScore,
 } from '../../../scripts/country-sources';
-import {
-  COUNTRY_MEDIAN_WAGE,
-  COUNTRY_CITIZENSHIP_RESIDENCE_YEARS,
-  FX_RATES,
-} from '@gtmi/extraction';
+import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from '@gtmi/extraction';
 import { and, eq } from 'drizzle-orm';
 
 const METHODOLOGY_VERSION = '1.0.0';
@@ -404,10 +399,10 @@ export const extractSingleProgram = task({
     }
 
     // --- Stage 2: Batch extract LLM fields. Exclude E.3.2 (always API),
-    // E.3.1 (when V-Dem-handled), and A.1.2 / D.2.2 (Phase 3.6 derive
-    // stage owns these — see ADR-016). ---
+    // E.3.1 (when V-Dem-handled), and the Pillar D / E derived fields
+    // (Phase 3.6 derive stage owns these — see ADR-016 + the methodology
+    // v2.0.0 superseding ADR). Pillar A no longer has a derived field. ---
     const DERIVED_FIELD_KEYS = new Set([
-      'A.1.2',
       'B.2.4',
       'D.1.2',
       'D.1.3',
@@ -536,18 +531,6 @@ export const extractSingleProgram = task({
         return r && r.output.valueRaw !== '' ? r : null;
       };
 
-      const a11Live = lookupExtraction('A.1.1');
-      const a11Db = a11Live ? null : await readApprovedFieldValue('A.1.1');
-      const a11ValueRaw = a11Live?.output.valueRaw ?? a11Db?.valueRaw ?? null;
-      let a11ValueCurrency: string | null = a11Db?.valueCurrency ?? null;
-      if (a11ValueCurrency === null && a11ValueRaw) {
-        const m = a11ValueRaw.match(/^([A-Z]{3})\b/);
-        if (m && m[1]) a11ValueCurrency = m[1];
-      }
-      const a11SourceUrl = a11Live?.sourceUrl ?? a11Db?.sourceUrl ?? null;
-      const a11SourceSentence: string | null =
-        a11Live?.output.sourceSentence ?? a11Db?.sourceSentence ?? null;
-
       const d11Live = lookupExtraction('D.1.1');
       const d11Db = d11Live ? null : await readApprovedFieldValue('D.1.1');
       const d11Raw = d11Live?.output.valueRaw ?? d11Db?.valueRaw ?? null;
@@ -565,17 +548,6 @@ export const extractSingleProgram = task({
       const d12Years: number | null = d12DerivedResult?.numericValue ?? null;
       const d12SourceUrl: string | null = d12PolicyEntry?.sourceUrl ?? null;
 
-      const a12Result = deriveA12({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        a11ValueRaw,
-        a11ValueCurrency,
-        a11SourceUrl,
-        a11SourceSentence,
-        medianWage: COUNTRY_MEDIAN_WAGE[country] ?? null,
-        fxRate: a11ValueCurrency ? (FX_RATES[a11ValueCurrency.toUpperCase()] ?? null) : null,
-      });
       const d22Result = deriveD22({
         programId,
         countryIso: country,
@@ -658,7 +630,6 @@ export const extractSingleProgram = task({
       });
 
       for (const derived of [
-        a12Result,
         d12DerivedResult,
         d22Result,
         d23Result,

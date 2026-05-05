@@ -11,7 +11,7 @@ import { ScoringError } from '../src/types';
 const NO_PARAMS: NormalizationParams = {};
 
 const PARAMS_WITH_BOUNDS: NormalizationParams = {
-  'A.2.2': { min: 0, max: 10 },
+  'A.1.3': { min: 0, max: 10 },
   'B.2.1': { mean: 1000, stddev: 250 },
 };
 
@@ -36,7 +36,7 @@ function defOf(
 describe('scoreSingleIndicator — null / sentinel guards', () => {
   it('returns null when valueNormalized is null', () => {
     const r = scoreSingleIndicator({
-      fieldDefinition: defOf({ key: 'A.2.2', normalizationFn: 'min_max' }),
+      fieldDefinition: defOf({ key: 'A.1.3', normalizationFn: 'min_max' }),
       valueNormalized: null,
       normalizationParams: PARAMS_WITH_BOUNDS,
     });
@@ -45,7 +45,7 @@ describe('scoreSingleIndicator — null / sentinel guards', () => {
 
   it('returns null when valueNormalized is undefined', () => {
     const r = scoreSingleIndicator({
-      fieldDefinition: defOf({ key: 'A.2.2', normalizationFn: 'min_max' }),
+      fieldDefinition: defOf({ key: 'A.1.3', normalizationFn: 'min_max' }),
       valueNormalized: undefined,
       normalizationParams: PARAMS_WITH_BOUNDS,
     });
@@ -54,7 +54,7 @@ describe('scoreSingleIndicator — null / sentinel guards', () => {
 
   it('returns null on the notApplicable marker (FIX 1 honoured)', () => {
     const r = scoreSingleIndicator({
-      fieldDefinition: defOf({ key: 'A.1.2', normalizationFn: 'min_max' }),
+      fieldDefinition: defOf({ key: 'A.1.1', normalizationFn: 'min_max' }),
       valueNormalized: { notApplicable: true, reason: 'Points-based programme' },
       normalizationParams: PARAMS_WITH_BOUNDS,
     });
@@ -66,7 +66,7 @@ describe('scoreSingleIndicator — min_max', () => {
   it('returns 100 for the no-limit marker on higher_is_better', () => {
     const r = scoreSingleIndicator({
       fieldDefinition: defOf({
-        key: 'A.3.3',
+        key: 'A.1.5',
         normalizationFn: 'min_max',
         direction: 'higher_is_better',
       }),
@@ -92,7 +92,7 @@ describe('scoreSingleIndicator — min_max', () => {
   it('returns the min_max-normalised score for a numeric value', () => {
     const r = scoreSingleIndicator({
       fieldDefinition: defOf({
-        key: 'A.2.2',
+        key: 'A.1.3',
         normalizationFn: 'min_max',
         direction: 'lower_is_better',
       }),
