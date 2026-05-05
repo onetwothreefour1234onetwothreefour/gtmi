@@ -209,32 +209,42 @@ and alternative-qualification-pathways were dropped.
 | ------------------------------------ | ------ | ------------- | ----------------- |
 | A.3.1 Annual quota presence and size | 100%   | categorical   | no quota = better |
 
-### Pillar B — Process (15% of PAQ)
+### Pillar B — Process Design (15% of PAQ)
 
-**B.1 Time to decision (40% of pillar)**
+Restructured in methodology v3.0.0 (2026-05-05) — see ADR-029. The
+v2 indicators were reorganised under four new sub-factors (speed,
+process complexity, total cost, transparency); fees and mandatory
+non-government costs collapse into a single all-in USD figure
+(B.3.1) extracted directly with inline currency conversion, and the
+v2 keys for online-application availability and employer-borne
+levies were dropped.
 
-| Indicator                                    | Weight | Normalization | Direction          |
-| -------------------------------------------- | ------ | ------------- | ------------------ |
-| B.1.1 Published SLA processing time (days)   | 50%    | min-max       | shorter = better   |
-| B.1.2 Fast-track option availability and SLA | 30%    | categorical   | available = better |
-| B.1.3 Number of application steps            | 20%    | min-max       | fewer = better     |
+**B.1 Speed (30% of pillar)**
 
-**B.2 Direct cost (35% of pillar)**
+| Indicator                     | Weight | Normalization | Direction        |
+| ----------------------------- | ------ | ------------- | ---------------- |
+| B.1.1 Standard SLA (days)     | 70%    | min-max       | shorter = better |
+| B.1.2 Fast track availability | 30%    | boolean       | yes = better     |
 
-| Indicator                                           | Weight | Normalization | Direction      |
-| --------------------------------------------------- | ------ | ------------- | -------------- |
-| B.2.1 Principal applicant fees (USD)                | 40%    | z-score       | lower = better |
-| B.2.2 Per-dependant fees (USD)                      | 25%    | z-score       | lower = better |
-| B.2.3 Employer-borne levies and skill charges (USD) | 20%    | z-score       | lower = better |
-| B.2.4 Mandatory non-government costs                | 15%    | z-score       | lower = better |
+**B.2 Process Complexity (20% of pillar)**
 
-**B.3 Digital and administrative access (25% of pillar)**
+| Indicator                                   | Weight | Normalization | Direction      |
+| ------------------------------------------- | ------ | ------------- | -------------- |
+| B.2.1 Number of mandatory application steps | 50%    | min-max       | fewer = better |
+| B.2.2 Mandatory in-person touchpoints       | 50%    | min-max       | fewer = better |
 
-| Indicator                                | Weight | Normalization      | Direction               |
-| ---------------------------------------- | ------ | ------------------ | ----------------------- |
-| B.3.1 Online application availability    | 40%    | categorical        | online-first = better   |
-| B.3.2 In-person / biometric requirement  | 35%    | min-max (inverted) | fewer = better          |
-| B.3.3 Appeal and refusal process clarity | 25%    | categorical        | clear + timely = better |
+**B.3 Total Cost (30% of pillar)**
+
+| Indicator                                                           | Weight | Normalization | Direction      |
+| ------------------------------------------------------------------- | ------ | ------------- | -------------- |
+| B.3.1 Total applicant cost (USD; principal + 1 spouse + 2 children) | 100%   | min-max       | lower = better |
+
+**B.4 Transparency (20% of pillar)**
+
+| Indicator                                | Weight | Normalization | Direction               |
+| ---------------------------------------- | ------ | ------------- | ----------------------- |
+| B.4.1 Appeal and refusal process clarity | 50%    | categorical   | clear + timely = better |
+| B.4.2 Application status tracking        | 50%    | categorical   | self-service = better   |
 
 ### Pillar C — Rights (20% of PAQ)
 
