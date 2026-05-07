@@ -86,28 +86,36 @@ async function main(): Promise<void> {
         await tx.unsafe(stmt);
         console.log(`  OK   ${preview}${stmt.length > 80 ? '…' : ''}`);
       }
-      // Phase 3.10d / A.1 — record the apply in migrations_applied
-      // (idempotent ON CONFLICT). Best-effort; the table only exists
-      // after migration 00022 is applied, so the INSERT is wrapped to
-      // tolerate the table-missing case during the bootstrap apply.
-      try {
-        const checksum = createHash('sha256').update(source, 'utf8').digest('hex');
-        const operator =
-          process.env['USER'] ?? process.env['USERNAME'] ?? process.env['LOGNAME'] ?? 'unknown';
-        await tx`
-          INSERT INTO migrations_applied (filename, applied_at, applied_by, checksum_sha256)
-          VALUES (${basename(filePath)}, NOW(), ${operator}, ${checksum})
-          ON CONFLICT (filename) DO UPDATE SET
-            applied_at = NOW(),
-            applied_by = ${operator},
-            checksum_sha256 = ${checksum}
-        `;
-      } catch {
-        // migrations_applied table doesn't exist yet (pre-00022).
-        // Silent; the table itself will record the bootstrap apply.
-      }
     });
     console.log('\nMigration applied successfully (transaction committed).');
+
+    // Phase 3.10d / A.1 — record the apply in migrations_applied (idempotent
+    // ON CONFLICT). Best-effort, OUTSIDE the transaction so a missing journal
+    // table during bootstrap doesn't poison the migration commit. Postgres
+    // aborts the entire transaction on any error regardless of JS-level
+    // try/catch, so the journal write must not share a transaction with the
+    // migration's own statements.
+    try {
+      const checksum = createHash('sha256').update(source, 'utf8').digest('hex');
+      const operator =
+        process.env['USER'] ?? process.env['USERNAME'] ?? process.env['LOGNAME'] ?? 'unknown';
+      await sql`
+        INSERT INTO migrations_applied (filename, applied_at, applied_by, checksum_sha256)
+        VALUES (${basename(filePath)}, NOW(), ${operator}, ${checksum})
+        ON CONFLICT (filename) DO UPDATE SET
+          applied_at = NOW(),
+          applied_by = ${operator},
+          checksum_sha256 = ${checksum}
+      `;
+      console.log('Journal row written.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('migrations_applied')) {
+        console.log('Journal table not present yet — skipped journal write.');
+      } else {
+        console.warn(`Journal write failed: ${msg}`);
+      }
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`\nMigration FAILED — transaction rolled back. ${msg}`);
