@@ -31,8 +31,8 @@ export const PHASE2_PLACEHOLDER_PARAMS: NormalizationParams = {
   'B.3.1': { min: 0, max: 50_000 }, // total applicant cost USD (principal + 1 spouse + 2 children) — min_max
   // B.4.1 / B.4.2 are categorical — no params.
 
-  // C — Conditions
-  'C.2.2': { min: 0, max: 25 }, // dependent child age cap — min_max
+  // C — Benefits (methodology v4.0.0 / ADR-030; renamed from "Rights")
+  'C.2.2': { min: 0, max: 30 }, // dependent child age cap — min_max (no_cap → 100 via NO_LIMIT_MARKER)
 
   // D — Pathways
   'D.1.2': { min: 0, max: 10 }, // years to PR eligibility — min_max

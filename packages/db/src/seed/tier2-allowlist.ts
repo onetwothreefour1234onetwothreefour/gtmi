@@ -32,6 +32,6 @@
 
 export const TIER2_BACKFILL_ALLOWLIST: readonly string[] = Object.freeze([
   'B.4.1', // Appeal and refusal process clarity (methodology v3.0.0; was B.3.3)
-  'C.2.4', // Same-sex partner recognition
+  'C.3.1', // Public healthcare access (methodology v4.0.0; replaces v3 C.2.4 entry)
   'D.2.3', // Dual citizenship permitted
 ]);

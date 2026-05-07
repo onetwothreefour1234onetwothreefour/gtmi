@@ -45,51 +45,40 @@ export const RUBRIC_SCORES: Record<string, Record<string, number>> = {
     email_only: 50,
     online_portal: 100,
   },
+  // Pillar C rubrics rewritten in methodology v4.0.0 (ADR-030):
+  // collapsed vocabularies on the same axes (employer switching,
+  // self-employment, spouse inclusion, healthcare, education) plus net-new
+  // C.1.3 (visa duration). Old keys C.1.4 (LMT) and C.2.4 (same-sex partner)
+  // retired and removed.
   'C.1.1': {
-    not_required: 100,
-    required_initial_only: 60,
-    required_throughout: 0,
+    open: 100,
+    notification_only: 50,
+    new_application_required: 0,
   },
   'C.1.2': {
-    free_switching: 100,
-    notification_only: 70,
-    re_application: 30,
-    not_permitted: 0,
+    full: 100,
+    restricted: 50,
+    none: 0,
   },
   'C.1.3': {
-    full_rights: 100,
-    limited_secondary: 65,
-    permitted_with_permission: 35,
-    prohibited: 0,
+    permanent: 100,
+    long_term_renewable: 67,
+    short_term_renewable: 33,
+    non_renewable: 0,
   },
   'C.2.1': {
-    automatic_with_full_work_rights: 100,
-    automatic_with_limited_work_rights: 75,
-    automatic_no_work_rights: 50,
-    by_permit_with_work_rights: 65,
-    by_permit_no_work_rights: 25,
+    automatic_full: 100,
+    automatic_limited_or_permit: 50,
     not_permitted: 0,
   },
-  // C.3.1 — `automatic` and `conditional_rhca` were added inline to the
-  // rubric; their scores are mirrored here so applyRubricScores doesn't
-  // throw when re-seeding. `automatic` is an analyst-introduced alias of
-  // `full_access`; `conditional_rhca` matches the levy / RHCA pattern.
   'C.3.1': {
-    full_access: 100,
-    automatic: 100,
-    conditional_rhca: 70,
-    levy_required: 70,
-    insurance_required: 50,
-    emergency_only: 20,
-    no_access: 0,
+    full: 100,
+    partial: 50,
+    none: 0,
   },
-  // C.3.2 vocabulary aligned with REGIONAL_SUBSTITUTES and the v2 prompt.
-  // 100/40 are analyst-set (mirror REGIONAL_SUBSTITUTES['C.3.2']); 20 / 0
-  // fill the gradient for restricted / none.
   'C.3.2': {
-    automatic: 100,
-    fee_paying: 40,
-    restricted: 20,
+    full: 100,
+    partial: 50,
     none: 0,
   },
   'D.2.4': {

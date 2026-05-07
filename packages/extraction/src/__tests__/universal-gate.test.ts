@@ -64,9 +64,17 @@ describe('isNumericInSanityRange', () => {
     expect(isNumericInSanityRange('E.3.1', 0)).toBe(true);
   });
 
-  it('accepts the no-cap sentinel 999 for fields that opt in (A.1.5, C.2.2)', () => {
-    expect(isNumericInSanityRange('A.1.5', 999)).toBe(true);
-    expect(isNumericInSanityRange('C.2.2', 999)).toBe(true);
+  it('rejects the integer 999 on age-cap fields (methodology v4.0.0 / ADR-030: no_cap token is the only no-cap encoding)', () => {
+    // Sanity ranges for A.1.5 / C.2.2 dropped to 0..100 — the integer
+    // 999 no longer trickles through as a "valid age". The no-cap
+    // semantic is carried via the sentinel-token route (valueRaw =
+    // 'no_cap' | 'no_limit' | 'none' | '999') which normalize-raw.ts
+    // converts to the structured NO_LIMIT_MARKER before this gate.
+    expect(isNumericInSanityRange('A.1.5', 999)).toBe(false);
+    expect(isNumericInSanityRange('C.2.2', 999)).toBe(false);
+    // The realistic cap upper bound (100) still passes.
+    expect(isNumericInSanityRange('A.1.5', 100)).toBe(true);
+    expect(isNumericInSanityRange('C.2.2', 100)).toBe(true);
   });
 
   it('fails open for unknown fields (no entry → returns true)', () => {

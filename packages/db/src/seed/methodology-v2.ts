@@ -112,85 +112,12 @@ export const PHASE_3_3_PROMPT_OVERRIDES: Record<string, string> = {
   // ────────────────────────────────────────────────────────────────────
 
   // ────────────────────────────────────────────────────────────────────
-  // C.1.3 — Recall: CAN/UKVI use "open work permit" / "ancillary work
-  // rights" rather than "self-employment".
+  // Pillar C overrides removed in methodology v4.0.0 — the entire
+  // Pillar C indicator set has been restructured (renamed to "Benefits"),
+  // collapsing rubrics and dropping C.1.4 / C.2.4 entirely. The prompts
+  // in methodology-v1.ts are now the canonical source of truth for every
+  // Pillar C field (no Phase 3.3 overlay). See ADR-030.
   // ────────────────────────────────────────────────────────────────────
-  'C.1.3': withPreamble(
-    `Extraction Task: C.1.3 — Self-employment and secondary income rights
-Question: Can the visa holder engage in self-employment and secondary income activities?
-Allowed values:
-
-"full_rights": both fully permitted.
-"limited_secondary": secondary employment permitted but self-employment restricted/prohibited.
-"permitted_with_permission": permitted only with prior authorization.
-"prohibited": self-employment and secondary income not permitted.
-
-Recall hints:
-
-PR-track visas (Express Entry once PR is granted) → "full_rights".
-Open work permit / open spouse permit / "no employer-specific restriction" → "full_rights".
-"Tied to employer" / "employer-specific work permit" / "named sponsor" / "may only work for [sponsoring employer]" → "limited_secondary" or "prohibited" depending on whether other paid work is barred.
-"Self-employment is not permitted" (UK Skilled Worker explicit) → "limited_secondary" if secondary employee work is allowed, else "prohibited".
-"Permission may be granted on application" → "permitted_with_permission".
-Australia 482 Specialist stream: only the sponsoring employer + nominated occupation → "limited_secondary".
-
-Edge cases:
-
-Passive investment income (dividends, rental) generally outside these rules unless addressed.
-Sector/occupation restrictions should be noted.
-Volunteer and unpaid work generally permitted regardless — do not factor in.`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // C.2.2 — Recall: "dependent child" age varies by country; explicit
-  // hints needed.
-  // ────────────────────────────────────────────────────────────────────
-  'C.2.2': withPreamble(
-    `Extraction Task: C.2.2 — Dependent child age cap
-Question: Up to what age can a dependent child be included on the principal's visa?
-
-Recall hints:
-
-Common patterns:
-  * Australia 482 / 189: under 18 (or under 23 if dependent full-time student).
-  * UK Skilled Worker: under 18 at first application; can stay until current visa expires.
-  * Canada Express Entry / IRCC: under 22 at the time of application (locked-in age).
-  * Singapore EP/S Pass DP: unmarried child under 21.
-  * Hong Kong: under 18 (or 21 for full-time students).
-Look for: "child under [X]", "dependent child", "minor", "unmarried son/daughter under [X]", "locked-in age".
-
-Edge cases:
-
-If cap differs for full-time students, report the higher cap and note the condition (populate student_extension_age in notes).
-If no age cap, return 999.
-"Locked-in age" (age frozen at time of application) is a CAP — report the lock-in age (Canada: 22).
-If children age out mid-visa, note this in notes — but report the entry-eligibility cap.`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // C.2.4 — Recall: CAN uses "common-law partner" not "de facto".
-  // ────────────────────────────────────────────────────────────────────
-  'C.2.4': withPreamble(
-    `Extraction Task: C.2.4 — Same-sex partner recognition
-Question: Does this program recognize same-sex spouses or same-sex de facto partners as eligible dependants?
-
-Recall hints:
-
-Recognition phrases (positive evidence for true):
-  * "spouse" defined as including same-sex married partners.
-  * "common-law partner" (Canada) — gender-neutral, includes same-sex.
-  * "de facto partner" (Australia) — gender-neutral, includes same-sex.
-  * "civil partner" / "civil union" (UK, several EU) — gender-neutral.
-  * "domestic partner" (Singapore on a case-by-case basis).
-"Spouse" alone with no gender qualifier in a country that legally permits same-sex marriage (CAN, AUS, UK, etc.) → true.
-Recognition of a foreign same-sex marriage (even where the country doesn't itself perform them) → true if explicitly accepted.
-"Partner" with no qualifier in a country that doesn't recognize same-sex relationships at all (most Gulf states) → likely false; check carefully.
-
-Edge cases:
-
-If silent and the country is one where same-sex marriage is unlawful, default to false and note "no explicit recognition; country does not legally recognize same-sex marriage".
-If silent and the country legally recognizes same-sex marriage, default to true (general law applies).`
-  ),
 
   // ────────────────────────────────────────────────────────────────────
   // D.2.3 — Negative-match: country's general dual-citizenship policy
@@ -567,6 +494,12 @@ const STRUCTURED_BOOL_RUBRIC = {
 // (automatic for OECD, fee_paying for GCC) when extraction is empty;
 // LLM-extracted values can be any of the four, scored via the rubric.
 // 100 / 40 are analyst-set; 20 / 0 fill the gradient for restricted / none.
+//
+// Methodology v4.0.0 / ADR-030: C.3.2 reverted to plain categorical;
+// this rubric is dormant. Retained alongside the rest of the
+// country_substitute_regional infrastructure (REGIONAL_SUBSTITUTES,
+// executeCountrySubstitute, engine branch) per §k.4 — cleanup deferred.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const C32_REGIONAL_RUBRIC = {
   categories: [
     {
@@ -648,30 +581,12 @@ If the page mentions PR as a pathway endpoint but does NOT describe the retentio
     ),
   },
 
-  'C.3.2': {
-    dataType: 'categorical',
-    normalizationFn: 'country_substitute_regional',
-    direction: 'higher_is_better',
-    scoringRubricJsonb: C32_REGIONAL_RUBRIC,
-    // Phase 3.8 / P0.5 — first prompt rewritten to use the rubric-driven
-    // "Allowed values" generator. The {{ALLOWED_VALUES}} marker is
-    // replaced at build time with the C32_REGIONAL_RUBRIC categories,
-    // so prompt and rubric can never drift apart again.
-    extractionPromptMd: withRubricVocab(
-      'C.3.2',
-      C32_REGIONAL_RUBRIC,
-      `Extraction Task: C.3.2 — Public education access for children of visa holders
-Question: Do children of this programme's visa holders have automatic access to the public education system (free schooling) on the same terms as citizen children?
-
-{{ALLOWED_VALUES}}
-
-Edge cases:
-
-If the page is silent, the publish stage will substitute the regional default
-('automatic' for OECD high-income, 'fee_paying' for GCC) — do NOT guess. Return
-empty so the substitution mechanism can fire cleanly.`
-    ),
-  },
+  // C.3.2 country_substitute_regional restructure removed in methodology
+  // v4.0.0 — new C.3.2 is a plain categorical (full / partial / none)
+  // extracted directly from the page. The country_substitute_regional
+  // infrastructure (REGIONAL_SUBSTITUTES, executeCountrySubstitute,
+  // engine branch) is left in place dormant and will be cleaned up in a
+  // follow-up PR. See ADR-030.
 };
 
 /**

@@ -65,14 +65,14 @@ const COUNTRY_SUBSTITUTE_MODEL = 'country-substitute-regional';
 export const NUMERIC_SANITY_RANGES: Record<string, { min: number; max: number }> = {
   'A.1.1': { min: 0, max: 1000 }, // salary threshold as % of local median wage
   'A.1.3': { min: 0, max: 30 }, // minimum years of work experience
-  'A.1.5': { min: 0, max: 999 }, // applicant age cap (999 = "no cap" sentinel)
+  'A.1.5': { min: 0, max: 100 }, // applicant age cap (use no_cap token if no upper limit)
   'A.2.1': { min: 0, max: 20 }, // number of mandatory qualifying criteria
   'A.2.3': { min: 0, max: 20 }, // number of distinct qualifying tracks
   'B.1.1': { min: 0, max: 3650 }, // standard SLA days (~10 years)
   'B.2.1': { min: 0, max: 50 }, // mandatory application steps
   'B.2.2': { min: 0, max: 20 }, // mandatory in-person touchpoints
   'B.3.1': { min: 0, max: 1_000_000 }, // total applicant cost USD (principal + 1 spouse + 2 children)
-  'C.2.2': { min: 0, max: 999 }, // dependent child age cap
+  'C.2.2': { min: 0, max: 100 }, // dependent child age cap (use no_cap token if no upper limit)
   'D.1.2': { min: 0, max: 50 }, // years to PR
   'D.2.2': { min: 0, max: 99 }, // years to citizenship
   'D.3.1': { min: 0, max: 366 }, // tax residency trigger days

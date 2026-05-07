@@ -73,11 +73,11 @@ describe('migration 00010 — methodology v2 column reconciliation', () => {
     expect(PHASE_3_5_INDICATOR_RESTRUCTURES['B.2.4']).toBeUndefined();
   });
 
-  it('seed source-of-truth agrees with C.3.2 country_substitute_regional override', () => {
-    const r = PHASE_3_5_INDICATOR_RESTRUCTURES['C.3.2'];
-    expect(r).toBeDefined();
-    expect(r!.normalizationFn).toBe('country_substitute_regional');
-    expect(r!.dataType).toBe('categorical');
+  it('C.3.2 country_substitute_regional override removed in methodology v4.0.0 (ADR-030)', () => {
+    // The historical SQL in migration 00010 still references C.3.2; that
+    // is preserved as-is. The seed-side restructure entry is gone — new
+    // C.3.2 is a plain categorical extracted from the page.
+    expect(PHASE_3_5_INDICATOR_RESTRUCTURES['C.3.2']).toBeUndefined();
   });
 });
 

@@ -170,7 +170,7 @@ describe('PillarBreakdown — tabs vs expand-all (Q5)', () => {
     mkFieldValue('A', 'A.1.1', 'A.1', 'Minimum salary'),
     mkFieldValue('A', 'A.2.1', 'A.2', 'Education floor'),
     mkFieldValue('B', 'B.1.1', 'B.1', 'Application fee'),
-    mkFieldValue('C', 'C.1.1', 'C.1', 'Spouse work rights'),
+    mkFieldValue('C', 'C.1.1', 'C.1', 'Employer switching'),
     mkFieldValue('D', 'D.2.2', 'D.2', 'Years to citizenship'),
     mkFieldValue('E', 'E.3.2', 'E.3', 'Government effectiveness'),
   ];

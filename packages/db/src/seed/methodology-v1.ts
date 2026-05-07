@@ -34,8 +34,8 @@ export const methodologyV1 = {
       'B.4': ['B.4.1', 'B.4.2'],
     },
     C: {
-      'C.1': ['C.1.1', 'C.1.2', 'C.1.3', 'C.1.4'],
-      'C.2': ['C.2.1', 'C.2.2', 'C.2.3', 'C.2.4'],
+      'C.1': ['C.1.1', 'C.1.2', 'C.1.3'],
+      'C.2': ['C.2.1', 'C.2.2', 'C.2.3'],
       'C.3': ['C.3.1', 'C.3.2'],
     },
     D: {
@@ -58,8 +58,8 @@ export const methodologyV1 = {
     'B.2': 0.2,
     'B.3': 0.3,
     'B.4': 0.2,
-    'C.1': 0.45,
-    'C.2': 0.35,
+    'C.1': 0.4,
+    'C.2': 0.4,
     'C.3': 0.2,
     'D.1': 0.5,
     'D.2': 0.35,
@@ -85,14 +85,12 @@ export const methodologyV1 = {
     'B.3.1': 1.0,
     'B.4.1': 0.5,
     'B.4.2': 0.5,
-    'C.1.1': 0.3,
+    'C.1.1': 0.4,
     'C.1.2': 0.3,
-    'C.1.3': 0.25,
-    'C.1.4': 0.15,
-    'C.2.1': 0.4,
-    'C.2.2': 0.25,
+    'C.1.3': 0.3,
+    'C.2.1': 0.5,
+    'C.2.2': 0.3,
     'C.2.3': 0.2,
-    'C.2.4': 0.15,
     'C.3.1': 0.5,
     'C.3.2': 0.5,
     'D.1.1': 0.3,
@@ -135,11 +133,9 @@ export const methodologyV1 = {
     'C.1.1': 'categorical',
     'C.1.2': 'categorical',
     'C.1.3': 'categorical',
-    'C.1.4': 'boolean',
     'C.2.1': 'categorical',
     'C.2.2': 'min_max',
     'C.2.3': 'boolean',
-    'C.2.4': 'boolean',
     'C.3.1': 'categorical',
     'C.3.2': 'categorical',
     'D.1.1': 'boolean',
@@ -163,7 +159,7 @@ export const methodologyV1 = {
     'E.3.2': 'min_max',
   },
   cme_paq_split: { cme: 0.3, paq: 0.7 },
-  version_tag: '3.0.0',
+  version_tag: '4.0.0',
   indicators: [
     {
       key: 'A.1.1',
@@ -323,9 +319,14 @@ Example: Australia 189/190 — age points 0 from 45 → effective cap 45.
 Example: NZ SMV — age cap explicitly 55.
 Look for phrases: "minimum age", "maximum age", "must be under [X]", "applicants aged X to Y", "age points table", "no age points awarded after [X]".
 
+No-cap pattern (IMPORTANT):
+
+If the source explicitly states there is no age cap (no upper age limit, "applicants of any age"), return the sentinel token "no_cap" as valueRaw. The scoring engine treats this as the maximum-score outcome under higher_is_better.
+
+DO NOT return the integer 999 or any other sentinel integer. Return one of: "no_cap", "no_limit", or "none". The downstream normalizer recognises all three.
+
 Edge cases:
 
-If no age cap exists, return 999 and note "no age cap".
 If points decline gradually after a certain age, return the age at which points reach zero (effective cap) and describe the curve.
 Return null only if age is not addressed at all on the page.`,
       scoringRubricJsonb: null,
@@ -734,35 +735,44 @@ A portal that only shows "submitted" / "decided" with no intermediate stages sti
     },
     {
       key: 'C.1.1',
-      label: 'Employer-sponsorship requirement',
+      label: 'Employer switching',
       dataType: 'categorical',
       pillar: 'C',
       subFactor: 'C.1',
-      weightWithinSubFactor: 0.3,
+      weightWithinSubFactor: 0.4,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: C.1.1 — Employer-sponsorship requirement
-Question: Does this program require an employer sponsor, and if so, throughout the visa duration?
+        `Extraction Task: C.1.1 — Employer switching
+Question: After the visa is granted, can the holder change employers, and how onerous is that switch? Focus on the post-grant permission, not the original sponsorship application.
+
 Allowed values:
 
-"not_required": no employer sponsor needed at any stage.
-"required_initial_only": sponsor required for initial application; holder independent afterward.
-"required_throughout": sponsor required for the duration; losing sponsor jeopardizes status.
+"open": the holder can change employers freely without any new permission, notification, or application — same visa continues unchanged.
+"notification_only": the holder must inform the immigration authority (or sponsor registry) of the change, but no new application is required and no decision is made on the move.
+"new_application_required": the holder must submit a new sponsorship application, change-of-employer petition, or similar process before the move can take effect.
 
 Edge cases:
 
-Endorsing bodies (Tech Nation, professional bodies) that are not employers: count as "not_required" if endorsement is one-time; "required_throughout" if endorsement must be maintained.`,
+A grace period after job loss to find a new employer is documentable but does not by itself change the category.
+"You may switch within the same occupation classification" without further process → "open".
+"Sponsor must lodge a new nomination / Certificate of Sponsorship" → "new_application_required".
+Open work permits / spouse open permits → "open".
+If the visa is non-employer-tied entirely (points-based, talent visas without sponsor), → "open".`,
       scoringRubricJsonb: {
         categories: [
-          { value: 'not_required', description: 'no employer sponsor needed at any stage.' },
           {
-            value: 'required_initial_only',
-            description: 'sponsor required for initial application; holder independent afterward.',
+            value: 'open',
+            description: 'change employers freely without any new permission or application.',
           },
           {
-            value: 'required_throughout',
-            description: 'sponsor required for the duration; losing sponsor jeopardizes status.',
+            value: 'notification_only',
+            description: 'must inform the authority/sponsor registry; no new application required.',
+          },
+          {
+            value: 'new_application_required',
+            description:
+              'must submit a new sponsorship application or change-of-employer petition.',
           },
         ],
       },
@@ -772,7 +782,7 @@ Endorsing bodies (Tech Nation, professional bodies) that are not employers: coun
     },
     {
       key: 'C.1.2',
-      label: 'Ability to switch employers (no re-application vs. re-application)',
+      label: 'Self-employment and secondary income',
       dataType: 'categorical',
       pillar: 'C',
       subFactor: 'C.1',
@@ -780,34 +790,39 @@ Endorsing bodies (Tech Nation, professional bodies) that are not employers: coun
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: C.1.2 — Ability to switch employers
-Question: How freely can the visa holder change employers?
+        `Extraction Task: C.1.2 — Self-employment and secondary income
+Question: Can the visa holder engage in self-employment, freelance work, or earn secondary income (directorship fees, consulting, investments) while holding this visa?
+
 Allowed values:
 
-"free_switching": switch without permission or re-application.
-"notification_only": switching requires notifying the authority, no re-application.
-"re_application": switching requires new sponsorship application or substantial re-filing.
-"not_permitted": employer switching not permitted.
+"full": no restrictions on income sources — self-employment, freelance, secondary employment, and investment income all permitted.
+"restricted": permitted with conditions (employer permission required, sector limited, hours capped, or specific income types only).
+"none": employment must be through a single sponsoring employer only; no self-employment or secondary income permitted.
 
 Edge cases:
 
-Grace periods after job loss should be noted (and captured in grace_period_days where stated).
-Restrictions to same occupational classification should be noted.`,
+Passive investment income (dividends, rental) is generally outside these rules unless the source explicitly addresses it.
+Volunteer / unpaid work is generally permitted regardless — do not factor in.
+"Self-employment is not permitted on the Skilled Worker visa" + secondary employment allowed → "restricted".
+Open work permit / PR-track post-grant → "full".
+Single-employer-tied visas with no exception path → "none".`,
       scoringRubricJsonb: {
         categories: [
           {
-            value: 'free_switching',
-            description: 'switch without permission or re-application.',
+            value: 'full',
+            description:
+              'no restrictions on income sources — self-employment, freelance, secondary employment all permitted.',
           },
           {
-            value: 'notification_only',
-            description: 'switching requires notifying the authority, no re-application.',
+            value: 'restricted',
+            description:
+              'permitted with conditions (employer permission, sector limit, income-type limit).',
           },
           {
-            value: 're_application',
-            description: 'switching requires new sponsorship application or substantial re-filing.',
+            value: 'none',
+            description:
+              'single sponsoring employer only; no self-employment or secondary income permitted.',
           },
-          { value: 'not_permitted', description: 'employer switching not permitted.' },
         ],
       },
       normalizationFn: 'categorical',
@@ -816,42 +831,50 @@ Restrictions to same occupational classification should be noted.`,
     },
     {
       key: 'C.1.3',
-      label: 'Self-employment and secondary income rights',
+      label: 'Visa duration and renewability',
       dataType: 'categorical',
       pillar: 'C',
       subFactor: 'C.1',
-      weightWithinSubFactor: 0.25,
+      weightWithinSubFactor: 0.3,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: C.1.3 — Self-employment and secondary income rights
-Question: Can the visa holder engage in self-employment and secondary income activities?
+        `Extraction Task: C.1.3 — Visa duration and renewability
+Question: What is the initial grant period for this visa, and is it renewable?
+
 Allowed values:
 
-"full_rights": both fully permitted.
-"limited_secondary": secondary employment permitted but self-employment restricted/prohibited.
-"permitted_with_permission": permitted only with prior authorization.
-"prohibited": self-employment and secondary income not permitted.
+"permanent": indefinite leave to remain or permanent-residency-equivalent status granted as the initial grant or convertible at first renewal.
+"long_term_renewable": initial grant of 5 years or more, renewable on the same visa.
+"short_term_renewable": initial grant under 5 years, renewable on the same visa.
+"non_renewable": fixed-term visa with no renewal pathway on this visa (holder must switch tracks or leave).
 
 Edge cases:
 
-Passive investment income (dividends, rental) generally outside these rules unless addressed.
-Sector/occupation restrictions should be noted.`,
+Use the standard / typical grant period; if there are stream-specific variations (e.g. 2-year vs 4-year vs 5-year tiers under the same visa), report the longest standard route and note the variants.
+"Initial grant 4 years, renewable indefinitely subject to ongoing eligibility" → "short_term_renewable".
+"Indefinite leave granted on application" or "permanent residency from day 1" → "permanent".
+"Granted for 1 year only, no extension possible — must switch to PR or depart" → "non_renewable".
+A visa that *leads to* PR but is itself short-term is "short_term_renewable" or "long_term_renewable" depending on the grant length, NOT "permanent".`,
       scoringRubricJsonb: {
         categories: [
-          { value: 'full_rights', description: 'both fully permitted.' },
           {
-            value: 'limited_secondary',
+            value: 'permanent',
             description:
-              'secondary employment permitted but self-employment restricted/prohibited.',
+              'indefinite leave or permanent-residency-equivalent at initial grant or first renewal.',
           },
           {
-            value: 'permitted_with_permission',
-            description: 'permitted only with prior authorization.',
+            value: 'long_term_renewable',
+            description: 'initial grant of 5 years or more, renewable on the same visa.',
           },
           {
-            value: 'prohibited',
-            description: 'self-employment and secondary income not permitted.',
+            value: 'short_term_renewable',
+            description: 'initial grant under 5 years, renewable on the same visa.',
+          },
+          {
+            value: 'non_renewable',
+            description:
+              'fixed-term visa with no renewal pathway; holder must switch tracks or leave.',
           },
         ],
       },
@@ -860,82 +883,45 @@ Sector/occupation restrictions should be noted.`,
       sourceTierRequired: 1,
     },
     {
-      key: 'C.1.4',
-      label: 'Labor market test requirement',
-      dataType: 'boolean',
-      pillar: 'C',
-      subFactor: 'C.1',
-      weightWithinSubFactor: 0.15,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: C.1.4 — Labor market test requirement
-Question: Is a labor market test (LMT), resident labor market test, or "no suitable local candidate" certification required before visa issuance?
-Edge cases:
-
-LMT waived for shortage-list occupations: report true for standard case, note the waiver.
-LMT waived for high salaries: same.
-If program explicitly exempted from LMT, report false.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'boolean',
-      direction: 'lower_is_better',
-      sourceTierRequired: 1,
-    },
-    {
       key: 'C.2.1',
-      label: 'Spouse inclusion and work rights (automatic / by permit / none)',
+      label: 'Spouse inclusion and work access',
       dataType: 'categorical',
       pillar: 'C',
       subFactor: 'C.2',
-      weightWithinSubFactor: 0.4,
+      weightWithinSubFactor: 0.5,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: C.2.1 — Spouse inclusion and work rights
-Question: Can a spouse accompany the principal applicant, and what are the spouse's work rights?
+        `Extraction Task: C.2.1 — Spouse inclusion and work access
+Question: Can the principal applicant's spouse or partner be included on the same application or a linked application, and what work access do they have?
+
 Allowed values:
 
-"automatic_with_full_work_rights": included on the same application/visa and has unrestricted work rights.
-"automatic_with_limited_work_rights": included on the same visa but work rights limited (sector, hours, separate permit).
-"automatic_no_work_rights": included on the same visa but cannot work.
-"by_permit_with_work_rights": must apply separately on a dependant pass; if approved, can work.
-"by_permit_no_work_rights": must apply separately; if approved, cannot work.
-"not_permitted": spouse cannot accompany.
-
-Recall hints:
-
-The category names use the literal word "automatic" but the source rarely does. Use these decision rules:
-
-  - "Family members can be included on this visa" + no separate dependant pass mentioned → automatic.
-  - Source describes a separate "Dependant Pass", "Spouse Visa", or "DP application" required → by_permit.
-  - "Family members can work" / "spouse has work rights" / "no condition on family member's employment" → with_full_work_rights.
-  - "Family members can work but require a separate work permit / Letter of Consent" → with_limited_work_rights.
-  - Source is silent on work rights but covers inclusion → return only the inclusion half if confident; if uncertain, return empty.
+"automatic_full": spouse is included on the same visa application by default (or via a linked dependant pass with no extra eligibility test) AND has unrestricted work access in the host country.
+"automatic_limited_or_permit": spouse can be included (either on the same visa or via a linked dependant pass) but work access is restricted (sector limit, hours cap, requires a separate permit, or no work permitted).
+"not_permitted": spouse cannot be included as a dependant on this visa; spouse must apply on a separate independent visa.
 
 Edge cases:
 
-This indicator reflects a married opposite-sex spouse. Same-sex partner recognition is C.2.4; unmarried partner variations go in notes.
-If source explicitly references "secondary applicants" or "subsequent entrants" without specifying spouse, do not use that for this field.`,
+This indicator covers a married opposite-sex spouse as the standard case. De facto / civil partner inclusion variations should be captured in notes but mapped to the closest category for this field.
+A spouse who must apply on a separate "Dependant Pass" but is granted by default once on the principal's record → "automatic_limited_or_permit" if any work limitation; "automatic_full" if work is unrestricted.
+"Spouse may apply for an independent work permit" → that's NOT spouse inclusion on this visa — map to the work-access status the spouse gets via the dependant pass, not via the independent route.
+If the source is silent on spouse work access but covers inclusion, report "automatic_limited_or_permit" with notes "work access not stated — defaulted to limited".`,
       scoringRubricJsonb: {
         categories: [
           {
-            value: 'automatic_with_full_work_rights',
-            description: 'included and has unrestricted work rights.',
+            value: 'automatic_full',
+            description: 'spouse included by default with unrestricted work access.',
           },
           {
-            value: 'automatic_with_limited_work_rights',
-            description: 'included but work rights limited (sector, hours, separate permit).',
-          },
-          { value: 'automatic_no_work_rights', description: 'included but cannot work.' },
-          {
-            value: 'by_permit_with_work_rights',
-            description: 'applies separately; if approved, can work.',
+            value: 'automatic_limited_or_permit',
+            description:
+              'spouse included but work access restricted, requires separate permit, or not permitted.',
           },
           {
-            value: 'by_permit_no_work_rights',
-            description: 'applies separately; if approved, cannot work.',
+            value: 'not_permitted',
+            description: 'spouse cannot be included as a dependant on this visa.',
           },
-          { value: 'not_permitted', description: 'spouse cannot accompany.' },
         ],
       },
       normalizationFn: 'categorical',
@@ -944,21 +930,38 @@ If source explicitly references "secondary applicants" or "subsequent entrants" 
     },
     {
       key: 'C.2.2',
-      label: 'Dependent child age cap and inclusion terms',
+      label: 'Dependent child age cap',
       dataType: 'numeric',
       pillar: 'C',
       subFactor: 'C.2',
-      weightWithinSubFactor: 0.25,
+      weightWithinSubFactor: 0.3,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
         `Extraction Task: C.2.2 — Dependent child age cap
-Question: Up to what age can a dependent child be included on the principal's visa?
+Question: What is the maximum age for a dependent child to be included on or linked to this visa?
+
+Recall hints:
+
+Common patterns to look for: "child under [X]", "dependent child", "minor", "unmarried son/daughter under [X]", "locked-in age".
+Australia 482 / 189: under 18 (or under 23 if dependent full-time student).
+UK Skilled Worker: under 18 at first application; can stay until current visa expires.
+Canada Express Entry / IRCC: under 22 at the time of application (locked-in age).
+Singapore EP/S Pass DP: unmarried child under 21.
+Hong Kong: under 18 (or 21 for full-time students).
+
+No-cap pattern (IMPORTANT):
+
+If the source explicitly states there is no age cap (e.g. "dependent child of any age permitted", "no upper age limit"), return the sentinel token "no_cap" as valueRaw. The scoring engine treats this as the maximum-score outcome under higher_is_better.
+
+DO NOT return the integer 999 or any other sentinel integer. Return one of: "no_cap", "no_limit", or "none". The downstream normalizer recognises all three.
+
 Edge cases:
 
-If cap differs for full-time students, report the higher cap and note the condition (populate student_extension_age).
-If no age cap, return 999.
-If children age out mid-visa, note this.`,
+If the cap differs for full-time students, report the higher cap and note the condition (populate student_extension_age in notes).
+"Locked-in age" (age frozen at time of application) is a CAP — report the lock-in age (Canada: 22).
+If children age out mid-visa, note this in notes — but report the entry-eligibility cap as the value.
+If the source is silent on the age cap, return null with notes "child age cap not stated on official source".`,
       scoringRubricJsonb: null,
       normalizationFn: 'min_max',
       direction: 'higher_is_better',
@@ -966,7 +969,7 @@ If children age out mid-visa, note this.`,
     },
     {
       key: 'C.2.3',
-      label: 'Parent or extended family inclusion option',
+      label: 'Extended family inclusion',
       dataType: 'boolean',
       pillar: 'C',
       subFactor: 'C.2',
@@ -974,34 +977,22 @@ If children age out mid-visa, note this.`,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: C.2.3 — Parent or extended family inclusion option
-Question: Does this program permit inclusion of parents, grandparents, or other extended family as dependants?
+        `Extraction Task: C.2.3 — Extended family inclusion
+Question: Does the program offer any pathway for parents, grandparents, or other extended family members beyond spouse and dependent children to be included or sponsored?
+
+Return value: a boolean — true if any pathway exists (dependant parent, financial-dependency parent inclusion, ascending-family sponsorship). false otherwise.
+
+Recall hints:
+
+"Dependent parent" provisions requiring financial dependency qualify as true.
+"Parent visa" mentioned but as a separate visa (not a dependant on this visa) does NOT count — return false for this indicator.
+Grandparents, siblings, adult children of the principal: these count as extended family if the source explicitly permits inclusion as dependants.
+
 Edge cases:
 
-"Dependant parent" provisions requiring financial dependency qualify as true.
-Separate parent visas (not dependants on this visa) do not count.
-Siblings generally don't count unless explicitly addressed.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'boolean',
-      direction: 'higher_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'C.2.4',
-      label: 'Same-sex partner recognition',
-      dataType: 'boolean',
-      pillar: 'C',
-      subFactor: 'C.2',
-      weightWithinSubFactor: 0.15,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: C.2.4 — Same-sex partner recognition
-Question: Does this program recognize same-sex spouses or same-sex de facto partners as eligible dependants?
-Edge cases:
-
-Recognition of a foreign same-sex marriage counts as true even if the country doesn't itself perform them.
-De facto / civil partnership recognition with similar rights to marriage counts as true.`,
+If the program page is silent on extended family at all, return false with notes "not mentioned on official source".
+Parent / extended-family visas that exist as separate independent visas (e.g. UK Adult Dependent Relative) → false.
+"Other family members may be considered on a case-by-case basis" → true with notes capturing the discretionary nature.`,
       scoringRubricJsonb: null,
       normalizationFn: 'boolean',
       direction: 'higher_is_better',
@@ -1018,51 +1009,42 @@ De facto / civil partnership recognition with similar rights to marriage counts 
         SHARED_PREAMBLE +
         '\n\n' +
         `Extraction Task: C.3.1 — Public healthcare access
-Question: What is the visa holder's access to the public healthcare system?
+Question: Does the visa holder have access to the host country's public healthcare system?
+
 Allowed values:
 
-"automatic" (alias of "full_access"): the document states unconditionally that the visa holder is entitled to the same public-health benefits as citizens or permanent residents.
-"full_access": same basis as citizens/PRs (legacy alias of "automatic"; either is acceptable).
-"conditional_rhca": the document states the visa holder's access is contingent on a bilateral or reciprocal health agreement between countries — phrasing such as "eligible for [public health system] if [country] has a Reciprocal Health Care Agreement", "bilateral health agreement", or "covered only if your country of citizenship has signed a [agreement-name]".
-"levy_required": access conditional on payment of a health levy or contribution (e.g. an annual surcharge, employer-paid contribution, or means-tested premium).
-"insurance_required": access conditional on the visa holder holding private health insurance.
-"emergency_only": only emergency care is publicly covered; routine care is not.
-"no_access": the document explicitly excludes the visa holder from public health coverage — phrasing such as "not eligible", "must arrange private health insurance", or "not covered".
-"not_stated": the page mentions this visa program but does NOT discuss healthcare access at all. Use this when the document is silent — not when access is denied. (This produces a row that scores null and surfaces the gap explicitly rather than silently.)
+"full": equivalent access to citizens with no surcharge beyond standard contributions (taxes, payroll deductions that all residents pay).
+"partial": access with one or more conditions — waiting periods, surcharges, levies, reciprocal-agreement gating, contribution requirements, emergency-only coverage, or restriction to certain treatment categories.
+"none": no public healthcare access on this visa; private cover is required.
+
+Recall hints:
+
+"Same access as citizens" / "entitled to [public health system]" / "covered by Medicare/NHS/Medicare/etc." → "full".
+"Subject to Immigration Health Surcharge" / "must pay an annual health levy" / "covered if your country has a Reciprocal Health Care Agreement" → "partial".
+"Not eligible for [public health system]" / "must arrange private health insurance" → "none".
+"Emergency care only" → "partial".
 
 Edge cases:
-- Hybrid regimes (e.g., levy + private top-up): map to the primary requirement, note secondary.
-- Employer-provided insurance does not change the underlying regime.
-- Use the generic patterns above. Apply the same pattern logic to whatever public health system the document references.`,
+
+If the visa-program page is silent on healthcare access, escalate to a Tier-2 source (this indicator is on the tier-2 allowlist for that reason).
+Employer-provided private insurance does not change the underlying public-system regime.
+Hybrid regimes (e.g. levy + private top-up): map to "partial" and capture the structure in notes.`,
       scoringRubricJsonb: {
         categories: [
-          { value: 'full_access', score: 100, description: 'same basis as citizens/PRs.' },
           {
-            value: 'automatic',
-            score: 100,
-            description: 'same basis as citizens/PRs (alias of full_access).',
+            value: 'full',
+            description:
+              'equivalent access to citizens with no surcharge beyond standard contributions.',
           },
           {
-            value: 'conditional_rhca',
-            score: 70,
-            description: 'access contingent on a reciprocal/bilateral health agreement.',
+            value: 'partial',
+            description:
+              'access with conditions: waiting periods, surcharges, levies, reciprocal agreement, or restricted scope.',
           },
           {
-            value: 'levy_required',
-            score: 70,
-            description: 'access upon payment of a health levy/contribution.',
+            value: 'none',
+            description: 'no public healthcare access; private cover required.',
           },
-          {
-            value: 'insurance_required',
-            score: 50,
-            description: 'access contingent on private insurance.',
-          },
-          {
-            value: 'emergency_only',
-            score: 20,
-            description: 'only emergency care covered publicly.',
-          },
-          { value: 'no_access', score: 0, description: 'no public healthcare access.' },
         ],
       },
       normalizationFn: 'categorical',
@@ -1080,33 +1062,40 @@ Edge cases:
         SHARED_PREAMBLE +
         '\n\n' +
         `Extraction Task: C.3.2 — Public education access for children
-Question: What is the dependent child's access to public education?
+Question: Do dependent children included on this visa have access to state-funded public education?
+
 Allowed values:
 
-"automatic": public schooling available on the same basis as citizens/PRs (no extra fees).
-"fee_paying": access available but foreign-student or fee-paying levy applies.
-"restricted": case-by-case basis or local-authority approval, not guaranteed.
-"none": no access to public education.
+"full": unrestricted access equivalent to citizen children — same enrolment process, same fees (or no fees), same school choice.
+"partial": access with conditions or limited to certain levels (foreign-student fees apply, restricted to specific schools, case-by-case, primary-only).
+"none": no access to public education; private schooling only.
+
+Recall hints:
+
+"Children may attend public schools on the same basis as citizens" → "full".
+"International student fees apply" / "foreign-student levy" / "case-by-case approval by local authority" → "partial".
+"Must enrol in private school" / "no access to state-funded education" → "none".
+Right to attend ≠ right to free attendance. If tuition applies to the dependant child, → "partial".
 
 Edge cases:
 
-Right to attend does not mean right to free attendance: if tuition applies, "fee_paying" not "automatic".
-Higher-education access is separate and not required here.`,
+Higher-education access is separate and out of scope for this indicator — focus on K-12 (primary + secondary).
+If the source is silent on dependant access specifically but the country is one where state schools are universally fee-free for residents, report "full" with notes "inferred from country-wide policy; visa-page silent".`,
       scoringRubricJsonb: {
         categories: [
           {
-            value: 'automatic',
-            description: 'public schooling available on the same basis as citizens/PRs.',
+            value: 'full',
+            description: 'unrestricted access equivalent to citizen children.',
           },
           {
-            value: 'fee_paying',
-            description: 'access available but foreign-student or fee-paying levy applies.',
+            value: 'partial',
+            description:
+              'access with conditions: foreign-student fees, restricted to specific schools, case-by-case, primary-only.',
           },
           {
-            value: 'restricted',
-            description: 'case-by-case basis or local-authority approval, not guaranteed.',
+            value: 'none',
+            description: 'no access to public education; private schooling only.',
           },
-          { value: 'none', description: 'no access to public education.' },
         ],
       },
       normalizationFn: 'categorical',

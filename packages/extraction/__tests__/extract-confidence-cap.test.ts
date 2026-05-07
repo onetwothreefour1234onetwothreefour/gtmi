@@ -48,21 +48,21 @@ describe('executeAllFields confidenceCap option (Phase 3-recanary-prep)', () => 
   it('without cap, returns the original confidence', async () => {
     const stub = new Map([
       ['B.4.1', makeOutput('B.4.1', 0.92, PROGRAM_ID)],
-      ['C.2.4', makeOutput('C.2.4', 0.78, PROGRAM_ID)],
+      ['C.3.1', makeOutput('C.3.1', 0.78, PROGRAM_ID)],
     ]);
     const ext = new StubExtract(stub);
     const out = await ext.executeAllFields(
       [SCRAPE],
       [
         { key: 'B.4.1', label: 'Appeal', promptMd: 'p1' },
-        { key: 'C.2.4', label: 'Same-sex', promptMd: 'p2' },
+        { key: 'C.3.1', label: 'Same-sex', promptMd: 'p2' },
       ],
       PROGRAM_ID,
       'Test program',
       'AUS'
     );
     expect(out.get('B.4.1')!.output.extractionConfidence).toBe(0.92);
-    expect(out.get('C.2.4')!.output.extractionConfidence).toBe(0.78);
+    expect(out.get('C.3.1')!.output.extractionConfidence).toBe(0.78);
   });
 
   it('cap=0.85 clips a 0.92 result down to 0.85', async () => {
@@ -96,7 +96,7 @@ describe('executeAllFields confidenceCap option (Phase 3-recanary-prep)', () => 
   it('cap=0.85 with mixed confidences caps only those above the cap', async () => {
     const stub = new Map([
       ['B.4.1', makeOutput('B.4.1', 0.95, PROGRAM_ID)],
-      ['C.2.4', makeOutput('C.2.4', 0.82, PROGRAM_ID)],
+      ['C.3.1', makeOutput('C.3.1', 0.82, PROGRAM_ID)],
       ['D.2.3', makeOutput('D.2.3', 0.85, PROGRAM_ID)], // exactly at cap; not capped
     ]);
     const ext = new StubExtract(stub);
@@ -104,7 +104,7 @@ describe('executeAllFields confidenceCap option (Phase 3-recanary-prep)', () => 
       [SCRAPE],
       [
         { key: 'B.4.1', label: 'a', promptMd: 'p1' },
-        { key: 'C.2.4', label: 'b', promptMd: 'p2' },
+        { key: 'C.3.1', label: 'b', promptMd: 'p2' },
         { key: 'D.2.3', label: 'c', promptMd: 'p3' },
       ],
       PROGRAM_ID,
@@ -113,7 +113,7 @@ describe('executeAllFields confidenceCap option (Phase 3-recanary-prep)', () => 
       { confidenceCap: 0.85 }
     );
     expect(out.get('B.4.1')!.output.extractionConfidence).toBe(0.85); // capped
-    expect(out.get('C.2.4')!.output.extractionConfidence).toBe(0.82); // unchanged
+    expect(out.get('C.3.1')!.output.extractionConfidence).toBe(0.82); // unchanged
     expect(out.get('D.2.3')!.output.extractionConfidence).toBe(0.85); // unchanged (=cap)
   });
 

@@ -123,7 +123,15 @@ describe('Rubric ↔ prompt vocabulary drift (v2 Phase 3.5 restructures)', () =>
   // Phase 3.5 restructures embed scores in the rubric directly (no
   // RUBRIC_SCORES indirection), so the consistency contract is:
   // prompt vocab == rubric vocab, and every rubric category has a score.
+  // Methodology v4.0.0 (ADR-030): C.3.2 left the Phase 3.5 set, and the
+  // surviving entries (D.1.3 / D.1.4) are boolean_with_annotation, which
+  // is not in CATEGORICAL_LIKE. The intersection is empty; the suite
+  // collapses to a structural sentinel.
   const restructured = v2Categorical.filter((i) => PHASE_3_5_RESTRUCTURED_KEYS.includes(i.key));
+
+  it('no Phase 3.5 categorical-like restructures remain in methodology v4.0.0', () => {
+    expect(restructured).toEqual([]);
+  });
 
   it.each(restructured.map((i) => [i.key, i]))(
     '%s: rubric values match prompt-enumerated values exactly',
@@ -149,8 +157,19 @@ describe('Rubric ↔ prompt vocabulary drift (v2 Phase 3.5 restructures)', () =>
 });
 
 describe('REGIONAL_SUBSTITUTES ↔ rubric vocabulary', () => {
+  // Methodology v4.0.0 (ADR-030) reverted C.3.2 from
+  // country_substitute_regional to plain categorical. The
+  // REGIONAL_SUBSTITUTES['C.3.2'] entry is left in place dormant; no
+  // active field uses the substitute infrastructure. Drift assertions
+  // skip C.3.2 because the substitute vocabulary (automatic / fee_paying)
+  // and the new rubric vocabulary (full / partial / none) diverge by design.
+  const SUBSTITUTE_KEYS_ACTIVE_IN_METHODOLOGY = Object.keys(REGIONAL_SUBSTITUTES).filter(
+    (k) => k !== 'C.3.2'
+  );
+
   it('every substitute value exists in the field rubric (v2)', () => {
-    for (const [fieldKey, regions] of Object.entries(REGIONAL_SUBSTITUTES)) {
+    for (const fieldKey of SUBSTITUTE_KEYS_ACTIVE_IN_METHODOLOGY) {
+      const regions = REGIONAL_SUBSTITUTES[fieldKey]!;
       const v2Ind = (methodologyV2.indicators as SeedIndicator[]).find((i) => i.key === fieldKey);
       expect(v2Ind, `${fieldKey}: no v2 indicator definition`).toBeDefined();
       const rubric = rubricVocab(v2Ind!.scoringRubricJsonb);
@@ -165,7 +184,8 @@ describe('REGIONAL_SUBSTITUTES ↔ rubric vocabulary', () => {
   });
 
   it('every substitute score matches the rubric score for the same value', () => {
-    for (const [fieldKey, regions] of Object.entries(REGIONAL_SUBSTITUTES)) {
+    for (const fieldKey of SUBSTITUTE_KEYS_ACTIVE_IN_METHODOLOGY) {
+      const regions = REGIONAL_SUBSTITUTES[fieldKey]!;
       const v2Ind = (methodologyV2.indicators as SeedIndicator[]).find((i) => i.key === fieldKey);
       const cats = v2Ind?.scoringRubricJsonb?.categories ?? [];
       for (const sub of Object.values(regions)) {

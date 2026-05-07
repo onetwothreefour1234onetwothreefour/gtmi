@@ -53,8 +53,8 @@ describe('Methodology V2 — arithmetic invariants (must match V1)', () => {
     expect(approxEqual(sum, 1.0)).toBe(true);
   });
 
-  it('total indicator count is exactly 45 (unchanged from v1; methodology v3.0.0)', () => {
-    expect(methodologyV2.indicators.length).toBe(45);
+  it('total indicator count is exactly 43 (unchanged from v1; methodology v4.0.0)', () => {
+    expect(methodologyV2.indicators.length).toBe(43);
   });
 
   it('every v1 indicator weight is preserved in v2 (Phase 3.5 changes data-type only)', () => {
@@ -69,8 +69,8 @@ describe('Methodology V2 — arithmetic invariants (must match V1)', () => {
 });
 
 describe('Methodology V2 — Phase 3.5 indicator restructures', () => {
-  it('PHASE_3_5_RESTRUCTURED_KEYS contains exactly 3 entries (methodology v3.0.0; B.2.3/B.2.4 retired)', () => {
-    expect(PHASE_3_5_RESTRUCTURED_KEYS).toEqual(['D.1.3', 'D.1.4', 'C.3.2']);
+  it('PHASE_3_5_RESTRUCTURED_KEYS contains exactly 2 entries (methodology v4.0.0; B.2.3/B.2.4/C.3.2 retired)', () => {
+    expect(PHASE_3_5_RESTRUCTURED_KEYS).toEqual(['D.1.3', 'D.1.4']);
   });
 
   it('D.1.3 / D.1.4 use boolean_with_annotation + lower_is_better', () => {
@@ -83,10 +83,10 @@ describe('Methodology V2 — Phase 3.5 indicator restructures', () => {
     }
   });
 
-  it('C.3.2 uses country_substitute_regional + higher_is_better + categorical dataType', () => {
+  it('C.3.2 uses categorical (methodology v4.0.0; country_substitute_regional retired for C.3.2)', () => {
     const ind = methodologyV2.indicators.find((i) => i.key === 'C.3.2');
     expect(ind).toBeDefined();
-    expect(ind!.normalizationFn).toBe('country_substitute_regional');
+    expect(ind!.normalizationFn).toBe('categorical');
     expect(ind!.direction).toBe('higher_is_better');
     expect(ind!.dataType).toBe('categorical');
   });

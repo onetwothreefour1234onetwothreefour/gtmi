@@ -71,7 +71,7 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     geographicLevel: 'national',
     reason:
       'Visa conditions detail page for 482 — covers family members, work/study rights (C.1.x, C.2.x)',
-    fieldKeys: ['C.1.1', 'C.1.2', 'C.1.4', 'C.2.1', 'C.2.2', 'C.2.3'],
+    fieldKeys: ['C.1.1', 'C.1.2', 'C.1.3', 'C.2.1', 'C.2.2', 'C.2.3'],
     country: 'AUS',
   },
   {
@@ -154,7 +154,7 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     tier: 1,
     geographicLevel: 'national',
     reason: 'Skilled Worker dependant rights: work, study, healthcare — C.1.x, C.2.x, C.3.x',
-    fieldKeys: ['C.1.1', 'C.1.2', 'C.1.4', 'C.2.1', 'C.2.2', 'C.2.3', 'C.3.1', 'C.3.2'],
+    fieldKeys: ['C.1.1', 'C.1.2', 'C.1.3', 'C.2.1', 'C.2.2', 'C.2.3', 'C.3.1', 'C.3.2'],
     country: 'GBR',
   },
   {
@@ -191,7 +191,7 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     geographicLevel: 'national',
     reason:
       'S Pass dependent pass rights — who qualifies, work/study rights for family (C.1.x, C.2.x)',
-    fieldKeys: ['C.1.1', 'C.1.2', 'C.1.4', 'C.2.1', 'C.2.2', 'C.2.3'],
+    fieldKeys: ['C.1.1', 'C.1.2', 'C.1.3', 'C.2.1', 'C.2.2', 'C.2.3'],
     country: 'SGP',
   },
   {

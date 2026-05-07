@@ -34,7 +34,7 @@ GTMI Composite Score (0–100)
 └── Program Architecture Quality (PAQ) — 70%
     ├── Pillar A: Access      (weight within PAQ: 28%)
     ├── Pillar B: Process     (weight within PAQ: 15%)
-    ├── Pillar C: Rights      (weight within PAQ: 20%)
+    ├── Pillar C: Benefits    (weight within PAQ: 20%)
     ├── Pillar D: Pathway     (weight within PAQ: 22%)
     └── Pillar E: Stability   (weight within PAQ: 15%)
 
@@ -64,7 +64,7 @@ The split is formally tested in the sensitivity analysis (section 8). Under alte
 
 **Pillar B: Process (15%).** How hard is the application itself? Measures friction, cost, speed, and administrative clarity.
 
-**Pillar C: Rights (20%).** What can the visa holder actually do once granted? Measures labor market, family, and practical freedoms.
+**Pillar C: Benefits (20%).** What entitlements does the visa holder receive once granted? Measures work flexibility, family inclusion, and access to social services. Renamed from "Rights" in methodology v4.0.0 (ADR-030) — "Benefits" better matches the applicant-facing framing of what the visa actually delivers.
 
 **Pillar D: Pathway (22%).** Where does the visa lead? Measures clarity and attainability of progression to permanent residence and citizenship.
 
@@ -246,32 +246,38 @@ levies were dropped.
 | B.4.1 Appeal and refusal process clarity | 50%    | categorical   | clear + timely = better |
 | B.4.2 Application status tracking        | 50%    | categorical   | self-service = better   |
 
-### Pillar C — Rights (20% of PAQ)
+### Pillar C — Benefits (20% of PAQ)
 
-**C.1 Labor market flexibility (45% of pillar)**
+Restructured in methodology v4.0.0 (2026-05-06) — see ADR-030. The
+pillar was renamed from "Rights" to "Benefits"; the v3 indicators
+were reorganised under three sub-factors (work flexibility, family,
+social access); rubrics collapsed onto cleaner 3-value (or 4-value
+for C.1.3) vocabularies; v3 keys C.1.1 (employer sponsorship), C.1.4
+(labor market test) and C.2.4 (same-sex partner) were dropped; C.1.3
+is conceptually new (visa duration & renewability).
 
-| Indicator                                         | Weight | Normalization      | Direction             |
-| ------------------------------------------------- | ------ | ------------------ | --------------------- |
-| C.1.1 Employer-sponsorship requirement            | 30%    | categorical        | not required = better |
-| C.1.2 Ability to switch employers                 | 30%    | categorical        | free switch = better  |
-| C.1.3 Self-employment and secondary income rights | 25%    | categorical        | permitted = better    |
-| C.1.4 Labor market test requirement               | 15%    | boolean (inverted) | not required = better |
-
-**C.2 Family rights (35% of pillar)**
-
-| Indicator                                   | Weight | Normalization         | Direction           |
-| ------------------------------------------- | ------ | --------------------- | ------------------- |
-| C.2.1 Spouse inclusion and work rights      | 40%    | categorical           | automatic = better  |
-| C.2.2 Dependent child age cap and inclusion | 25%    | min-max + categorical | higher cap = better |
-| C.2.3 Parent or extended family inclusion   | 20%    | boolean               | available = better  |
-| C.2.4 Same-sex partner recognition          | 15%    | boolean               | recognized = better |
-
-**C.3 Access to public services (20% of pillar)**
+**C.1 Work Flexibility (40% of pillar)**
 
 | Indicator                                  | Weight | Normalization | Direction          |
 | ------------------------------------------ | ------ | ------------- | ------------------ |
-| C.3.1 Public healthcare access             | 50%    | categorical   | automatic = better |
-| C.3.2 Public education access for children | 50%    | categorical   | automatic = better |
+| C.1.1 Employer switching                   | 40%    | categorical   | open = better      |
+| C.1.2 Self-employment and secondary income | 30%    | categorical   | full = better      |
+| C.1.3 Visa duration and renewability       | 30%    | categorical   | permanent = better |
+
+**C.2 Family (40% of pillar)**
+
+| Indicator                              | Weight | Normalization | Direction               |
+| -------------------------------------- | ------ | ------------- | ----------------------- |
+| C.2.1 Spouse inclusion and work access | 50%    | categorical   | automatic_full = better |
+| C.2.2 Dependent child age cap          | 30%    | min-max       | higher cap = better     |
+| C.2.3 Extended family inclusion        | 20%    | boolean       | available = better      |
+
+**C.3 Social Access (20% of pillar)**
+
+| Indicator                                  | Weight | Normalization | Direction     |
+| ------------------------------------------ | ------ | ------------- | ------------- |
+| C.3.1 Public healthcare access             | 50%    | categorical   | full = better |
+| C.3.2 Public education access for children | 50%    | categorical   | full = better |
 
 ### Pillar D — Pathway (22% of PAQ)
 

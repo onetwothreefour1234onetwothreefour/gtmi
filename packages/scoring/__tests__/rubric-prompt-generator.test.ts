@@ -68,7 +68,12 @@ Edge cases: none.`
   });
 });
 
-describe('integration: C.3.2 v2 prompt is generator-built', () => {
+describe('integration: C.3.2 prompt vocabulary matches rubric (methodology v4.0.0)', () => {
+  // Under v4 the C.3.2 prompt is hand-written in methodology-v1.ts (not
+  // generator-built — country_substitute_regional override removed in
+  // ADR-030). The behavioural invariant still holds: every rubric value
+  // must appear in the prompt's "Allowed values" block so the LLM
+  // cannot return a value the rubric doesn't recognise.
   it('contains every C.3.2 rubric value in its "Allowed values" block', () => {
     const ind = methodologyV2.indicators.find((i) => i.key === 'C.3.2')!;
     const cats = (ind.scoringRubricJsonb as { categories: Array<{ value: string }> }).categories;

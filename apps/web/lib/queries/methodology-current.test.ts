@@ -77,8 +77,8 @@ describe('groupFieldsByPillar', () => {
     expect(out.find((p) => p.key === 'C')?.indicatorCount).toBe(0);
   });
 
-  it('produces the full 45-indicator tree from a methodology-shaped input', () => {
-    // Synthetic field set matching the live DB shape: 9 + 7 + 10 + 11 + 8.
+  it('produces the full 43-indicator tree from a methodology-shaped input', () => {
+    // Synthetic field set matching the live DB shape: 9 + 7 + 8 + 11 + 8.
     const make = (k: string, p: string, s: string): FieldDefinitionInput =>
       makeField({ key: k, pillar: p, subFactor: s });
     const fields: FieldDefinitionInput[] = [
@@ -100,15 +100,13 @@ describe('groupFieldsByPillar', () => {
       make('B.3.1', 'B', 'B.3'),
       make('B.4.1', 'B', 'B.4'),
       make('B.4.2', 'B', 'B.4'),
-      // Pillar C — 10
+      // Pillar C — 8 indicators across C.1 (3), C.2 (3), C.3 (2) under methodology v4.0.0 (renamed "Benefits")
       make('C.1.1', 'C', 'C.1'),
       make('C.1.2', 'C', 'C.1'),
       make('C.1.3', 'C', 'C.1'),
-      make('C.1.4', 'C', 'C.1'),
       make('C.2.1', 'C', 'C.2'),
       make('C.2.2', 'C', 'C.2'),
       make('C.2.3', 'C', 'C.2'),
-      make('C.2.4', 'C', 'C.2'),
       make('C.3.1', 'C', 'C.3'),
       make('C.3.2', 'C', 'C.3'),
       // Pillar D — 11
@@ -135,10 +133,10 @@ describe('groupFieldsByPillar', () => {
     ];
     const out = groupFieldsByPillar(fields, ALL_PILLAR_WEIGHTS, {});
     const totalIndicators = out.reduce((s, p) => s + p.indicatorCount, 0);
-    expect(totalIndicators).toBe(45);
+    expect(totalIndicators).toBe(43);
     expect(out.find((p) => p.key === 'A')?.indicatorCount).toBe(9);
     expect(out.find((p) => p.key === 'B')?.indicatorCount).toBe(7);
-    expect(out.find((p) => p.key === 'C')?.indicatorCount).toBe(10);
+    expect(out.find((p) => p.key === 'C')?.indicatorCount).toBe(8);
     expect(out.find((p) => p.key === 'D')?.indicatorCount).toBe(11);
     expect(out.find((p) => p.key === 'E')?.indicatorCount).toBe(8);
     // Pillar A/C/D/E each have 3 sub-factors; Pillar B has 4 = 16 sub-factors total.

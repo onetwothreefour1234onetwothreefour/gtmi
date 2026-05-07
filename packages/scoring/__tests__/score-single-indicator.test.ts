@@ -270,7 +270,7 @@ describe('scoreSingleIndicator — boolean', () => {
   it('returns 0 for true on lower_is_better', () => {
     const r = scoreSingleIndicator({
       fieldDefinition: defOf({
-        key: 'C.1.4',
+        key: 'D.1.1', // synthetic — direction is overridden below
         normalizationFn: 'boolean',
         direction: 'lower_is_better',
       }),
