@@ -67,13 +67,13 @@ export function ThisEdition({ events, className }: ThisEditionProps) {
 
         {visible.length === 0 ? (
           <EmptyState
-            title="Awaiting Phase 5 — policy change tracking"
+            title="Live policy-change tracking opens soon"
             body={
               <>
-                Live monitoring of Tier 1 government sources surfaces policy revisions to scored
-                programmes within 24 hours of detection, classified by severity. No approved changes
-                have been published yet — the strip will populate as Phase 5 brings the{' '}
-                <code className="num text-data-sm">policy_changes</code> table online.
+                Tier&nbsp;1 government sources are re-checked weekly. Detected revisions to scored
+                programmes will appear here within 24 hours of detection, classified
+                minor&nbsp;/&nbsp;material&nbsp;/&nbsp;breaking, with the diff and the score impact
+                recorded. The strip is empty until the first approved change lands.
               </>
             }
             ctaHref="/changes"

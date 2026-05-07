@@ -195,17 +195,17 @@ export default async function CountryDetailPage({ params }: PageProps) {
           data-testid="country-stability-section"
         >
           <div className="mx-auto max-w-page">
-            <p className="eyebrow mb-3">Country-level stability</p>
+            <p className="eyebrow mb-3">Country-level performance outcomes</p>
             <h2
               className="serif"
               style={{ fontSize: 32, fontWeight: 400, margin: 0, letterSpacing: '-0.02em' }}
             >
-              Policy volatility and institutional reliability.
+              Track record and rule stability.
             </h2>
             <div className="mt-6">
               <EmptyState
-                title="Stability summary ships in Phase 5"
-                body="Once policy-change tracking is live, this section will summarise the program's track record (E.1 — program age, cumulative approvals) and rule stability (E.2 — material policy changes, suspension history)."
+                title="Performance Outcomes summary lights up with the next release"
+                body="Once policy-change tracking is live, this section will summarise the programme's track record (E.1 — program age, cumulative approvals) and rule stability (E.2 — material policy changes, suspension history)."
               />
             </div>
           </div>
@@ -233,8 +233,9 @@ export default async function CountryDetailPage({ params }: PageProps) {
           </p>
           <DataTableNote>
             Composite per programme = 30% CME + 70% PAQ. CME comes from IMD&rsquo;s Appeal factor
-            re-normalized across the 30-country cohort; PAQ aggregates 48 indicators across Access,
-            Process, Rights, Pathway, Stability — every value traceable to a primary source.
+            re-normalised across the 30-country cohort; PAQ aggregates 33 indicators across Product
+            Design, Process Design, Benefits, Pathway, and Performance Outcomes — every value
+            traceable to a primary source.
           </DataTableNote>
         </div>
       </section>

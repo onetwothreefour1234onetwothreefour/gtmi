@@ -31,6 +31,7 @@ const COLS: { title: string; items: { label: string; href: string }[] }[] = [
     title: 'Transparency',
     items: [
       { label: 'Changes log', href: '/changes' },
+      { label: 'FAQ', href: '/faq' },
       { label: 'About the index', href: '/about' },
       { label: 'Cite this index', href: '/about' },
     ],
@@ -60,10 +61,9 @@ const PRIMARY_SOURCES = [
   'IND FR',
   'OECD MIG',
   'Eurostat',
-  'World Bank',
   'IMF',
-  'ICAEW',
   'ILO',
+  'IMD',
 ];
 
 function formatRefreshDate(iso: string | null | undefined): string {

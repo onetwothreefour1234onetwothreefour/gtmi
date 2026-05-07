@@ -2,7 +2,13 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
+import {
+  PILLAR_COLORS,
+  PILLAR_LABEL,
+  PILLAR_ORDER,
+  SUB_FACTOR_LABEL,
+  type PillarKey,
+} from '@/lib/theme';
 import { IndicatorRow } from './indicator-row';
 import { PillarRadar } from './pillar-radar';
 import { formatScore } from '@/lib/format';
@@ -23,16 +29,6 @@ export interface PillarBreakdownProps {
   phase2Placeholder?: boolean;
   className?: string;
 }
-
-const PILLAR_LABEL: Record<PillarKey, string> = {
-  A: 'Access',
-  B: 'Process',
-  C: 'Rights',
-  D: 'Pathway',
-  E: 'Stability',
-};
-
-const PILLAR_ORDER: PillarKey[] = ['A', 'B', 'C', 'D', 'E'];
 
 /**
  * Programme detail's "Indicators & provenance" section. Implements analyst Q5:
@@ -124,7 +120,7 @@ export function PillarBreakdown({
                   <p className="mt-3 text-data-sm text-ink-4">
                     Cohort median computed across{' '}
                     <span className="num text-ink">{cohortScoredCount}</span> scored programmes.
-                    Phase 5 calibration will tighten the band.
+                    Calibration on a larger cohort will tighten the band.
                   </p>
                 )}
               </div>
@@ -345,7 +341,9 @@ function SubFactorBlock({
         >
           {group.subFactor}
         </span>
-        <span className="text-data-sm text-ink-4">{PILLAR_LABEL[group.pillar]}</span>
+        <span className="serif" style={{ fontSize: 16, fontWeight: 500 }}>
+          {SUB_FACTOR_LABEL[group.subFactor] ?? PILLAR_LABEL[group.pillar]}
+        </span>
         <span className="text-data-sm text-ink-4">
           · {group.rows.length} indicator{group.rows.length === 1 ? '' : 's'}
         </span>

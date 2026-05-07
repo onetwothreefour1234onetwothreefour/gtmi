@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
+import { PILLAR_COLORS, PILLAR_LABEL, PILLAR_ORDER, type PillarKey } from '@/lib/theme';
 import { formatScore } from '@/lib/format';
 import { pillarContribution } from '@/lib/queries/program-detail-helpers';
 import type { PillarScores } from '@/lib/queries/program-detail-types';
@@ -21,16 +21,6 @@ const DEFAULT_PILLAR_WEIGHTS: Record<PillarKey, number> = {
   D: 0.22,
   E: 0.15,
 };
-
-const PILLAR_LABEL: Record<PillarKey, string> = {
-  A: 'Access',
-  B: 'Process',
-  C: 'Rights',
-  D: 'Pathway',
-  E: 'Stability',
-};
-
-const PILLAR_ORDER: PillarKey[] = ['A', 'B', 'C', 'D', 'E'];
 
 /**
  * Pillar breakdown table sitting beside the PillarRadar on the program

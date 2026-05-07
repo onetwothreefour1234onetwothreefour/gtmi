@@ -41,11 +41,11 @@ export function PreviewBanner({ bodyHtml, className }: PreviewBannerProps) {
         ) : (
           <>
             <span>
-              Composite scores are computed with engineer-chosen normalization ranges and are
+              Composite scores are computed with engineer-chosen normalisation ranges and are
               flagged
             </span>
             <PreCalibrationChip />
-            <span>per programme. Calibrated scores ship in Phase 5 (5-country pilot).</span>
+            <span>per programme. Calibrated scores ship once the cohort is large enough.</span>
           </>
         )}
       </div>

@@ -35,7 +35,7 @@ const DEFAULT_COMMITMENTS: FalsifiabilityCommitment[] = [
   {
     numeral: '04',
     title: 'Pre-calibration is disclosed at every score.',
-    body: 'Programmes scored against engineer-chosen normalization ranges carry a Pre-cal chip until the 5-country pilot calibration ships in Phase 5.',
+    body: 'Until the cohort is large enough to set normalisation ranges from real percentiles rather than engineer estimates, every affected score carries a "Pre-calibration" chip. Once the calibration runs, the chip clears and the absolute scores will shift — relative methodology application stays correct throughout.',
   },
   {
     numeral: '05',

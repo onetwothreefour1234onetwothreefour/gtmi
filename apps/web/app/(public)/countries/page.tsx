@@ -47,8 +47,9 @@ export default async function CountriesIndexPage() {
           <p className="mt-4 max-w-[640px] text-ink-3" style={{ fontSize: 16, lineHeight: 1.55 }}>
             <span className="num text-ink">{rows.length}</span> countries in the cohort —{' '}
             <span className="num text-ink">{scoredCount}</span> with at least one PAQ-scored
-            programme. Composite is 30% CME (Country Mobility Environment, IMD-derived) + 70% PAQ
-            (Programme Architecture Quality). Click a card for the country&rsquo;s programme detail.
+            programme. Composite is 30% CME (Country Mobility Environment, derived from the IMD
+            World Talent Ranking Appeal factor) + 70% PAQ (Program Architecture Quality across 33
+            indicators). Click a card for the country&rsquo;s programme detail.
           </p>
         </div>
       </header>
@@ -60,7 +61,7 @@ export default async function CountriesIndexPage() {
           <div className="mt-10">
             <DataTableNote>
               Sort: highest CME score first; cohort countries without a CME score appear at the
-              bottom alphabetically. CME numbers carry the PRE-CAL marker until Phase 5 calibration
+              bottom alphabetically. CME numbers carry the PRE-CAL marker until calibration
               completes against the full cohort.
             </DataTableNote>
           </div>

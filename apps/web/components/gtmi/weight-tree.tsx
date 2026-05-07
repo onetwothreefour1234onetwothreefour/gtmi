@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
+import { PILLAR_COLORS, PILLAR_LABEL, SUB_FACTOR_LABEL } from '@/lib/theme';
 import type { MethodologyPillar } from '@/lib/queries/methodology-current-types';
 
 export interface WeightTreeProps {
@@ -8,18 +8,10 @@ export interface WeightTreeProps {
   cmePaqSplit: { cme: number; paq: number };
   /** Live pillar tree from getMethodologyCurrent. */
   pillars: MethodologyPillar[];
-  /** Render the indicator level too (off by default — adds 48 leaf rows). */
+  /** Render the indicator level too (off by default — adds 33 leaf rows). */
   showIndicators?: boolean;
   className?: string;
 }
-
-const PILLAR_LABEL: Record<PillarKey, string> = {
-  A: 'Access',
-  B: 'Process',
-  C: 'Rights',
-  D: 'Pathway',
-  E: 'Stability',
-};
 
 /**
  * Live methodology weight tree. Translates docs/design/screen-methodology.jsx:
@@ -54,7 +46,7 @@ export function WeightTree({
 
       <Branch
         ariaLevel={2}
-        label="CME — Comparative Mobility Engine"
+        label="CME — Country Mobility Environment"
         weightPct={cmePct}
         accentVar="var(--ink-3)"
         testId="weight-tree-cme"
@@ -62,7 +54,7 @@ export function WeightTree({
 
       <Branch
         ariaLevel={2}
-        label="PAQ — Programme Architecture & Quality"
+        label="PAQ — Program Architecture & Quality"
         weightPct={paqPct}
         accentVar="var(--ink-2)"
         testId="weight-tree-paq"
@@ -256,7 +248,7 @@ function SubFactorBlock({
       <div
         role="treeitem"
         aria-level={4}
-        aria-label={`Sub-factor ${code}, ${weightWithinPillarPct.toFixed(1)}% of pillar, ${indicatorCount} indicators`}
+        aria-label={`Sub-factor ${code} ${SUB_FACTOR_LABEL[code] ?? ''}, ${weightWithinPillarPct.toFixed(1)}% of pillar, ${indicatorCount} indicators`}
         className="flex items-center gap-3 py-1 hover:bg-paper-2"
         style={{ paddingLeft: 88, position: 'relative' }}
         data-testid={`weight-tree-subfactor-${code}`}
@@ -267,6 +259,9 @@ function SubFactorBlock({
         <span className="num text-data-sm" style={{ color }}>
           {code}
         </span>
+        {SUB_FACTOR_LABEL[code] && (
+          <span className="text-data-sm text-ink-2">{SUB_FACTOR_LABEL[code]}</span>
+        )}
         <span className="text-data-sm text-ink-4">
           · {indicatorCount} indicator{indicatorCount === 1 ? '' : 's'}
         </span>

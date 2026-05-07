@@ -32,11 +32,11 @@ GTMI Composite Score (0–100)
 │   └── Sourced from IMD World Talent Ranking "Appeal" factor, re-normalized
 │
 └── Program Architecture Quality (PAQ) — 70%
-    ├── Pillar A: Access      (weight within PAQ: 28%)
-    ├── Pillar B: Process     (weight within PAQ: 15%)
-    ├── Pillar C: Benefits    (weight within PAQ: 20%)
-    ├── Pillar D: Pathway     (weight within PAQ: 22%)
-    └── Pillar E: Stability   (weight within PAQ: 15%)
+    ├── Pillar A: Product Design        (weight within PAQ: 28%)
+    ├── Pillar B: Process Design        (weight within PAQ: 15%)
+    ├── Pillar C: Benefits              (weight within PAQ: 20%)
+    ├── Pillar D: Pathway               (weight within PAQ: 22%)
+    └── Pillar E: Performance Outcomes  (weight within PAQ: 15%)
 
         Each pillar has 2–4 sub-factors.
         Each sub-factor has 1–5 indicators (data fields).
@@ -60,15 +60,15 @@ The split is formally tested in the sensitivity analysis (section 8). Under alte
 
 ### 1.3 The five pillars of Program Architecture Quality
 
-**Pillar A: Access (28%).** Who can even apply? Highest pillar weight because selection criteria are the single biggest determinant of real-world utility.
+**Pillar A: Product Design (28%).** Who can even apply? Highest pillar weight because selection criteria are the single biggest determinant of real-world utility.
 
-**Pillar B: Process (15%).** How hard is the application itself? Measures friction, cost, speed, and administrative clarity.
+**Pillar B: Process Design (15%).** How hard is the application itself? Measures friction, cost, speed, and administrative clarity.
 
 **Pillar C: Benefits (20%).** What entitlements does the visa holder receive once granted? Measures work flexibility, family inclusion, and access to social services. Renamed from "Rights" in methodology v4.0.0 (ADR-030) — "Benefits" better matches the applicant-facing framing of what the visa actually delivers.
 
 **Pillar D: Pathway (22%).** Where does the visa lead? Measures clarity and attainability of progression to permanent residence and citizenship.
 
-**Pillar E: Stability (15%).** How reliable is this promise? Measures policy volatility, transparency, and institutional reliability. GTMI's most proprietary pillar.
+**Pillar E: Performance Outcomes (15%).** How reliable is this promise and what is the track record? Measures programme age, cumulative approvals, severity-weighted policy changes, and suspension history. GTMI's most proprietary pillar; renamed from "Stability" in methodology v6.0.0 (ADR-032) alongside the WGI / V-Dem retirement.
 
 ---
 
@@ -176,7 +176,7 @@ Normalization formula: `CME = 100 × (score − 53.08) / (93.07 − 53.08)`
 
 ## 5. The Program Architecture Quality (PAQ) — 70%
 
-### Pillar A — Access (28% of PAQ)
+### Pillar A — Product Design (28% of PAQ)
 
 Restructured in methodology v2.0.0 (2026-05-05) — see ADR-028. The
 v1 indicators were reorganised under three new sub-factors
@@ -307,7 +307,7 @@ SCORE_DEPENDENCIES design.
 | D.2.2 Total minimum years from visa entry to citizenship | 40%    | min-max       | shorter = better; D.2.1=false → 0 |
 | D.2.3 Dual citizenship permitted                         | 20%    | boolean       | permitted = better                |
 
-### Pillar E — Stability (15% of PAQ)
+### Pillar E — Performance Outcomes (15% of PAQ)
 
 Methodology v6.0.0 (ADR-032) collapses Pillar E from 8 indicators across
 3 sub-factors to **4 indicators across 2 sub-factors**, framed as

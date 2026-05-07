@@ -15,11 +15,11 @@ export interface CohortStats {
   programmesActive: number;
   /** Total programmes (all statuses) — for the "/ N total" caption when needed. */
   programmesTotal: number;
-  /** Distinct field_definitions rows. Methodology v1 = 48. */
+  /** Distinct field_definitions rows. Methodology v6 = 33. */
   indicatorsTotal: number;
   /** Distinct sources tracked across the cohort. */
   sourcesTotal: number;
-  /** Average per-program coverage (approved field_values / 48), 0–1. */
+  /** Average per-program coverage (approved field_values / total indicators), 0–1. */
   coverageAvg: number;
   /** MAX(extracted_at) across approved field_values. ISO string, or null. */
   lastVerifiedAt: string | null;

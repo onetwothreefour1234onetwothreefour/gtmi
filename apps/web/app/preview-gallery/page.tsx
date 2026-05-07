@@ -408,8 +408,8 @@ export default function PrimitivesPreviewPage() {
         <Block title="EmptyState">
           <div className="grid gap-4 md:grid-cols-2">
             <EmptyState
-              title="Awaiting Phase 5 calibration"
-              body="This program is seeded but has no field values or scores yet."
+              title="Awaiting calibration"
+              body="This programme is seeded but has no field values or scores yet."
               ctaHref="/methodology"
               ctaLabel="See methodology"
             />
@@ -433,9 +433,10 @@ export default function PrimitivesPreviewPage() {
 
         <Block title="DataTableNote">
           <DataTableNote>
-            Composite = 30% CME + 70% PAQ. CME comes from IMD&rsquo;s Appeal factor re-normalized
-            across the 30-country cohort. PAQ is GTMI&rsquo;s 48-indicator program-architecture
-            score across five pillars: Access, Process, Rights, Pathway, Stability.
+            Composite = 30% CME + 70% PAQ. CME comes from IMD&rsquo;s Appeal factor re-normalised
+            across the 30-country cohort. PAQ is GTMI&rsquo;s 33-indicator program-architecture
+            score across five pillars: Product Design, Process Design, Benefits, Pathway,
+            Performance Outcomes.
           </DataTableNote>
         </Block>
 

@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { getProgramDetail } from '@/lib/queries/program-detail';
-import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
+import { PILLAR_COLORS, PILLAR_LABEL, PILLAR_ORDER } from '@/lib/theme';
 
 export const alt = 'GTMI programme detail';
 export const size = { width: 1200, height: 630 };
@@ -16,15 +16,6 @@ const INK_3 = '#5C4A2E';
 const INK_4 = '#8A7456';
 const ACCENT = '#B8412A';
 const RULE = '#D9D2BE';
-
-const PILLAR_ORDER: PillarKey[] = ['A', 'B', 'C', 'D', 'E'];
-const PILLAR_LABEL: Record<PillarKey, string> = {
-  A: 'Access',
-  B: 'Process',
-  C: 'Rights',
-  D: 'Pathway',
-  E: 'Stability',
-};
 
 export default async function ProgramOG({
   params,
@@ -194,7 +185,7 @@ export default async function ProgramOG({
               fontWeight: 600,
             }}
           >
-            Awaiting Phase 5 calibration
+            Awaiting calibration
           </span>
           <span style={{ fontSize: 36, color: INK_4, fontStyle: 'italic' }}>
             No composite score yet

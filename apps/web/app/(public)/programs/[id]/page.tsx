@@ -27,7 +27,7 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-const FIELDS_TOTAL = 48;
+const FIELDS_TOTAL = 33;
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
@@ -89,7 +89,7 @@ export default async function ProgramDetailPage({ params }: PageProps) {
     '@context': 'https://schema.org',
     '@type': 'Dataset',
     name: `${detail.header.programName} — ${detail.header.countryName} (GTMI)`,
-    description: `GTMI programme profile for ${detail.header.programName}, including the composite GTMI score, the per-pillar score breakdown across Access, Process, Rights, Pathway, and Stability, and source provenance for every published indicator value.`,
+    description: `GTMI programme profile for ${detail.header.programName}, including the composite GTMI score, the per-pillar score breakdown across Product Design, Process Design, Benefits, Pathway, and Performance Outcomes, and source provenance for every published indicator value.`,
     url: absoluteUrl(`/programs/${detail.header.programId}`),
     license: `${SITE_URL}/about`,
     creator: { '@type': 'Organization', name: 'TTR Group', url: SITE_URL },
@@ -141,9 +141,10 @@ export default async function ProgramDetailPage({ params }: PageProps) {
           role="note"
         >
           <p className="mx-auto max-w-page text-data-sm">
-            <strong className="font-semibold">Pre-calibration.</strong> This composite uses Phase 2
-            engineer-chosen normalization. Calibration completes in Phase 5 against the full pilot
-            cohort; relative methodology application is correct, absolute values will shift.
+            <strong className="font-semibold">Pre-calibration.</strong> This composite uses
+            engineer-chosen normalisation ranges. Calibration replaces them with cohort percentiles
+            once enough programmes are scored — relative methodology application stays correct
+            throughout, absolute values will shift when calibration runs.
           </p>
         </section>
       )}
@@ -154,8 +155,8 @@ export default async function ProgramDetailPage({ params }: PageProps) {
         <section className="px-12 pt-10">
           <div className="mx-auto max-w-page">
             <EmptyState
-              title="Awaiting Phase 5 calibration"
-              body="This programme is seeded but has no field values or scores yet. Phase 5 will score the full 5-country pilot — see the methodology page for what each pillar measures."
+              title="Awaiting calibration"
+              body="This programme is seeded but has no field values or scores yet. The next scoring run extends the pipeline to additional countries — see the methodology page for what each pillar measures."
               ctaHref="/methodology"
               ctaLabel="See methodology"
             />

@@ -110,9 +110,9 @@ export default async function ProgramsIndexPage({
 
           <div className="mt-10">
             <DataTableNote>
-              Composite = 30% CME + 70% PAQ across 48 indicators. Trend sparklines render a
+              Composite = 30% CME + 70% PAQ across 33 indicators. Trend sparklines render a
               deterministic 12-month walk seeded by programme id and current composite — a stable
-              placeholder until Phase 5/6 produces enough scoring history for real plotting.
+              placeholder until enough scoring history exists for real plotting.
             </DataTableNote>
           </div>
         </div>

@@ -290,11 +290,13 @@ describe('ChangesAudit', () => {
     };
   }
 
-  it('renders the empty state with Phase 5 copy when events is empty', () => {
+  it('renders the empty state with next-release copy when events is empty', () => {
     render(<ChangesAudit events={[]} />);
-    expect(screen.getByTestId('changes-audit')).toHaveTextContent(/Phase 5/);
     expect(screen.getByTestId('changes-audit')).toHaveTextContent(
-      /Policy change detection ships in Phase 5/
+      /timeline activates with the next release/i
+    );
+    expect(screen.getByTestId('changes-audit')).toHaveTextContent(
+      /Policy change detection ships in the next release/
     );
   });
 

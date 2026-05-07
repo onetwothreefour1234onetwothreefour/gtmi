@@ -110,7 +110,7 @@ describe('axe a11y smoke', () => {
 
   it('DataTableNote has no detectable violations', async () => {
     const { container } = render(
-      <DataTableNote>Composite = 30% CME + 70% PAQ across 48 indicators.</DataTableNote>
+      <DataTableNote>Composite = 30% CME + 70% PAQ across 33 indicators.</DataTableNote>
     );
     expect(await axe(container)).toHaveNoViolations();
   });

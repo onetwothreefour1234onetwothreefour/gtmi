@@ -105,7 +105,7 @@ export default async function LandingPage({
       {pillarWeights && (
         <SpecimenPlate
           plateNo="I"
-          title="Five pillars. Forty-eight indicators."
+          title="Five pillars. Thirty-three indicators."
           caption="Pillar weights are fixed in the methodology version table and drive both this page and the production scoring engine. There is no separate executive-summary version."
           tone="paper-3"
         >
@@ -159,8 +159,8 @@ export default async function LandingPage({
               Composite = {Math.round(cmePaqSplit.cme * 100)}% CME +{' '}
               {Math.round(cmePaqSplit.paq * 100)}% PAQ across {stats.indicatorsTotal} indicators.
               Trend sparklines render a deterministic 12-month walk seeded by programme id and
-              current composite — a stable placeholder until Phase 5/6 produces enough scoring
-              history for real plotting. End-of-line dot pins to the displayed score.
+              current composite — a stable placeholder until enough scoring history exists for real
+              plotting. End-of-line dot pins to the displayed score.
             </DataTableNote>
           </div>
         </div>

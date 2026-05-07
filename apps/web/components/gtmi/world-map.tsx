@@ -148,8 +148,8 @@ export function WorldMap({ scores, className }: WorldMapProps) {
           })}
         </ul>
         <p className="mt-4 text-data-sm leading-relaxed text-ink-4">
-          Counts reflect top-scoring programmes per jurisdiction in the current run. Phase 5
-          calibration may shift quintile boundaries.
+          Counts reflect top-scoring programmes per jurisdiction in the current run. Calibration on
+          the full cohort may shift quintile boundaries.
         </p>
       </div>
     </section>

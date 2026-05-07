@@ -85,7 +85,7 @@ export function HeroLanding({ stats, cmePaqSplit, className }: HeroLandingProps)
             <div
               className="relative h-full"
               style={{ flex: cmePct, background: 'var(--ink)' }}
-              aria-label={`CME ${cmePct}% — Comparative Mobility Engine`}
+              aria-label={`CME ${cmePct}% — Country Mobility Environment`}
             >
               <div className="absolute left-3 top-3" style={{ color: 'var(--paper)' }}>
                 <p className="serif" style={{ fontSize: 32, fontWeight: 500, lineHeight: 1 }}>
@@ -103,16 +103,16 @@ export function HeroLanding({ stats, cmePaqSplit, className }: HeroLandingProps)
                   CME
                 </p>
                 <p className="mt-1" style={{ fontSize: 11, opacity: 0.7, lineHeight: 1.3 }}>
-                  Comparative
+                  Country
                   <br />
-                  Mobility Engine
+                  Mobility Environment
                 </p>
               </div>
             </div>
             <div
               className="relative h-full border border-rule"
               style={{ flex: paqPct, background: 'var(--paper-3)' }}
-              aria-label={`PAQ ${paqPct}% — Programme Architecture and Quality`}
+              aria-label={`PAQ ${paqPct}% — Program Architecture Quality`}
             >
               <div className="absolute left-3 top-3 text-ink">
                 <p className="serif" style={{ fontSize: 32, fontWeight: 500, lineHeight: 1 }}>
@@ -130,7 +130,7 @@ export function HeroLanding({ stats, cmePaqSplit, className }: HeroLandingProps)
                   PAQ
                 </p>
                 <p className="mt-1 text-ink-3" style={{ fontSize: 11, lineHeight: 1.3 }}>
-                  Programme Architecture
+                  Program Architecture
                   <br />
                   &amp; Quality
                 </p>
@@ -138,9 +138,10 @@ export function HeroLanding({ stats, cmePaqSplit, className }: HeroLandingProps)
             </div>
           </div>
           <p className="mt-4 text-data-sm leading-relaxed text-ink-4">
-            CME measures comparative outcomes — wage uplift, route-to-PR, cost-to-applicant. PAQ
-            measures programme architecture — predictability, transparency, fairness, family rights,
-            recourse.
+            CME is the IMD World Talent Ranking Appeal sub-index, re-normalised across our
+            30-country cohort. PAQ is our own 33-indicator measure of the visa programme itself —
+            product design, process design, benefits, pathway, performance outcomes — extracted from
+            primary government sources.
           </p>
         </div>
       </div>
@@ -159,7 +160,7 @@ export function HeroLanding({ stats, cmePaqSplit, className }: HeroLandingProps)
         <StatCell
           label="Indicators"
           value={String(stats.indicatorsTotal)}
-          sub="5 pillars · 30/70 weighted"
+          sub="5 pillars · 30/70 CME / PAQ"
         />
         <StatCell
           label="Source documents"

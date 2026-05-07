@@ -120,12 +120,12 @@ export function ChangesAudit({ events, emptyHtml, className }: ChangesAuditProps
 
       {events.length === 0 ? (
         <EmptyState
-          title="Phase 5 lights up the timeline"
+          title="The timeline activates with the next release"
           body={
             emptyHtml ? (
               <span dangerouslySetInnerHTML={{ __html: emptyHtml }} />
             ) : (
-              'Policy change detection ships in Phase 5. Once live, every Tier 1 source we track will be re-scraped weekly. Detected changes appear here within 24 hours, classified by severity, with diffs and Wayback-archived snapshots.'
+              'Policy change detection ships in the next release. Once live, every Tier 1 source we track will be re-scraped weekly. Detected changes appear here within 24 hours, classified by severity, with diffs and Wayback-archived snapshots.'
             )
           }
           ctaHref="/about"

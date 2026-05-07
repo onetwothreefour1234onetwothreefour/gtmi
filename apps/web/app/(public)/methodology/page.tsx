@@ -9,7 +9,7 @@ import {
   DataTableNote,
   PreviewBanner,
 } from '@/components/gtmi';
-import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
+import { PILLAR_COLORS, PILLAR_LABEL, SUB_FACTOR_LABEL, type PillarKey } from '@/lib/theme';
 import { getMethodologyCurrent } from '@/lib/queries/methodology-current';
 import { getCohortStats } from '@/lib/queries/cohort-stats';
 import { loadContent } from '@/lib/content';
@@ -24,14 +24,6 @@ export const metadata: Metadata = {
 // Runtime render — DATABASE_URL is runtime-only in Cloud Run.
 // unstable_cache inside the queries handles cross-request caching.
 export const dynamic = 'force-dynamic';
-
-const PILLAR_LABEL: Record<PillarKey, string> = {
-  A: 'Access',
-  B: 'Process',
-  C: 'Rights',
-  D: 'Pathway',
-  E: 'Stability',
-};
 
 function pillarWeightsFromMethodology(pillars: MethodologyPillar[]): Record<PillarKey, number> {
   return Object.fromEntries(pillars.map((p) => [p.key, p.weightWithinPaq])) as Record<
@@ -162,13 +154,16 @@ export default async function MethodologyPage() {
               className="serif"
               style={{ fontSize: 32, fontWeight: 400, margin: 0, letterSpacing: '-0.02em' }}
             >
-              PAQ is weighted higher than CME because programme architecture is more falsifiable,
-              less noisy, and harder to game than outcomes data.
+              PAQ is weighted higher than CME because the user&rsquo;s real question is &ldquo;which
+              visa do I pursue?&rdquo; — and that is what programme architecture answers.
             </h2>
             <p className="mt-4 text-ink-3" style={{ fontSize: 15, lineHeight: 1.6 }}>
-              CME measures comparative outcomes — wage uplift, route-to-PR, cost-to-applicant. PAQ
-              measures programme architecture — predictability, transparency, fairness, family
-              rights, recourse.
+              CME is the IMD World Talent Ranking Appeal sub-index, re-normalised across our
+              30-country cohort — a single number per country capturing how attractive the broader
+              environment is. PAQ is our 33-indicator measure of the visa programme itself: who can
+              apply, how the process works, what the visa entitles you to, where it leads, and how
+              its track record holds up. Setting the split at 30/70 keeps country context decisive
+              when programmes are otherwise close, without letting it dominate.
             </p>
           </div>
           <div className="flex justify-center pl-12 pt-6">
@@ -286,17 +281,17 @@ export default async function MethodologyPage() {
             className="serif"
             style={{ fontSize: 32, fontWeight: 400, margin: 0, letterSpacing: '-0.02em' }}
           >
-            Six sensitivity runs ship with the Phase 5 calibration.
+            Six sensitivity runs ship with the first calibrated edition.
           </h2>
           <div className="mt-6">
             {sensitivityHtml ? (
               <Prose html={sensitivityHtml} />
             ) : (
               <EmptyState
-                title="Sensitivity analyses ship in Phase 5"
-                body="Weight Monte Carlo, normalization, aggregation, CME/PAQ split, dropout, and correlation runs all activate once the 5-country pilot is calibrated."
+                title="Sensitivity analyses ship with the first calibrated edition"
+                body="Six runs activate together: weight-vector Monte Carlo, normalisation alternatives, geometric vs. arithmetic aggregation, CME/PAQ split robustness, indicator dropout, and within-sub-factor correlation. Each run is reproducible against the methodology version pinned to the run."
                 ctaHref="/about"
-                ctaLabel="See the build plan"
+                ctaLabel="Read the build plan"
               />
             )}
           </div>
@@ -471,8 +466,11 @@ export default async function MethodologyPage() {
                   <span className="num text-data-sm" style={{ color: PILLAR_COLORS[pillar.key] }}>
                     {sf.code}
                   </span>
-                  <span className="text-data-md text-ink-2">
-                    {sf.indicators.length} indicator{sf.indicators.length === 1 ? '' : 's'}
+                  {SUB_FACTOR_LABEL[sf.code] && (
+                    <span className="text-data-md text-ink-2">{SUB_FACTOR_LABEL[sf.code]}</span>
+                  )}
+                  <span className="text-data-sm text-ink-4">
+                    · {sf.indicators.length} indicator{sf.indicators.length === 1 ? '' : 's'}
                   </span>
                   <span className="flex-1" />
                   <span className="num text-data-sm text-ink-4">

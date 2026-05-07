@@ -13,7 +13,7 @@ import type {
   SortField,
 } from './types';
 
-const FIELDS_TOTAL = 48;
+const FIELDS_TOTAL = 33;
 
 /** Map RankedProgramRow shape to a Drizzle SELECT producing typed scalars. */
 type RawRow = {

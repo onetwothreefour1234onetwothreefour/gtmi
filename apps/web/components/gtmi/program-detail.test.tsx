@@ -69,8 +69,8 @@ describe('ProgramHeader', () => {
         paq={13.72}
         rank={1}
         scoredCount={2}
-        fieldsPopulated={30}
-        fieldsTotal={48}
+        fieldsPopulated={21}
+        fieldsTotal={33}
         phase2Placeholder={true}
         {...overrides}
       />
@@ -105,9 +105,9 @@ describe('ProgramHeader', () => {
   it('renders the coverage chip with populated/total math when scored', () => {
     renderHeader();
     const chip = screen.getByTestId('coverage-chip');
-    expect(chip).toHaveAttribute('title', '30/48 fields populated');
-    // Default percent format = 30/48 → 63%.
-    expect(chip).toHaveTextContent('63%');
+    expect(chip).toHaveAttribute('title', '21/33 fields populated');
+    // Default percent format = 21/33 → 64%.
+    expect(chip).toHaveTextContent('64%');
   });
 
   it('hides the coverage chip when the programme is unscored', () => {

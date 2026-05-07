@@ -137,7 +137,7 @@ export default async function OG(): Promise<Response> {
             color: INK_4,
           }}
         >
-          <span>30% CME · 70% PAQ · 48 indicators · primary sources only</span>
+          <span>30% CME · 70% PAQ · 33 indicators · primary sources only</span>
           <span style={{ color: INK, fontWeight: 600 }}>TTR Group</span>
         </div>
       </div>

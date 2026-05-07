@@ -10,7 +10,7 @@ import type { PolicyChangeRow } from '@/lib/queries/policy-changes';
 const STATS = {
   programmesActive: 91,
   programmesTotal: 95,
-  indicatorsTotal: 48,
+  indicatorsTotal: 33,
   sourcesTotal: 312,
   coverageAvg: 0.628,
   lastVerifiedAt: '2026-04-29T11:30:00.000Z',
@@ -27,7 +27,7 @@ describe('HeroLanding', () => {
     render(<HeroLanding stats={STATS} cmePaqSplit={{ cme: 0.3, paq: 0.7 }} />);
     const strip = screen.getByTestId('stats-strip');
     expect(strip).toHaveTextContent('91'); // programmesActive
-    expect(strip).toHaveTextContent('48'); // indicatorsTotal
+    expect(strip).toHaveTextContent('33'); // indicatorsTotal
     expect(strip).toHaveTextContent('312'); // sourcesTotal
     expect(strip).toHaveTextContent('63%'); // coverageAvg rounded
     // Last updated formatted DD MMM YYYY.
@@ -40,7 +40,7 @@ describe('HeroLanding', () => {
         stats={{
           programmesActive: 0,
           programmesTotal: 0,
-          indicatorsTotal: 48,
+          indicatorsTotal: 33,
           sourcesTotal: 0,
           coverageAvg: 0,
           lastVerifiedAt: null,
@@ -61,9 +61,11 @@ describe('HeroLanding', () => {
 });
 
 describe('ThisEdition', () => {
-  it('renders the empty-state copy when no policy changes exist (Phase 4 reality)', () => {
+  it('renders the empty-state copy when no policy changes exist', () => {
     render(<ThisEdition events={[]} />);
-    expect(screen.getByTestId('this-edition')).toHaveTextContent('Awaiting Phase 5');
+    expect(screen.getByTestId('this-edition')).toHaveTextContent(
+      'Live policy-change tracking opens soon'
+    );
   });
 
   it('shows up to 3 most-recent policy changes when populated', () => {
@@ -104,6 +106,7 @@ describe('TopNav', () => {
     expect(screen.getByText('Countries')).toBeInTheDocument();
     expect(screen.getByText('Methodology')).toBeInTheDocument();
     expect(screen.getByText('Changes')).toBeInTheDocument();
+    expect(screen.getByText('FAQ')).toBeInTheDocument();
     expect(screen.getByText('About')).toBeInTheDocument();
   });
 
@@ -136,9 +139,10 @@ describe('routeFromPathname', () => {
     expect(routeFromPathname('/countries/CAN')).toBe('countries');
   });
 
-  it('maps /methodology, /changes, /about to their tabs', () => {
+  it('maps /methodology, /changes, /faq, /about to their tabs', () => {
     expect(routeFromPathname('/methodology')).toBe('methodology');
     expect(routeFromPathname('/changes')).toBe('changes');
+    expect(routeFromPathname('/faq')).toBe('faq');
     expect(routeFromPathname('/about')).toBe('about');
   });
 
@@ -171,7 +175,7 @@ describe('PreviewBanner', () => {
     render(<PreviewBanner />);
     const banner = screen.getByTestId('preview-banner');
     expect(banner).toHaveTextContent('Preview release');
-    expect(banner).toHaveTextContent('engineer-chosen normalization ranges');
+    expect(banner).toHaveTextContent('engineer-chosen normalisation ranges');
   });
 
   it('renders an HTML override when bodyHtml is supplied', () => {

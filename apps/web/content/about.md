@@ -12,16 +12,19 @@ the IMD World Talent Ranking Top&nbsp;30 by Appeal factor. The composite
 score combines a 30%&nbsp;Country Mobility Environment (CME) score —
 re-normalised from IMD&rsquo;s published Appeal factor across our cohort
 — with a 70%&nbsp;Program Architecture Quality (PAQ) score, our
-proprietary 48-indicator framework across five pillars: Access, Process,
-Rights, Pathway, Stability. Every weight on the methodology page is read
-live from the database and every published value traces to an exact
-sentence in a Tier&nbsp;1 government source.
+proprietary 33-indicator framework across five pillars: Product Design,
+Process Design, Benefits, Pathway, and Performance Outcomes. Every weight
+on the methodology page is read live from the database and every published
+value traces to an exact sentence in a Tier&nbsp;1 government source.
 
 ## Data sources
 
-- IMD World Talent Ranking — Appeal factor (CME baseline).
-- Migration Policy Institute and OECD migration outlooks — supplementary policy-change context for E.2.1.
-- Official immigration, tax, and gazette pages of each scored country.
+- IMD World Talent Ranking — Appeal factor (CME baseline, annually re-normalised).
+- Migration Policy Institute, OECD Migration Outlook, IMD World Talent
+  Ranking — supplementary recall hints for E.2.1 (severity-weighted policy
+  changes). No external index feeds a scoring value directly.
+- Official immigration ministry, gazette, and statistics-bureau pages of
+  each scored country, at national and regional level.
 
 ## Citation
 

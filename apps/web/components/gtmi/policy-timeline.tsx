@@ -43,8 +43,8 @@ export function PolicyTimeline({ events, className }: PolicyTimelineProps) {
     return (
       <EmptyState
         className={className}
-        title="Policy change tracking ships in Phase 5"
-        body="Live monitoring of Tier 1 government sources will surface amendments to this program in real time, classified by severity (minor / material / breaking) with diffs and Wayback archives."
+        title="Policy change tracking opens with the next release"
+        body="Live monitoring of Tier 1 government sources will surface amendments to this programme in real time, classified by severity (minor / material / breaking) with diffs and Wayback archives."
       />
     );
   }

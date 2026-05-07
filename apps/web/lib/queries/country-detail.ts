@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm';
 import type { PillarKey } from '@/lib/theme';
 import type { CountryDetail, CountryHeader, CountryProgramRow } from './country-detail-types';
 
-const FIELDS_TOTAL = 48;
+const FIELDS_TOTAL = 33;
 
 interface HeaderRow {
   iso: string;

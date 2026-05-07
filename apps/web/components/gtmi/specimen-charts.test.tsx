@@ -20,14 +20,14 @@ describe('SplitSpecimen', () => {
 });
 
 describe('PillarsSpecimen', () => {
-  it('renders all five pillar columns with default methodology v1 weights', () => {
+  it('renders all five pillar columns with default methodology v6 weights', () => {
     render(<PillarsSpecimen />);
     const root = screen.getByTestId('pillars-specimen');
-    expect(root).toHaveTextContent('Access');
-    expect(root).toHaveTextContent('Process');
-    expect(root).toHaveTextContent('Rights');
+    expect(root).toHaveTextContent('Product Design');
+    expect(root).toHaveTextContent('Process Design');
+    expect(root).toHaveTextContent('Benefits');
     expect(root).toHaveTextContent('Pathway');
-    expect(root).toHaveTextContent('Stability');
+    expect(root).toHaveTextContent('Performance Outcomes');
     // Default weights: 28% / 15% / 20% / 22% / 15%
     expect(root).toHaveTextContent('28% wt');
     expect(root).toHaveTextContent('15% wt');

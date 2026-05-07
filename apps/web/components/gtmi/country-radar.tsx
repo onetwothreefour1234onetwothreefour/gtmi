@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { ACCENT_OXBLOOD, type PillarKey } from '@/lib/theme';
+import { ACCENT_OXBLOOD, PILLAR_LABEL, PILLAR_ORDER, type PillarKey } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 export interface CountryRadarProgram {
@@ -27,15 +27,6 @@ export interface CountryRadarProps {
   countryName: string;
   className?: string;
 }
-
-const ORDER: PillarKey[] = ['A', 'B', 'C', 'D', 'E'];
-const LABEL: Record<PillarKey, string> = {
-  A: 'Access',
-  B: 'Process',
-  C: 'Rights',
-  D: 'Pathway',
-  E: 'Stability',
-};
 
 /**
  * Country-level radar overlay. Renders one polygon per scored programme
@@ -56,8 +47,8 @@ export function CountryRadar({ programs, countryName, className }: CountryRadarP
 
   // Recharts `data` shape: one row per pillar, columns keyed by programme.
   type Row = { pillar: string } & Record<string, string | number | null>;
-  const data: Row[] = ORDER.map((k) => {
-    const row: Row = { pillar: LABEL[k] };
+  const data: Row[] = PILLAR_ORDER.map((k) => {
+    const row: Row = { pillar: PILLAR_LABEL[k] };
     for (const p of programs) row[p.programId] = p.pillarScores[k];
     return row;
   });
@@ -74,9 +65,9 @@ export function CountryRadar({ programs, countryName, className }: CountryRadarP
           </tr>
         </thead>
         <tbody>
-          {ORDER.map((k) => (
+          {PILLAR_ORDER.map((k) => (
             <tr key={k}>
-              <th scope="row">{LABEL[k]}</th>
+              <th scope="row">{PILLAR_LABEL[k]}</th>
               {programs.map((p) => (
                 <td key={p.programId}>{p.pillarScores[k].toFixed(2)}</td>
               ))}

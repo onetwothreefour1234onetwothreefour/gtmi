@@ -21,6 +21,44 @@ export const PILLAR_COLORS = {
 
 export type PillarKey = keyof typeof PILLAR_COLORS;
 
+/**
+ * Canonical pillar display labels (methodology v6.0.0 / ADR-028..032).
+ * Single source of truth — every component imports from here so the
+ * next pillar rename is one diff, not nine.
+ */
+export const PILLAR_LABEL: Record<PillarKey, string> = {
+  A: 'Product Design',
+  B: 'Process Design',
+  C: 'Benefits',
+  D: 'Pathway',
+  E: 'Performance Outcomes',
+};
+
+/** Stable display order (used by every pillar strip / radar / table). */
+export const PILLAR_ORDER: readonly PillarKey[] = ['A', 'B', 'C', 'D', 'E'];
+
+/**
+ * Canonical sub-factor display labels (methodology v6.0.0). Keyed on
+ * the sub-factor code as it appears in `field_definitions.subfactor_code`
+ * and in `methodology_versions.framework.subFactors[].code`.
+ */
+export const SUB_FACTOR_LABEL: Record<string, string> = {
+  'A.1': 'Qualification Threshold',
+  'A.2': 'System Design',
+  'A.3': 'Volume',
+  'B.1': 'Speed',
+  'B.2': 'Complexity',
+  'B.3': 'Cost',
+  'B.4': 'Transparency',
+  'C.1': 'Work Flexibility',
+  'C.2': 'Family',
+  'C.3': 'Social Access',
+  'D.1': 'Permanent Residency',
+  'D.2': 'Citizenship',
+  'E.1': 'Track Record',
+  'E.2': 'Rule Stability',
+};
+
 /** Sequential score scale, low → high. Higher score = better. */
 export const SCORE_SCALE = ['#FCEEC9', '#E8B17A', '#C46A4A', '#9C3F2A', '#7A2A1F'] as const;
 

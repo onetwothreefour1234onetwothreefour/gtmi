@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { ACCENT_OXBLOOD, type PillarKey } from '@/lib/theme';
+import { ACCENT_OXBLOOD, PILLAR_LABEL, PILLAR_ORDER, type PillarKey } from '@/lib/theme';
 
 export type PillarScores = Record<PillarKey, number>;
 
@@ -21,19 +21,10 @@ export interface PillarRadarProps {
   cohortMedian?: PillarScores | null;
   /** Optional third polygon — "Compare to..." dropdown selection. */
   compareTo?: { label: string; scores: PillarScores } | null;
-  /** Phase 4 cohort = 2 programs. Surface the small-cohort caveat in the chart. */
+  /** Surface a small-cohort caveat in the legend (n=2, n=3 etc). */
   smallCohortNote?: boolean;
   className?: string;
 }
-
-const ORDER: PillarKey[] = ['A', 'B', 'C', 'D', 'E'];
-const LABEL: Record<PillarKey, string> = {
-  A: 'Access',
-  B: 'Process',
-  C: 'Rights',
-  D: 'Pathway',
-  E: 'Stability',
-};
 
 /**
  * Pillar radar with optional cohort-median + compare overlays.
@@ -50,9 +41,9 @@ export function PillarRadar({
   smallCohortNote = false,
   className,
 }: PillarRadarProps) {
-  const data = ORDER.map((k) => {
+  const data = PILLAR_ORDER.map((k) => {
     type Row = { pillar: string } & Record<string, string | number | null>;
-    const row: Row = { pillar: LABEL[k], program: program[k] };
+    const row: Row = { pillar: PILLAR_LABEL[k], program: program[k] };
     if (cohortMedian) row.cohort = cohortMedian[k];
     if (compareTo) row.compare = compareTo.scores[k];
     return row;
@@ -70,9 +61,9 @@ export function PillarRadar({
           </tr>
         </thead>
         <tbody>
-          {ORDER.map((k) => (
+          {PILLAR_ORDER.map((k) => (
             <tr key={k}>
-              <th scope="row">{LABEL[k]}</th>
+              <th scope="row">{PILLAR_LABEL[k]}</th>
               <td>{program[k].toFixed(2)}</td>
               {cohortMedian && <td>{cohortMedian[k].toFixed(2)}</td>}
               {compareTo && <td>{compareTo.scores[k].toFixed(2)}</td>}

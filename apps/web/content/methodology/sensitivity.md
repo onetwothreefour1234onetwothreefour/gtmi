@@ -30,7 +30,7 @@ is coming and what it means.
    single drop, which signals that the rank depends too heavily on a
    single number.
 
-6. **Correlation and redundancy.** Pearson matrix across all 48 indicators.
+6. **Correlation and redundancy.** Pearson matrix across all 33 indicators.
    Within-sub-factor correlations above ρ&nbsp;=&nbsp;0.8 trigger a review:
    if two indicators are saying the same thing, one of them is redundant
    weight.

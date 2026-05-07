@@ -4,7 +4,7 @@ import * as React from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { cn } from '@/lib/utils';
 
-const POPOVER_COPY = `Pre-calibration scores use engineer-chosen normalization parameters because cohort-wide calibration requires at least 5 scored programs. Calibration completes in Phase 5. These scores are correct in their relative methodology application but their absolute values will shift once calibrated against the full pilot cohort.`;
+const POPOVER_COPY = `Pre-calibration scores use engineer-chosen normalisation parameters because cohort-wide calibration requires at least 5 scored programmes. Calibration runs once the cohort is large enough; these scores are correct in their relative methodology application but their absolute values will shift once calibrated against the full cohort.`;
 
 export interface PreCalibrationChipProps {
   size?: 'sm' | 'md';

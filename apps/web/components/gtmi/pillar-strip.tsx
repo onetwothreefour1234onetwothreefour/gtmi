@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
+import { PILLAR_COLORS, PILLAR_LABEL, PILLAR_ORDER, type PillarKey } from '@/lib/theme';
 import { ScoreBar } from './score-bar';
 import { formatScore } from '@/lib/format';
 
@@ -8,20 +8,10 @@ export interface PillarStripProps {
   pillarScores: Record<PillarKey, number> | null;
   /** Number of indicators per pillar — typically derived from the methodology query. */
   indicatorCounts?: Record<PillarKey, number>;
-  /** Pillar weights within PAQ (defaults to methodology v1). */
+  /** Pillar weights within PAQ (defaults to methodology v6). */
   pillarWeights?: Record<PillarKey, number>;
   className?: string;
 }
-
-const PILLAR_LABEL: Record<PillarKey, string> = {
-  A: 'Access',
-  B: 'Process',
-  C: 'Rights',
-  D: 'Pathway',
-  E: 'Stability',
-};
-
-const PILLAR_ORDER: PillarKey[] = ['A', 'B', 'C', 'D', 'E'];
 
 const DEFAULT_WEIGHTS: Record<PillarKey, number> = {
   A: 0.28,

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 export interface CoverageChipProps {
   populated: number;
   total: number;
-  /** Display style. 'percent' (design default) or 'fraction' ("30/48"). */
+  /** Display style. 'percent' (design default) or 'fraction' ("28/33"). */
   format?: 'percent' | 'fraction';
   className?: string;
 }
@@ -16,7 +16,7 @@ export interface CoverageChipProps {
  *
  * Editorial restyle (Phase 4-A): default render switches to the design's
  * percent format (`92%`); fraction stays on the title attribute for hover.
- * Pass `format="fraction"` to keep the absolute "30/48" rendering when
+ * Pass `format="fraction"` to keep the absolute "28/33" rendering when
  * needed.
  */
 export function CoverageChip({

@@ -1,22 +1,14 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
+import { PILLAR_COLORS, PILLAR_LABEL, PILLAR_ORDER, type PillarKey } from '@/lib/theme';
 
 export interface PillarsSpecimenProps {
-  /** Per-pillar weight as fraction of PAQ (must sum to 1). Default: methodology v1. */
+  /** Per-pillar weight as fraction of PAQ (must sum to 1). Default: methodology v6. */
   pillarWeights?: Record<PillarKey, number>;
   /** Total artefact width in pixels. Default: 600. */
   width?: number;
   className?: string;
 }
-
-const PILLAR_LABEL: Record<PillarKey, string> = {
-  A: 'Access',
-  B: 'Process',
-  C: 'Rights',
-  D: 'Pathway',
-  E: 'Stability',
-};
 
 const DEFAULT_WEIGHTS: Record<PillarKey, number> = {
   A: 0.28,
@@ -26,16 +18,15 @@ const DEFAULT_WEIGHTS: Record<PillarKey, number> = {
   E: 0.15,
 };
 
-const PILLAR_ORDER: PillarKey[] = ['A', 'B', 'C', 'D', 'E'];
-
 /**
  * Five-letter typographic poster: one column per pillar, each with a top
  * accent stripe in the pillar colour, the letter in 56px Fraunces, the
  * methodology label, and the weight rendered as `NN% wt`.
  *
- * Translates docs/design/screen-rankings-v2.jsx:PillarsSpecimen, with the
- * pillar labels mapped to the methodology vocabulary
- * (Access/Process/Rights/Pathway/Stability per analyst Q1).
+ * Translates docs/design/screen-rankings-v2.jsx:PillarsSpecimen. Pillar
+ * labels come from the canonical map in lib/theme.ts (methodology v6.0.0:
+ * Product Design / Process Design / Benefits / Pathway / Performance
+ * Outcomes).
  */
 export function PillarsSpecimen({
   pillarWeights = DEFAULT_WEIGHTS,

@@ -62,8 +62,8 @@ export default async function ChangesPage() {
             The query that drives this page (<code className="num">getPolicyChanges</code>) executes
             a real <code className="num">SELECT</code> against{' '}
             <code className="num">policy_changes</code> with RLS gating{' '}
-            <code className="num">summary_human_approved=true</code>. Phase 5 populates the table;
-            this page activates with zero code change.
+            <code className="num">summary_human_approved=true</code>. The table populates as
+            policy-change tracking goes live; this page activates with zero code change.
           </DataTableNote>
         </div>
       </section>

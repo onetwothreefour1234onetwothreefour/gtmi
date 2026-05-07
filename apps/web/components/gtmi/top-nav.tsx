@@ -11,7 +11,8 @@ export type TopNavRoute =
   | 'countries'
   | 'methodology'
   | 'about'
-  | 'changes';
+  | 'changes'
+  | 'faq';
 
 export interface TopNavProps {
   /**
@@ -34,6 +35,7 @@ const ITEMS: { id: TopNavRoute; label: string; href: string }[] = [
   { id: 'countries', label: 'Countries', href: '/countries' },
   { id: 'methodology', label: 'Methodology', href: '/methodology' },
   { id: 'changes', label: 'Changes', href: '/changes' },
+  { id: 'faq', label: 'FAQ', href: '/faq' },
   { id: 'about', label: 'About', href: '/about' },
 ];
 
@@ -51,6 +53,7 @@ export function routeFromPathname(pathname: string | null): TopNavRoute | null {
   if (pathname === '/countries' || pathname.startsWith('/countries/')) return 'countries';
   if (pathname === '/methodology' || pathname.startsWith('/methodology/')) return 'methodology';
   if (pathname === '/changes' || pathname.startsWith('/changes/')) return 'changes';
+  if (pathname === '/faq' || pathname.startsWith('/faq/')) return 'faq';
   if (pathname === '/about' || pathname.startsWith('/about/')) return 'about';
   return null;
 }

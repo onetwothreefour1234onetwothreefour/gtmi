@@ -3,20 +3,17 @@
 import * as React from 'react';
 import * as Slider from '@radix-ui/react-slider';
 import { cn } from '@/lib/utils';
-import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
+import { PILLAR_COLORS, PILLAR_LABEL, PILLAR_ORDER, type PillarKey } from '@/lib/theme';
 import {
   DEFAULT_PILLAR_WEIGHTS,
   rebalancePillarWeights,
   type PillarWeights,
 } from '@/lib/advisor-mode';
 
-const PILLARS: { key: PillarKey; label: string }[] = [
-  { key: 'A', label: 'Access' },
-  { key: 'B', label: 'Process' },
-  { key: 'C', label: 'Rights' },
-  { key: 'D', label: 'Pathway' },
-  { key: 'E', label: 'Stability' },
-];
+const PILLARS: { key: PillarKey; label: string }[] = PILLAR_ORDER.map((k) => ({
+  key: k,
+  label: PILLAR_LABEL[k],
+}));
 
 export interface WeightSliderProps {
   weights: PillarWeights;

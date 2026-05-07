@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { PILLAR_COLORS, type PillarKey } from '@/lib/theme';
+import { PILLAR_COLORS, PILLAR_LABEL, PILLAR_ORDER, type PillarKey } from '@/lib/theme';
 
 export interface PillarMiniBarsProps {
   /** Map of pillar score 0-100. Null/undefined values render as inactive bars. */
@@ -9,15 +9,6 @@ export interface PillarMiniBarsProps {
   height?: number;
   className?: string;
 }
-
-const PILLAR_ORDER: PillarKey[] = ['A', 'B', 'C', 'D', 'E'];
-const PILLAR_LABEL: Record<PillarKey, string> = {
-  A: 'Access',
-  B: 'Process',
-  C: 'Rights',
-  D: 'Pathway',
-  E: 'Stability',
-};
 
 /**
  * Five 6px-wide vertical pillar bars used in dense rankings rows.

@@ -50,9 +50,9 @@ export function ProvenanceProof({ className }: ProvenanceProofProps) {
         <div className="border border-rule bg-paper p-7">
           <div className="mb-4 flex items-baseline justify-between">
             <div>
-              <p className="num text-data-sm text-ink-4">A.03</p>
+              <p className="num text-data-sm text-ink-4">D.1.2</p>
               <p className="serif mt-1" style={{ fontSize: 18, fontWeight: 500 }}>
-                Labour-market test required
+                Minimum years of residence to PR
               </p>
             </div>
             <div className="text-right">
@@ -60,13 +60,13 @@ export function ProvenanceProof({ className }: ProvenanceProofProps) {
                 Score
               </p>
               <p className="num-l" style={{ fontSize: 22 }}>
-                62
+                74
               </p>
             </div>
           </div>
           <div className="border-t border-rule pt-4">
             <p className="num mb-2 text-ink-4" style={{ fontSize: 11 }}>
-              SEM · Bundesgesetz über die Ausländerinnen und Ausländer · §21
+              IND NL · Permanent residence permit · Conditions
             </p>
             <p
               className="serif"
@@ -78,12 +78,11 @@ export function ProvenanceProof({ className }: ProvenanceProofProps) {
                 paddingLeft: 16,
               }}
             >
-              […] Eine Bewilligung kann nur erteilt werden, wenn nachgewiesen ist, dass{' '}
+              You can apply for a permanent residence permit if you{' '}
               <mark style={{ background: '#FBE5DC', padding: '1px 0' }}>
-                für die anzustellende Person in der Schweiz und in den EU/EFTA-Staaten keine
-                geeignete Person gefunden werden konnte
-              </mark>
-              . Der Vorrang ist während mindestens vier Wochen […]
+                have lived in the Netherlands legally and continuously for 5 years or more
+              </mark>{' '}
+              and meet the integration requirement […]
             </p>
             <dl
               className="num mt-4 grid grid-cols-4 gap-3 border-t border-rule-soft pt-3 text-ink-4"
@@ -91,19 +90,19 @@ export function ProvenanceProof({ className }: ProvenanceProofProps) {
             >
               <div>
                 <dt style={{ color: 'var(--ink-5)' }}>chars</dt>
-                <dd>14,231 → 14,498</dd>
+                <dd>3,212 → 3,318</dd>
               </div>
               <div>
-                <dt style={{ color: 'var(--ink-5)' }}>page</dt>
-                <dd>12 / 87</dd>
+                <dt style={{ color: 'var(--ink-5)' }}>tier</dt>
+                <dd>1 · national</dd>
               </div>
               <div>
                 <dt style={{ color: 'var(--ink-5)' }}>sha256</dt>
-                <dd>8f3a…b21c</dd>
+                <dd>4d9c…71ea</dd>
               </div>
               <div>
                 <dt style={{ color: 'var(--ink-5)' }}>scraped</dt>
-                <dd>2026-03-28</dd>
+                <dd>2026-04-22</dd>
               </div>
             </dl>
           </div>
