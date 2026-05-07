@@ -492,6 +492,13 @@ Six analyses published with every release:
 5. **Indicator dropout test** — drop one indicator at a time; flag if any program moves >5 ranks.
 6. **Correlation and redundancy** — Pearson matrix; ρ > 0.8 within sub-factor triggers review.
 
+The full executable specification — including weight audit, leverage analysis,
+8-analysis design (B1–B8 expanding the 6 above with rank-aggregation cross-checks),
+revision triggers, and tiered cohort-size unlocks — lives in
+[`docs/sensitivity-analysis/`](./sensitivity-analysis/). The plan activates
+when at least 5 programmes carry un-flagged composite scores; until then it is
+dormant. Start at [`docs/sensitivity-analysis/TRIGGER.md`](./sensitivity-analysis/TRIGGER.md).
+
 ---
 
 ## 9. Reproducibility and Versioning
