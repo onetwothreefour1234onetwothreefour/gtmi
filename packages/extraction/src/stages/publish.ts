@@ -75,10 +75,9 @@ export const NUMERIC_SANITY_RANGES: Record<string, { min: number; max: number }>
   'C.2.2': { min: 0, max: 100 }, // dependent child age cap (use no_cap token if no upper limit)
   'D.1.2': { min: 0, max: 50 }, // years to PR (or "not_applicable" sentinel when D.1.1=false)
   'D.2.2': { min: 0, max: 50 }, // total years to citizenship (or "not_applicable" sentinel when D.2.1=false)
-  'E.1.1': { min: 0, max: 1000 }, // policy changes count (severity-weighted)
-  'E.1.3': { min: 0, max: 200 }, // program age in years
-  'E.3.1': { min: -5, max: 5 }, // V-Dem / WGI rule of law
-  'E.3.2': { min: -5, max: 5 }, // WGI government effectiveness
+  'E.1.1': { min: 0, max: 200 }, // program age in years (uncapped at extraction; engine clamps via min_max params.max=20)
+  'E.1.2': { min: 0, max: 100_000_000 }, // cumulative approvals or active visa holders (categorical fallback handles no_data)
+  'E.2.1': { min: 0, max: 1000 }, // severity-weighted policy-change count (5-yr window)
 };
 
 export function isNumericInSanityRange(fieldKey: string, value: number): boolean {

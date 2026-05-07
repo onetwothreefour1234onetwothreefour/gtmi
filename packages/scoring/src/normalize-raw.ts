@@ -16,7 +16,8 @@ function isNormalizationFn(value: string): value is NormalizationFn {
     value === 'categorical' ||
     value === 'boolean' ||
     value === 'boolean_with_annotation' ||
-    value === 'country_substitute_regional'
+    value === 'country_substitute_regional' ||
+    value === 'numeric_or_categorical'
   );
 }
 
@@ -155,6 +156,34 @@ export function normalizeRawValue(
       if (!(trimmed in scoreMap)) {
         throw new ScoringError(
           `country_substitute_regional value "${trimmed}" not in rubric. Valid keys: ${Object.keys(scoreMap).join(', ')}`
+        );
+      }
+      return trimmed;
+    }
+    case 'numeric_or_categorical': {
+      // Methodology v6.0.0 / ADR-032 — dual-format. The LLM returns
+      // either a parseable integer (preferred) or a categorical bucket
+      // string from the rubric. Disambiguate by trying numeric parse
+      // first; on failure, fall back to rubric lookup.
+      if (!isCategoricalRubric(scoringRubricJsonb)) {
+        throw new ScoringError(
+          `Field uses numeric_or_categorical normalization but has no valid scoringRubricJsonb (the categorical fallback requires the rubric)`
+        );
+      }
+      const trimmed = valueRaw.trim();
+      const cleaned = trimmed.replace(/[$,\s%]/g, '');
+      // Numeric form: a clean integer-looking input parses cleanly. Use
+      // a strict regex so a bucket label with no commas (e.g. "small")
+      // doesn't slip through as NaN-from-parseFloat-of-"".
+      if (/^-?\d+(\.\d+)?$/.test(cleaned)) {
+        const n = parseFloat(cleaned);
+        if (isFinite(n)) return n;
+      }
+      // Categorical form: must match a rubric key.
+      const scoreMap = rubricToScoreMap(scoringRubricJsonb);
+      if (!(trimmed in scoreMap)) {
+        throw new ScoringError(
+          `numeric_or_categorical value "${trimmed}" is neither a parseable number nor a rubric key. Valid bucket keys: ${Object.keys(scoreMap).join(', ')}`
         );
       }
       return trimmed;

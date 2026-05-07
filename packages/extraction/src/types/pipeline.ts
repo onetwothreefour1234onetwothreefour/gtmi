@@ -128,24 +128,17 @@ export interface PublishStage {
   executeDerived(extraction: ExtractionOutput, provenance: ProvenanceRecord): Promise<string>;
 }
 
-// Phase 3.6 / ADR-016 (Pillar A portion superseded by ADR-028; Pillar B
-// portion superseded by ADR-029; ALL Pillar D portions superseded by
-// ADR-031) — Stage 6.5: Derive.
+// Phase 3.6 / ADR-016 (Pillar A → ADR-028, B → ADR-029, C → ADR-030,
+// D → ADR-031, E → ADR-032) — Stage 6.5: Derive.
 //
-// Pure deterministic computation of E.1.1 (severity-weighted policy
-// changes) and E.1.3 (program age) from already-extracted inputs plus
-// static lookup tables. No LLM calls. Inputs are resolved by the
-// caller (canary-run.ts / extract-single-program.ts) from the
-// extraction map and the static tables.
-//
-// All eight Pillar D deriveDxx functions were removed in methodology
-// v5.0.0 (ADR-031). D.1.2 / D.2.2 / D.2.3 are now LLM-extracted
-// directly; D.1.3 / D.1.4 / D.2.4 / D.3.1 / D.3.3 are retired.
+// Methodology v6.0.0 (ADR-032): the only remaining derive is program
+// age (now keyed E.1.1, was E.1.3). The deriveE11 (severity-weighted
+// policy changes) was deleted; new E.2.1 is LLM-extracted. No LLM
+// calls in this stage. Inputs are resolved by the caller
+// (canary-run.ts / extract-single-program.ts) from the programs table.
 export interface DeriveStageInputs {
-  /** Phase 3.9 / W20 — E.1.3 program age (years since launch, capped at 20). */
-  e13?: import('../stages/derive').DerivedE13Input;
-  /** Phase 3.9 / W20 — E.1.1 severity-weighted policy-change count. */
-  e11?: import('../stages/derive').DerivedE11Input;
+  /** ADR-032 — program age (years since launch, raw uncapped). Engine clamps to 20 at score time. */
+  programAge?: import('../stages/derive').DerivedProgramAgeInput;
 }
 
 export interface DeriveStage {

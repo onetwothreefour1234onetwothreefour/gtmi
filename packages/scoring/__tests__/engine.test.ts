@@ -46,23 +46,24 @@ describe('weight integrity', () => {
   });
 
   it('indicator weights per sub-factor from METHODOLOGY sum to 1.0', () => {
-    // Hard-coded per METHODOLOGY.md — these are the definitive weight checks.
+    // Hard-coded per the current methodology-v1 indicator_weights map.
+    // v6.0.0 layout (ADR-032): A.1×5, A.2×3, A.3×1, B.1×2, B.2×2, B.3×1,
+    // B.4×2, C.1×3, C.2×3, C.3×2, D.1×2, D.2×3, E.1×2, E.2×2.
     const indicators: Record<string, number[]> = {
-      'A.1': [0.5, 0.3, 0.2],
-      'A.2': [0.35, 0.35, 0.3],
-      'A.3': [0.4, 0.35, 0.25],
-      'B.1': [0.5, 0.3, 0.2],
-      'B.2': [0.4, 0.25, 0.2, 0.15],
-      'B.3': [0.4, 0.35, 0.25],
-      'C.1': [0.3, 0.3, 0.25, 0.15],
-      'C.2': [0.4, 0.25, 0.2, 0.15],
+      'A.1': [0.25, 0.2, 0.2, 0.2, 0.15],
+      'A.2': [0.35, 0.4, 0.25],
+      'A.3': [1.0],
+      'B.1': [0.7, 0.3],
+      'B.2': [0.5, 0.5],
+      'B.3': [1.0],
+      'B.4': [0.5, 0.5],
+      'C.1': [0.4, 0.3, 0.3],
+      'C.2': [0.5, 0.3, 0.2],
       'C.3': [0.5, 0.5],
-      'D.1': [0.3, 0.3, 0.2, 0.2],
-      'D.2': [0.3, 0.3, 0.2, 0.2],
-      'D.3': [0.36, 0.44, 0.2],
-      'E.1': [0.5, 0.3, 0.2],
-      'E.2': [0.4, 0.3, 0.3],
-      'E.3': [0.5, 0.5],
+      'D.1': [0.5, 0.5],
+      'D.2': [0.4, 0.4, 0.2],
+      'E.1': [0.5, 0.5],
+      'E.2': [0.5, 0.5],
     };
     for (const [sf, weights] of Object.entries(indicators)) {
       const sum = weights.reduce((a, b) => a + b, 0);
@@ -544,7 +545,6 @@ function makeFullInput(): ScoringInput {
     { id: 'd-d3', key: 'D.3.1', pillar: 'D', subFactor: 'D.3', w: 1.0, fn: 'min_max' as const },
     { id: 'd-e1', key: 'E.1.1', pillar: 'E', subFactor: 'E.1', w: 1.0, fn: 'min_max' as const },
     { id: 'd-e2', key: 'E.2.1', pillar: 'E', subFactor: 'E.2', w: 1.0, fn: 'min_max' as const },
-    { id: 'd-e3', key: 'E.3.1', pillar: 'E', subFactor: 'E.3', w: 1.0, fn: 'min_max' as const },
   ];
 
   return {

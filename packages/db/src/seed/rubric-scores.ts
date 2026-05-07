@@ -84,19 +84,15 @@ export const RUBRIC_SCORES: Record<string, Record<string, number>> = {
   // Pillar D categorical rubrics (D.2.4 / D.3.2 / D.3.3) removed in
   // methodology v5.0.0 (ADR-031) — those keys are retired. The new
   // Pillar D is all booleans + numerics with no rubric scores.
-  'E.2.2': {
-    no_cap: 100,
-    published_current: 90,
-    published_historical_only: 60,
-    exists_undisclosed: 20,
-    // "not_addressed" intentionally removed — represents coverage gap, not data.
-    // Publish stage routes valueRaw === "not_addressed" to ABSENT (no row written).
-  },
-  'E.2.3': {
-    comprehensive: 100,
-    substantive: 75,
-    basic: 50,
-    minimal: 25,
-    absent: 0,
+  // Pillar E rubric scores rewritten in methodology v6.0.0 (ADR-032):
+  // sub-factor E.3 retired (no rubric); E.2.2 / E.2.3 retired; new
+  // E.1.2 introduces a 5-bucket categorical fallback used by the
+  // numeric_or_categorical normFn when only a coarse range is reported.
+  'E.1.2': {
+    large: 100,
+    medium: 75,
+    small: 50,
+    marginal: 25,
+    no_data: 0,
   },
 };

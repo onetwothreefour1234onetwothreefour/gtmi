@@ -45,8 +45,6 @@ export interface ProvenanceReviewFields {
 export interface ProvenanceOptionalFields {
   /** ISO 4217 currency code preserved before numeric normalization. */
   valueCurrency?: string;
-  /** True for E.1.1 mean-substitution per METHODOLOGY §7.5. */
-  stabilityEdgeCase?: boolean;
   /**
    * Phase 3.9 / W7 — GCS storage path for the source-page snapshot
    * archived by the scrape pipeline. When present, the provenance

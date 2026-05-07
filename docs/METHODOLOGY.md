@@ -309,28 +309,25 @@ SCORE_DEPENDENCIES design.
 
 ### Pillar E — Stability (15% of PAQ)
 
-**E.1 Policy stability (50% of pillar)**
+Methodology v6.0.0 (ADR-032) collapses Pillar E from 8 indicators across
+3 sub-factors to **4 indicators across 2 sub-factors**, framed as
+**Track Record** (E.1) and **Rule Stability** (E.2). The institutional-
+quality sub-factor (E.3) is retired alongside the World Bank WGI / V-Dem
+external-index ingestion path.
 
-| Indicator                                     | Weight | Normalization      | Direction          |
-| --------------------------------------------- | ------ | ------------------ | ------------------ |
-| E.1.1 Material policy changes in last 5 years | 50%    | z-score (inverted) | fewer = better     |
-| E.1.2 Forward-announced pipeline changes      | 30%    | boolean            | announced = better |
-| E.1.3 Program age (years, capped at 20)       | 20%    | min-max            | older = better     |
+**E.1 Track Record (50% of pillar)**
 
-**E.2 Transparency (30% of pillar)**
+| Indicator                                         | Weight | Normalization                             | Direction       |
+| ------------------------------------------------- | ------ | ----------------------------------------- | --------------- |
+| E.1.1 Program age (years since introduction)      | 50%    | min-max (engine clamps score at 20 years) | older = better  |
+| E.1.2 Cumulative approvals or active visa holders | 50%    | numeric \| categorical (5-bucket rubric)  | larger = better |
 
-| Indicator                                             | Weight | Normalization   | Direction                |
-| ----------------------------------------------------- | ------ | --------------- | ------------------------ |
-| E.2.1 Published approval rate or admission statistics | 40%    | boolean + value | published = better       |
-| E.2.2 Published quota / cap information               | 30%    | categorical     | fully disclosed = better |
-| E.2.3 Public guidance and decision criteria           | 30%    | categorical     | comprehensive = better   |
+**E.2 Rule Stability (50% of pillar)**
 
-**E.3 Institutional quality (20% of pillar)**
-
-| Indicator                                       | Weight | Normalization | Direction       |
-| ----------------------------------------------- | ------ | ------------- | --------------- |
-| E.3.1 Rule of law (V-Dem / World Bank WGI)      | 50%    | re-normalized | higher = better |
-| E.3.2 Government effectiveness (World Bank WGI) | 50%    | re-normalized | higher = better |
+| Indicator                                                     | Weight | Normalization | Direction      |
+| ------------------------------------------------------------- | ------ | ------------- | -------------- |
+| E.2.1 Material policy changes in last 5 years (severity-wtd.) | 50%    | min-max       | fewer = better |
+| E.2.2 Program suspension or abrupt closure history (10-yr)    | 50%    | boolean       | none = better  |
 
 ---
 
@@ -338,13 +335,18 @@ SCORE_DEPENDENCIES design.
 
 ### 6.1 Source tiers
 
-| Tier | Description                                         | Pillars                    |
-| ---- | --------------------------------------------------- | -------------------------- |
-| 1    | Official government sources at any geographic level | A, B, C, D, E.1, E.2       |
-| 2    | Law firm and immigration consultant sources         | Cross-check only           |
-| 3    | News and policy monitoring                          | Early-warning signals only |
+| Tier | Description                                                        | Pillars                          |
+| ---- | ------------------------------------------------------------------ | -------------------------------- |
+| 1    | Official government sources at any geographic level                | A, B, C, D, E (all sub-factors)  |
+| 2    | Law firm, immigration consultant, MPI, OECD migration, IMD reports | E.2.1 supplementary; cross-check |
+| 3    | News and policy monitoring                                         | Early-warning signals only       |
 
-External indices (World Bank WGI, V-Dem) used in Pillar E.3 only, explicitly disclosed.
+Methodology v6.0.0 (ADR-032): the World Bank WGI / V-Dem ingestion path
+retired alongside the Pillar E restructure. Pillar E is now sourced from
+the same Tier 1 government pages as the rest of PAQ, with Tier 2 policy
+trackers (Migration Policy Institute, OECD migration outlooks, IMD World
+Talent Ranking) admitted as supplementary recall hints for E.2.1
+(severity-weighted policy changes).
 
 ### 6.2 Geographic source levels [NEW]
 
@@ -385,9 +387,11 @@ Each program is now extracted from up to 10 sources, discovered dynamically by S
 
 ### 7.1 Government-source-only for PAQ
 
-Every indicator in Pillars A through D, and sub-factors E.1 and E.2, must be populated from a Tier 1 government source at any geographic level. No exceptions.
-
-Pillar E.3 is explicitly sourced from external indices (World Bank WGI, V-Dem). Disclosed on methodology page.
+Every indicator in Pillars A through E must be populated from a Tier 1
+government source at any geographic level. Methodology v6.0.0 (ADR-032)
+retired the World Bank WGI / V-Dem external-index ingestion path that
+previously fed sub-factor E.3; Tier 2 policy trackers (MPI, OECD, IMD)
+are admitted as supplementary recall hints for E.2.1 only.
 
 ### 7.2 Seven-stage verification pipeline [UPDATED]
 

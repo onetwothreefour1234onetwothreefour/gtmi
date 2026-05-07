@@ -26,9 +26,8 @@ describe('NUMERIC_SANITY_RANGES coverage', () => {
       'D.1.2',
       'D.2.2',
       'E.1.1',
-      'E.1.3',
-      'E.3.1',
-      'E.3.2',
+      'E.1.2',
+      'E.2.1',
     ];
     for (const k of expectedKeys) {
       expect(NUMERIC_SANITY_RANGES[k], `missing sanity range for ${k}`).toBeDefined();
@@ -57,10 +56,14 @@ describe('isNumericInSanityRange', () => {
     expect(isNumericInSanityRange('B.1.1', 100_000)).toBe(false);
   });
 
-  it('rejects a >100% rule-of-law score (E.3.1 must be in [-5,5])', () => {
-    expect(isNumericInSanityRange('E.3.1', 8)).toBe(false);
-    expect(isNumericInSanityRange('E.3.1', -8)).toBe(false);
-    expect(isNumericInSanityRange('E.3.1', 0)).toBe(true);
+  it('rejects a wildly out-of-range program age (E.1.1 must be in [0, 200])', () => {
+    // Methodology v6.0.0 / ADR-032 — E.1.1 is now program age in years.
+    // The 200 ceiling is generous (catches LLM typos and parser errors)
+    // without false-rejecting the oldest H-1B-style programs.
+    expect(isNumericInSanityRange('E.1.1', 250)).toBe(false);
+    expect(isNumericInSanityRange('E.1.1', -1)).toBe(false);
+    expect(isNumericInSanityRange('E.1.1', 36)).toBe(true);
+    expect(isNumericInSanityRange('E.1.1', 0)).toBe(true);
   });
 
   it('rejects the integer 999 on age-cap fields (methodology v4.0.0 / ADR-030: no_cap token is the only no-cap encoding)', () => {

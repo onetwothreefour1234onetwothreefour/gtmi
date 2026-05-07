@@ -48,7 +48,7 @@ describe('Phase 3.6 — canary country-substitute dispatch (commit 2 verificatio
       { key: 'D.1.3', normalizationFn: 'boolean_with_annotation' },
       { key: 'D.1.4', normalizationFn: 'boolean_with_annotation' },
       { key: 'C.2.1', normalizationFn: 'categorical' },
-      { key: 'E.3.2', normalizationFn: 'categorical' },
+      { key: 'E.2.1', normalizationFn: 'min_max' },
     ];
     expect(fieldsTriggeringCountrySubstitute(defs)).toEqual([]);
   });

@@ -20,9 +20,7 @@ sentence in a Tier&nbsp;1 government source.
 ## Data sources
 
 - IMD World Talent Ranking — Appeal factor (CME baseline).
-- World Bank Worldwide Governance Indicators (E.3.2 Government Effectiveness).
-- V-Dem Institute (E.3.1 Rule of Law, Phase&nbsp;6).
-- OECD Tax Treaty Database (Pillar&nbsp;D supplementary, Phase&nbsp;6).
+- Migration Policy Institute and OECD migration outlooks — supplementary policy-change context for E.2.1.
 - Official immigration, tax, and gazette pages of each scored country.
 
 ## Citation

@@ -424,15 +424,6 @@ export function ProvenanceDrawer({
                     </dd>
                   </>
                 )}
-
-                {p.stabilityEdgeCase && (
-                  <>
-                    <dt className="text-ink-4">Note</dt>
-                    <dd className="text-precalib-fg" data-testid="provenance-drawer-stability-note">
-                      E.1.1 mean-substitution applied (program younger than 3 years).
-                    </dd>
-                  </>
-                )}
               </dl>
             </section>
           </div>

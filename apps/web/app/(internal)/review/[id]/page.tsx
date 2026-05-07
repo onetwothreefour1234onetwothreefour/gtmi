@@ -88,10 +88,13 @@ const NUMERIC_HINTS: Record<string, { min: number; max: number; unit?: string }>
   'C.2.2': { min: 0, max: 100, unit: 'years (use no_cap token if no upper limit)' },
   'D.1.2': { min: 0, max: 50, unit: 'years (or "not_applicable" if D.1.1 = false)' },
   'D.2.2': { min: 0, max: 50, unit: 'years (or "not_applicable" if D.2.1 = false)' },
-  'E.1.1': { min: 0, max: 1000, unit: 'severity-weighted count' },
-  'E.1.3': { min: 0, max: 200, unit: 'years' },
-  'E.3.1': { min: -5, max: 5, unit: 'WGI score' },
-  'E.3.2': { min: -5, max: 5, unit: 'WGI score' },
+  'E.1.1': { min: 0, max: 200, unit: 'years (program age; engine clamps score at 20)' },
+  'E.1.2': {
+    min: 0,
+    max: 100_000_000,
+    unit: 'cumulative approvals or active holders (or "no_data")',
+  },
+  'E.2.1': { min: 0, max: 1000, unit: 'severity-weighted policy-change count' },
 };
 
 export default async function ReviewDetailPage({ params }: PageProps) {

@@ -206,6 +206,106 @@ export function getRegionalSubstitute(countryIso: string, fieldKey: string): Reg
   return { value: sub.value, score: sub.score, region };
 }
 
+// ────────────────────────────────────────────────────────────────────
+// Methodology v6.0.0 / ADR-032 — numeric_or_categorical normalization.
+//
+// Pillar E.1.2 (cumulative approvals or active visa holders) accepts
+// either an integer count (preferred) or a categorical bucket string
+// from the LLM. The rubric defines five buckets in fixed order:
+//   large > medium > small > marginal > no_data
+// with scores 100 / 75 / 50 / 25 / 0. The numeric form is scored via
+// piecewise linear interpolation anchored at the bucket boundaries:
+//   ≥ 50_000        → 100  (large)
+//   10_000..50_000  → 75..100  (medium → large)
+//   1_000..10_000   → 50..75   (small → medium)
+//   100..1_000      → 25..50   (marginal → small)
+//   0..100          → 0..25    (no_data → marginal)
+// This keeps the numeric and categorical forms numerically continuous
+// at the bucket boundaries: 50_000 → 100 (top of medium = bottom of
+// large), 10_000 → 75 (top of small = bottom of medium), etc.
+// ────────────────────────────────────────────────────────────────────
+
+interface NumericOrCategoricalBucket {
+  /** Bucket lower bound (inclusive). */
+  threshold: number;
+  /** Bucket score at the lower bound. */
+  score: number;
+}
+
+/**
+ * Bucket boundaries for E.1.2 — must match the rubric in
+ * packages/db/src/seed/rubric-scores.ts.
+ *
+ * Ordered ascending by threshold so the engine can find the
+ * containing bucket with a single forward scan. The terminal bucket
+ * (large, threshold 50_000) caps at score 100; values above 50_000
+ * still score 100 (rubric calls "large" the top tier).
+ */
+const NUMERIC_OR_CATEGORICAL_BUCKETS: Record<string, NumericOrCategoricalBucket[]> = {
+  'E.1.2': [
+    { threshold: 0, score: 0 }, // no_data baseline
+    { threshold: 100, score: 25 }, // marginal lower
+    { threshold: 1_000, score: 50 }, // small lower
+    { threshold: 10_000, score: 75 }, // medium lower
+    { threshold: 50_000, score: 100 }, // large lower (and ceiling)
+  ],
+};
+
+export function normalizeNumericOrCategorical(
+  parsed: number | string,
+  fieldKey: string,
+  rubric: CategoricalRubric | null,
+  direction: Direction
+): number {
+  // String form → straightforward rubric lookup.
+  if (typeof parsed === 'string') {
+    if (!rubric) {
+      throw new ScoringError(
+        `numeric_or_categorical: field "${fieldKey}" has a string value but no scoringRubricJsonb`
+      );
+    }
+    return normalizeCategorical(parsed, rubric);
+  }
+
+  // Numeric form → piecewise linear interpolation against the field's
+  // bucket configuration. Bucket map is per-field (currently E.1.2
+  // only) and intentionally NOT derived from the rubric — the rubric
+  // describes the bucket SCORES; the numeric thresholds live here.
+  const buckets = NUMERIC_OR_CATEGORICAL_BUCKETS[fieldKey];
+  if (!buckets || buckets.length === 0) {
+    throw new ScoringError(
+      `numeric_or_categorical: field "${fieldKey}" has a numeric value but no bucket configuration in NUMERIC_OR_CATEGORICAL_BUCKETS`
+    );
+  }
+  // Negative inputs round to the bottom bucket (the LLM should never
+  // hand back a negative count, but the sanity range catches it
+  // upstream — fail open here).
+  let raw: number;
+  if (parsed <= buckets[0]!.threshold) {
+    raw = buckets[0]!.score;
+  } else if (parsed >= buckets[buckets.length - 1]!.threshold) {
+    raw = buckets[buckets.length - 1]!.score;
+  } else {
+    raw = buckets[0]!.score;
+    for (let i = 1; i < buckets.length; i++) {
+      const prev = buckets[i - 1]!;
+      const curr = buckets[i]!;
+      if (parsed >= prev.threshold && parsed < curr.threshold) {
+        const frac = (parsed - prev.threshold) / (curr.threshold - prev.threshold);
+        raw = prev.score + frac * (curr.score - prev.score);
+        break;
+      }
+    }
+  }
+  // Direction inversion is symmetric to other normFns. lower_is_better
+  // is unusual for E.1.2 (more visa holders = better), but supported
+  // for symmetry.
+  if (direction === 'lower_is_better') {
+    return Math.min(100, Math.max(0, 100 - raw));
+  }
+  return Math.min(100, Math.max(0, raw));
+}
+
 /**
  * Parse valueNormalized from JSONB based on the normalization function.
  * Throws ScoringError if the stored type does not match what the fn expects.
@@ -274,6 +374,17 @@ export function parseIndicatorValue(
       );
     }
     return valueNormalized as Record<string, unknown>;
+  }
+  if (fn === 'numeric_or_categorical') {
+    // Methodology v6.0.0 / ADR-032 — accept either a JSON number
+    // (preferred) or a JSON string (categorical fallback). The engine
+    // discriminates by typeof and dispatches to interpolation or rubric
+    // lookup accordingly.
+    if (typeof valueNormalized === 'number') return valueNormalized;
+    if (typeof valueNormalized === 'string') return valueNormalized;
+    throw new ScoringError(
+      `Expected JSON number or string for normalizationFn "numeric_or_categorical", got ${typeof valueNormalized}`
+    );
   }
   throw new ScoringError(`Unknown normalizationFn: "${String(fn)}"`);
 }

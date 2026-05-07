@@ -14,7 +14,17 @@ export type NormalizationFn =
   // rubric. The synthetic field_values row is stamped with
   // provenance.extractionModel === 'country-substitute-regional' so
   // the dashboard can surface a "Country-substitute" badge.
-  | 'country_substitute_regional';
+  | 'country_substitute_regional'
+  // Methodology v6.0.0 / ADR-032: dual-format field where the LLM may
+  // return either a numeric integer (preferred) or a categorical bucket
+  // string (fallback when only a coarse range is reported). Used by
+  // E.1.2 (cumulative approvals or active visa holders). Numeric form
+  // is scored via piecewise rubric-anchored interpolation against the
+  // categorical breakpoints; categorical form is scored via a direct
+  // rubric lookup. The rubric MUST be present and define both the
+  // bucket scores AND the numeric breakpoints (encoded as the bucket
+  // ordering: large/medium/small/marginal/no_data).
+  | 'numeric_or_categorical';
 
 export type Direction = 'higher_is_better' | 'lower_is_better';
 

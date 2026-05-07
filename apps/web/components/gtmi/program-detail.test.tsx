@@ -172,7 +172,7 @@ describe('PillarBreakdown — tabs vs expand-all (Q5)', () => {
     mkFieldValue('B', 'B.1.1', 'B.1', 'Application fee'),
     mkFieldValue('C', 'C.1.1', 'C.1', 'Employer switching'),
     mkFieldValue('D', 'D.2.2', 'D.2', 'Years to citizenship'),
-    mkFieldValue('E', 'E.3.2', 'E.3', 'Government effectiveness'),
+    mkFieldValue('E', 'E.2.1', 'E.2', 'Material policy changes (severity-weighted)'),
   ];
 
   function renderBreakdown(overrides: Partial<React.ComponentProps<typeof PillarBreakdown>> = {}) {

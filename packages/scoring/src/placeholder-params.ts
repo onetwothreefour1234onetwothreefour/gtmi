@@ -42,9 +42,14 @@ export const PHASE2_PLACEHOLDER_PARAMS: NormalizationParams = {
   // Conditional zero-scoring (SCORE_DEPENDENCIES) handles D.1.2/D.2.2
   // when the parent boolean (D.1.1/D.2.1) is false.
 
-  // E — Environment & Stability
-  'E.1.1': { mean: 3, stddev: 2.5 }, // policy changes count (severity-weighted) — z_score
-  'E.1.3': { min: 0, max: 20 }, // program age years — min_max
-  'E.3.1': { min: -2.5, max: 2.5 }, // V-Dem / WGI Rule of Law score — min_max
-  'E.3.2': { min: -2.5, max: 2.5 }, // WGI Government Effectiveness score — min_max
+  // E — Stability (methodology v6.0.0 / ADR-032; restructured to 4
+  // indicators across 2 sub-factors. E.3 institutional-quality
+  // sub-factor retired alongside the WGI / V-Dem ingestion path.)
+  'E.1.1': { min: 0, max: 20 }, // program age years — min_max (ceiling 20 enforced via params.max)
+  // E.1.2 (cumulative approvals or active visa holders) uses the
+  // numeric_or_categorical normFn; bucket thresholds + scores live in
+  // packages/scoring/src/normalize.ts (NUMERIC_OR_CATEGORICAL_BUCKETS)
+  // so no NormalizationParamSet is required here.
+  'E.2.1': { min: 0, max: 25 }, // severity-weighted policy-change count — min_max (Phase 5 recalibrates)
+  // E.2.2 is boolean — no params.
 };

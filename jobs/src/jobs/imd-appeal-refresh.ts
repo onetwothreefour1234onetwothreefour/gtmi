@@ -256,14 +256,16 @@ async function applyAndDiff(rows: ImdAppealRow[]): Promise<AppliedChange[]> {
  */
 async function writeImdRefreshSummary(changes: AppliedChange[]): Promise<void> {
   if (changes.length === 0) return;
-  // Select any field_definitions row to satisfy the FK; E.3.2 (WGI
-  // Government Effectiveness) is the closest semantic analogue since
-  // it's also a country-level external-index input.
+  // Select any field_definitions row to satisfy the FK. Methodology
+  // v6.0.0 (ADR-032) retired E.3.2 (the previous synthetic anchor),
+  // so this now points at A.1.1, which is the highest-weighted always-
+  // present cohort field. The field linkage is cosmetic — the row's
+  // purpose is the timeline marker, not the field-level diff.
   const fdRow = await db.execute<{ id: string; program_id: string }>(sql`
     SELECT fd.id, p.id AS program_id
     FROM field_definitions fd
     JOIN programs p ON 1=1
-    WHERE fd.key = 'E.3.2'
+    WHERE fd.key = 'A.1.1'
     LIMIT 1
   `);
   const iter = Array.isArray(fdRow)
@@ -271,7 +273,7 @@ async function writeImdRefreshSummary(changes: AppliedChange[]): Promise<void> {
     : ((fdRow as unknown as { rows?: Array<Record<string, unknown>> }).rows ?? []);
   const first = iter[0] as { id?: string; program_id?: string } | undefined;
   if (!first?.id || !first.program_id) {
-    console.warn('[imd-refresh] no E.3.2 field/programme found — skipping summary row');
+    console.warn('[imd-refresh] no A.1.1 field/programme found — skipping summary row');
     return;
   }
 

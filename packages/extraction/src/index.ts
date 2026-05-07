@@ -75,24 +75,20 @@ export {
   DERIVE_KNOWLEDGE_CONFIDENCE,
   DERIVE_KNOWLEDGE_MODEL,
   DeriveStageImpl,
-  deriveE11,
-  deriveE13,
+  deriveProgramAge,
 } from './stages/derive';
 export type {
   CitizenshipResidenceEntry,
   CivicTestPolicyEntry,
-  DerivedE11Input,
-  DerivedE13Input,
+  DerivedProgramAgeInput,
   DerivedRow,
   DualCitizenshipPolicyEntry,
   FxRateEntry,
   MedianWageEntry,
   NonGovCostsPolicyEntry,
-  PolicyChangeEventEntry,
   PrPresenceFieldEntry,
   PrPresencePolicyEntry,
   PrTimelinePolicyEntry,
-  ProgramPolicyHistoryEntry,
   TaxBasisPolicyEntry,
   TaxResidencyPolicyEntry,
 } from './stages/derive';
@@ -195,8 +191,9 @@ export * from './data/country-pr-timeline';
 export * from './data/country-civic-test-policy';
 export * from './data/country-tax-residency';
 export * from './data/country-tax-basis';
-// Phase 3.9 / W20 — per-program policy-change history for E.1.1 derive.
-export * from './data/program-policy-history';
+// Methodology v6.0.0 (ADR-032) — per-program policy-change history
+// retired (PROGRAM_POLICY_HISTORY data file deleted; the new E.2.1 is
+// LLM-extracted from the same recall hints).
 // Phase 3.9 / W3 — per-country cross-departmental authority registry.
 export * from './data/country-departments';
 // Phase 3.9 / W5 — per-program curated discovery hints.

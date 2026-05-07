@@ -7,8 +7,7 @@ import {
   PublishStageImpl,
   ScrapeStageImpl,
   ValidateStageImpl,
-  deriveE11,
-  deriveE13,
+  deriveProgramAge,
   dynamicTierQuotas,
   dynamicUrlCap,
   formatRunCostSummary,
@@ -19,13 +18,11 @@ import {
   planCanaryCost,
   resetRunCostAggregate,
   scoreProgramFromDb,
-  PROGRAM_POLICY_HISTORY,
 } from '@gtmi/extraction';
 import type {
   CrossCheckOutcome,
   CrossCheckResult,
   DiscoveredUrl,
-  ExtractionOutput,
   FieldSpec,
   ProvenanceRecord,
   ScrapeResult,
@@ -33,12 +30,7 @@ import type {
 import { db, blockerDomains, fieldDefinitions, programs } from '@gtmi/db';
 import { sql } from 'drizzle-orm';
 import { ACTIVE_FIELD_CODES } from '@gtmi/scoring';
-import {
-  COUNTRY_LEVEL_SOURCES,
-  ISO3_TO_ISO2,
-  fetchVdemRuleOfLawScore,
-  fetchWgiScore,
-} from '../../../scripts/country-sources';
+import { COUNTRY_LEVEL_SOURCES } from '../../../scripts/country-sources';
 import { eq } from 'drizzle-orm';
 
 const METHODOLOGY_VERSION = '1.0.0';
@@ -48,11 +40,6 @@ const AUTO_APPROVE_CONFIDENCE_THRESHOLD = 0.85;
 // Default OFF. Mirrors the canary-run.ts behaviour.
 const PHASE3_TIER2_FALLBACK = process.env['PHASE3_TIER2_FALLBACK'] === 'true';
 const TIER2_FALLBACK_CONFIDENCE_CAP = 0.85;
-
-// Phase 3.6 / Fix A — E.3.1 V-Dem (WGI Rule of Law) direct fetch gate.
-// Default true per analyst Q5 decision. Set PHASE3_VDEM_ENABLED=false to
-// disable for staged rollouts.
-const PHASE3_VDEM_ENABLED = process.env['PHASE3_VDEM_ENABLED'] !== 'false';
 
 interface PipelineResult {
   programId: string;
@@ -271,128 +258,16 @@ export const extractSingleProgram = task({
     let fieldsAutoApproved = 0;
     let fieldsQueued = 0;
 
-    // --- E.3.2: direct World Bank WGI API (bypasses LLM) ---
-    const e32def = allFieldDefs.find((d) => d.key === 'E.3.2');
-    if (e32def) {
-      const wgiResult = await fetchWgiScore(country);
-      if (wgiResult) {
-        const wgiExtraction: ExtractionOutput = {
-          fieldDefinitionKey: 'E.3.2',
-          programId,
-          valueRaw: wgiResult.score,
-          sourceSentence: `World Bank WGI Government Effectiveness estimate for ${wgiResult.countryName}: ${wgiResult.score} (${wgiResult.year})`,
-          characterOffsets: { start: 0, end: 0 },
-          extractionModel: 'world-bank-api-direct',
-          extractionConfidence: 1.0,
-          extractedAt: new Date(),
-        };
-        const wgiValidation = {
-          isValid: true,
-          validationConfidence: 1.0,
-          validationModel: 'world-bank-api-direct',
-          notes: 'Direct World Bank API source — no LLM extraction needed',
-        };
-        const iso2 = ISO3_TO_ISO2[country];
-        const wgiProvenance: ProvenanceRecord = {
-          sourceUrl: iso2
-            ? `https://api.worldbank.org/v2/country/${iso2}/indicator/GE.EST?format=json&mrv=1&source=3`
-            : 'https://api.worldbank.org/v2/wgi',
-          geographicLevel: 'global',
-          sourceTier: 1,
-          scrapeTimestamp: new Date().toISOString(),
-          contentHash: '',
-          sourceSentence: wgiExtraction.sourceSentence,
-          characterOffsets: { start: 0, end: 0 },
-          extractionModel: 'world-bank-api-direct',
-          extractionConfidence: 1.0,
-          validationModel: 'world-bank-api-direct',
-          validationConfidence: 1.0,
-          crossCheckResult: 'not_checked',
-          crossCheckUrl: null,
-          reviewedBy: 'auto',
-          reviewedAt: new Date(),
-          methodologyVersion: METHODOLOGY_VERSION,
-          reviewDecision: 'approve',
-        };
-        await publish.execute(wgiExtraction, wgiValidation, wgiProvenance);
-        fieldsExtracted++;
-        fieldsAutoApproved++;
-        console.log(`  [E.3.2] Published from World Bank API — AUTO-APPROVED`);
-      } else {
-        console.warn(`  [E.3.2] No WGI score available for ${country} — skipping`);
-      }
-    }
+    // Methodology v6.0.0 / ADR-032 — the WGI / V-Dem direct-fetch
+    // paths for E.3.1 and E.3.2 were retired here alongside the
+    // Pillar E restructure. Only E.1.1 (program age) remains derived;
+    // every other field goes through normal LLM extraction.
 
-    // --- E.3.1: direct World Bank WGI Rule of Law API (Phase 3.6 / Fix A) ---
-    // Gated on PHASE3_VDEM_ENABLED. When disabled or fetch returns null,
-    // E.3.1 stays in llmFields and goes through normal extraction.
-    let e31HandledByVdemPath = false;
-    const e31def = allFieldDefs.find((d) => d.key === 'E.3.1');
-    if (e31def && PHASE3_VDEM_ENABLED) {
-      const vdemResult = await fetchVdemRuleOfLawScore(country);
-      if (vdemResult) {
-        e31HandledByVdemPath = true;
-        const vdemExtraction: ExtractionOutput = {
-          fieldDefinitionKey: 'E.3.1',
-          programId,
-          valueRaw: vdemResult.score,
-          sourceSentence: `World Bank WGI Rule of Law estimate for ${vdemResult.countryName}: ${vdemResult.score} (${vdemResult.year})`,
-          characterOffsets: { start: 0, end: 0 },
-          extractionModel: 'v-dem-api-direct',
-          extractionConfidence: 1.0,
-          extractedAt: new Date(),
-        };
-        const vdemValidation = {
-          isValid: true,
-          validationConfidence: 1.0,
-          validationModel: 'v-dem-api-direct',
-          notes: 'Direct World Bank API source (WGI Rule of Law) — no LLM extraction needed',
-        };
-        const iso2 = ISO3_TO_ISO2[country];
-        const vdemProvenance: ProvenanceRecord = {
-          sourceUrl: iso2
-            ? `https://api.worldbank.org/v2/country/${iso2}/indicator/RL.EST?format=json&mrv=1&source=3`
-            : 'https://api.worldbank.org/v2/wgi-rl',
-          geographicLevel: 'global',
-          sourceTier: 1,
-          scrapeTimestamp: new Date().toISOString(),
-          contentHash: '',
-          sourceSentence: vdemExtraction.sourceSentence,
-          characterOffsets: { start: 0, end: 0 },
-          extractionModel: 'v-dem-api-direct',
-          extractionConfidence: 1.0,
-          validationModel: 'v-dem-api-direct',
-          validationConfidence: 1.0,
-          crossCheckResult: 'not_checked',
-          crossCheckUrl: null,
-          reviewedBy: 'auto',
-          reviewedAt: new Date(),
-          methodologyVersion: METHODOLOGY_VERSION,
-          reviewDecision: 'approve',
-        };
-        await publish.execute(vdemExtraction, vdemValidation, vdemProvenance);
-        fieldsExtracted++;
-        fieldsAutoApproved++;
-        console.log(`  [E.3.1] Published from World Bank WGI Rule of Law API — AUTO-APPROVED`);
-      } else {
-        console.warn(
-          `  [E.3.1] No Rule of Law score available for ${country} — falling through to LLM extraction`
-        );
-      }
-    }
-
-    // --- Stage 2: Batch extract LLM fields. Exclude E.3.2 (always API),
-    // E.3.1 (when V-Dem-handled), and the E.1.1 / E.1.3 derived fields
-    // (Phase 3.6 derive stage owns these — see ADR-016 + ADR-028 + ADR-029
-    // + ADR-031). Pillars A, B, and D no longer have any derived fields. ---
-    const DERIVED_FIELD_KEYS = new Set(['E.1.1', 'E.1.3']);
+    // --- Stage 2: Batch extract LLM fields. Exclude only the
+    // E.1.1 derived field — the derive stage owns it (see ADR-032). ---
+    const DERIVED_FIELD_KEYS = new Set(['E.1.1']);
     const llmFields: FieldSpec[] = allFieldDefs
-      .filter(
-        (d) =>
-          d.key !== 'E.3.2' &&
-          !(d.key === 'E.3.1' && e31HandledByVdemPath) &&
-          !DERIVED_FIELD_KEYS.has(d.key)
-      )
+      .filter((d) => !DERIVED_FIELD_KEYS.has(d.key))
       .map((d) => ({ key: d.key, promptMd: d.extractionPromptMd, label: d.label }));
 
     // Phase 3.10 — projected cost (mirror canary-run.ts behaviour).
@@ -471,42 +346,35 @@ export const extractSingleProgram = task({
       // retained as analyst reference but no longer plumbed into the
       // orchestrator.
 
-      // Phase 3.9 / W20 — E.1.3 (program age) + E.1.1 (severity-weighted
-      // policy-change count). E.1.3 reads programs.launch_year; load
-      // it now since the job's per-target run doesn't already have it.
+      // Methodology v6.0.0 / ADR-032 — only program age (E.1.1) is
+      // derived. Reads programs.launch_year; the seed-launch-years
+      // script keeps that column populated.
       const programRow = await db
         .select({ launchYear: programs.launchYear })
         .from(programs)
         .where(eq(programs.id, programId))
         .limit(1);
       const launchYear = programRow[0]?.launchYear ?? null;
-      const e13Result = deriveE13({
+      const programAgeResult = deriveProgramAge({
         programId,
         countryIso: country,
         methodologyVersion: METHODOLOGY_VERSION,
         launchYear,
         currentYear: new Date().getUTCFullYear(),
       });
-      const e11Result = deriveE11({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        history: PROGRAM_POLICY_HISTORY[programId] ?? null,
-      });
 
-      for (const derived of [e13Result, e11Result]) {
-        if (!derived) continue;
+      if (programAgeResult) {
         try {
-          await publish.executeDerived(derived.extraction, derived.provenance);
+          await publish.executeDerived(programAgeResult.extraction, programAgeResult.provenance);
           fieldsExtracted++;
           fieldsQueued++;
           console.log(
-            `  [${derived.extraction.fieldDefinitionKey}] Derived — pending_review (confidence ${derived.extraction.extractionConfidence})`
+            `  [${programAgeResult.extraction.fieldDefinitionKey}] Derived — pending_review (confidence ${programAgeResult.extraction.extractionConfidence})`
           );
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.warn(
-            `  [${derived.extraction.fieldDefinitionKey}] Derived publish failed: ${msg}`
+            `  [${programAgeResult.extraction.fieldDefinitionKey}] Derived publish failed: ${msg}`
           );
         }
       }
@@ -537,7 +405,7 @@ export const extractSingleProgram = task({
 
     // --- Per-field validate + publish (skip country-substitute fields, already published above) ---
     for (const def of allFieldDefs.filter(
-      (d) => d.key !== 'E.3.2' && d.normalizationFn !== 'country_substitute_regional'
+      (d) => d.normalizationFn !== 'country_substitute_regional'
     )) {
       const extractionResult = allExtractionResults.get(def.key);
       if (!extractionResult) continue;

@@ -19,6 +19,7 @@ export {
   REGIONAL_SUBSTITUTES,
   getRegionalSubstitute,
   normalizeBooleanWithAnnotation,
+  normalizeNumericOrCategorical,
 } from './normalize';
 export type { Region, RegionalSubstitute } from './normalize';
 export { normalizeRawValue } from './normalize-raw';

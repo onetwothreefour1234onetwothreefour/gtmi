@@ -205,7 +205,7 @@ export default async function CountryDetailPage({ params }: PageProps) {
             <div className="mt-6">
               <EmptyState
                 title="Stability summary ships in Phase 5"
-                body="Once policy-change tracking is live, this section will summarise the country's policy volatility, forward-announced changes, and World Bank governance indices alongside the underlying methodology v1 indicators (E.1, E.3.1, E.3.2)."
+                body="Once policy-change tracking is live, this section will summarise the program's track record (E.1 — program age, cumulative approvals) and rule stability (E.2 — material policy changes, suspension history)."
               />
             </div>
           </div>

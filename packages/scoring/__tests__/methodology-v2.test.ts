@@ -53,8 +53,8 @@ describe('Methodology V2 — arithmetic invariants (must match V1)', () => {
     expect(approxEqual(sum, 1.0)).toBe(true);
   });
 
-  it('total indicator count is exactly 37 (unchanged from v1; methodology v5.0.0)', () => {
-    expect(methodologyV2.indicators.length).toBe(37);
+  it('total indicator count is exactly 33 (unchanged from v1; methodology v6.0.0)', () => {
+    expect(methodologyV2.indicators.length).toBe(33);
   });
 
   it('every v1 indicator weight is preserved in v2 (Phase 3.5 changes data-type only)', () => {

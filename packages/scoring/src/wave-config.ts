@@ -2,9 +2,9 @@
  * Wave configuration — methodology-version constants for the canary /
  * Trigger.dev extraction pipeline + the public scoring engine.
  *
- * Wave 1 was the original 27 sub-factors used to validate the end-to-end
- * pipeline on the AUS canary. Wave 2 covers the remaining sub-factors
- * needed for full methodology coverage (37 fields total under v5.0.0).
+ * Under methodology v6.0.0 (ADR-032) all 33 indicators live in WAVE_1;
+ * WAVE_2 is empty but the constant + the WAVE_2_ENABLED flag are kept
+ * for forward-compat with future indicator additions.
  *
  * Consumers MUST import `ACTIVE_FIELD_CODES` rather than `WAVE_1_FIELD_CODES`
  * directly so a single flag flip changes scope across canary, Trigger.dev,
@@ -50,13 +50,12 @@ export const WAVE_1_FIELD_CODES: string[] = [
   'D.2.2',
   'D.2.3',
   'E.1.1',
-  'E.1.3',
+  'E.1.2',
+  'E.2.1',
   'E.2.2',
-  'E.3.2',
 ];
 
-// Remaining sub-factors required for full 37-field methodology coverage.
-// Methodology v2.0.0: all Pillar A indicators were flattened into WAVE_1.
+// Methodology v2.0.0: all Pillar A indicators flattened into WAVE_1.
 // Methodology v3.0.0 (ADR-029): all Pillar B indicators flattened into
 // WAVE_1 — no derived field remains in B (B.2.4 was the only one).
 // Methodology v4.0.0 (ADR-030): all Pillar C indicators flattened into
@@ -65,7 +64,13 @@ export const WAVE_1_FIELD_CODES: string[] = [
 // WAVE_1; D.1.3 / D.1.4 / D.2.4 / D.3.1 / D.3.2 / D.3.3 retired and removed.
 // Eight Pillar D deriveDxx functions deleted; D.1.2 / D.2.2 / D.2.3 are
 // now LLM-extracted directly.
-export const WAVE_2_FIELD_CODES: string[] = ['E.1.2', 'E.2.1', 'E.2.3', 'E.3.1'];
+// Methodology v6.0.0 (ADR-032): all Pillar E indicators flattened into
+// WAVE_1; E.1.2 (forward-announced changes), E.2.1 (published approval
+// rate), E.2.3 (public guidance), E.3.1 (rule of law), E.3.2 (govt
+// effectiveness) all retired and removed; E.1.3 retired (semantics
+// moved to new E.1.1). The WGI / V-Dem ingestion path is removed
+// entirely (no more sub-factor E.3). WAVE_2 is empty.
+export const WAVE_2_FIELD_CODES: string[] = [];
 
 export const ACTIVE_FIELD_CODES: string[] = WAVE_2_ENABLED
   ? [...WAVE_1_FIELD_CODES, ...WAVE_2_FIELD_CODES]

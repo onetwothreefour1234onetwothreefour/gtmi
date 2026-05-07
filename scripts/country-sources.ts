@@ -12,21 +12,23 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
   // OECD migration pages were removed 2026-04-26 — every probed path under
   // oecd.org/en/topics/.../migration returned a soft-404 ("the requested page
   // cannot be found") during the OECD site migration. Migration Policy Institute
-  // (below) covers E.1.1 with similar geography. Re-add an OECD source once the
-  // site stabilises and a stable URL is confirmed.
+  // (below) covers E.2.1 (severity-weighted policy changes) with similar
+  // geography. Re-add an OECD source once the site stabilises and a stable URL
+  // is confirmed. Methodology v6.0.0 / ADR-032: E.3.2 retired; the IMD source
+  // now serves E.2.1 only.
   {
     url: 'https://www.imd.org/centers/wcc/world-competitiveness-center/rankings/world-talent-ranking/',
     tier: 1,
     geographicLevel: 'global',
-    reason: 'Country-level talent competitiveness and appeal scores',
-    fieldKeys: ['E.1.1', 'E.3.2'],
+    reason: 'Country-level talent competitiveness and policy-change context for E.2.1',
+    fieldKeys: ['E.2.1'],
   },
   {
     url: 'https://www.migrationpolicy.org/programs/migration-data-hub',
     tier: 2,
     geographicLevel: 'global',
-    reason: 'Cross-country immigration policy tracking and changes',
-    fieldKeys: ['E.1.1'],
+    reason: 'Cross-country immigration policy tracking and changes (E.2.1)',
+    fieldKeys: ['E.2.1'],
   },
   // AUS national-level sources — only scraped for Australian programs.
   // URLs re-validated 2026-04-26: stale soft-404s replaced; ATO tax sources added.
@@ -228,257 +230,8 @@ export function getCountryLevelSources(fieldKey: string, country?: string): Coun
   });
 }
 
-export const ISO3_TO_ISO2: Record<string, string> = {
-  AUS: 'AU',
-  AUT: 'AT',
-  BEL: 'BE',
-  BHR: 'BH',
-  CAN: 'CA',
-  CHE: 'CH',
-  CHL: 'CL',
-  DEU: 'DE',
-  DNK: 'DK',
-  ESP: 'ES',
-  EST: 'EE',
-  FIN: 'FI',
-  FRA: 'FR',
-  GBR: 'GB',
-  HKG: 'HK',
-  HUN: 'HU',
-  IND: 'IN',
-  IRL: 'IE',
-  ISL: 'IS',
-  ISR: 'IL',
-  ITA: 'IT',
-  JPN: 'JP',
-  KOR: 'KR',
-  LTU: 'LT',
-  LUX: 'LU',
-  MYS: 'MY',
-  NAM: 'NA',
-  NLD: 'NL',
-  NOR: 'NO',
-  NZL: 'NZ',
-  OMN: 'OM',
-  POL: 'PL',
-  PRT: 'PT',
-  SAU: 'SA',
-  SGP: 'SG',
-  SVK: 'SK',
-  SVN: 'SI',
-  SWE: 'SE',
-  TWN: 'TW',
-  UAE: 'AE',
-  USA: 'US',
-  ZAF: 'ZA',
-  CZE: 'CZ',
-  GRC: 'GR',
-  MEX: 'MX',
-  THA: 'TH',
-  IDN: 'ID',
-  PHL: 'PH',
-  VNM: 'VN',
-  QAT: 'QA',
-  KWT: 'KW',
-  JOR: 'JO',
-  KAZ: 'KZ',
-  ROU: 'RO',
-  BGR: 'BG',
-  HRV: 'HR',
-  LVA: 'LV',
-  MKD: 'MK',
-  MNE: 'ME',
-  SRB: 'RS',
-  ALB: 'AL',
-  BIH: 'BA',
-  MDA: 'MD',
-  UKR: 'UA',
-  GEO: 'GE',
-  ARM: 'AM',
-  AZE: 'AZ',
-  BLR: 'BY',
-  KGZ: 'KG',
-  TJK: 'TJ',
-  TKM: 'TM',
-  UZB: 'UZ',
-  MNG: 'MN',
-  CHN: 'CN',
-  RUS: 'RU',
-  BRA: 'BR',
-  ARG: 'AR',
-  COL: 'CO',
-  PER: 'PE',
-  ECU: 'EC',
-  BOL: 'BO',
-  PRY: 'PY',
-  URY: 'UY',
-  VEN: 'VE',
-  GTM: 'GT',
-  HND: 'HN',
-  SLV: 'SV',
-  NIC: 'NI',
-  CRI: 'CR',
-  PAN: 'PA',
-  DOM: 'DO',
-  CUB: 'CU',
-  JAM: 'JM',
-  TTO: 'TT',
-  BRB: 'BB',
-  EGY: 'EG',
-  MAR: 'MA',
-  TUN: 'TN',
-  DZA: 'DZ',
-  LBY: 'LY',
-  SDN: 'SD',
-  ETH: 'ET',
-  KEN: 'KE',
-  TZA: 'TZ',
-  UGA: 'UG',
-  GHA: 'GH',
-  NGA: 'NG',
-  ZMB: 'ZM',
-  ZWE: 'ZW',
-  BWA: 'BW',
-  MOZ: 'MZ',
-  AGO: 'AO',
-  CMR: 'CM',
-  CIV: 'CI',
-  SEN: 'SN',
-  PAK: 'PK',
-  BGD: 'BD',
-  LKA: 'LK',
-  NPL: 'NP',
-  MMR: 'MM',
-  KHM: 'KH',
-  LAO: 'LA',
-  BRN: 'BN',
-  TLS: 'TL',
-  PNG: 'PG',
-  FJI: 'FJ',
-  WSM: 'WS',
-  TON: 'TO',
-  VUT: 'VU',
-  SLB: 'SB',
-  IRN: 'IR',
-  IRQ: 'IQ',
-  SYR: 'SY',
-  LBN: 'LB',
-  PSE: 'PS',
-  YEM: 'YE',
-  AFG: 'AF',
-  TUR: 'TR',
-  CYP: 'CY',
-  MLT: 'MT',
-};
-
-export async function fetchWgiScore(
-  countryIso3: string
-): Promise<{ score: string; year: string; countryName: string } | null> {
-  const iso2 = ISO3_TO_ISO2[countryIso3];
-  if (!iso2) {
-    console.warn(`[WGI] No ISO2 mapping found for ${countryIso3}`);
-    return null;
-  }
-  const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/GOV_WGI_GE.EST?format=json&mrv=1&source=3`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const json = (await res.json()) as unknown[];
-    const record = (json?.[1] as unknown[])?.[0] as
-      | {
-          value?: number | null;
-          date?: string;
-          country?: { value?: string };
-        }
-      | undefined;
-    if (!record || record.value === null || record.value === undefined) return null;
-    return {
-      score: String(Math.round(record.value * 100) / 100),
-      year: String(record.date),
-      countryName: record.country?.value ?? countryIso3,
-    };
-  } catch {
-    return null;
-  }
-}
-
-// Phase 3.6.1 / FIX 1 — manual live-API validation command for the
-// WGI indicator codes (run when refactoring this file or upgrading
-// the World Bank API client). Cannot be a vitest unit test because
-// scripts/ is outside any package's tsconfig rootDir.
-//
-//   pnpm exec tsx -e "import { fetchVdemRuleOfLawScore, fetchWgiScore } \
-//     from './scripts/country-sources'; (async () => { \
-//     for (const iso of ['AUS','SGP','CAN','GBR','HKG']) { \
-//       const ge = await fetchWgiScore(iso); \
-//       const rl = await fetchVdemRuleOfLawScore(iso); \
-//       console.log(iso, 'GE.EST=', ge?.score, 'RL.EST=', rl?.score); \
-//     } })();"
-//
-// Both fetchers must return numeric scores. The bug fixed in FIX 1 was
-// the indicator-code prefix: `RL.EST` returns "indicator not found",
-// `GOV_WGI_RL.EST` (the source=3 form) returns the data.
-//
-// Phase 3.6 / Fix A — E.3.1 Rule of Law direct fetch.
-//
-// Methodology v1 line 309 specifies E.3.1 as "Rule of law (V-Dem / World
-// Bank WGI)". Both are accepted; we use the World Bank WGI Rule of Law
-// indicator (`RL.EST`) because it has the same fetch shape, latency, and
-// availability profile as the existing E.3.2 (`GE.EST`) path. V-Dem's
-// `v2x_rule` series can be wired later as a cross-check; for the canary
-// the WGI value is the deterministic primary source.
-//
-// Gate: `PHASE3_VDEM_ENABLED` env var (default true post-commit-3 per
-// analyst Q5 decision). When false/unset, `executeE31VdemFetch` returns
-// null and the field falls through to the LLM extraction batch (which
-// will produce empty for ABSENT countries — same as today).
-export async function fetchVdemRuleOfLawScore(
-  countryIso3: string
-): Promise<{ score: string; year: string; countryName: string } | null> {
-  const iso2 = ISO3_TO_ISO2[countryIso3];
-  if (!iso2) {
-    console.warn(`[VDEM/WGI-RL] No ISO2 mapping found for ${countryIso3}`);
-    return null;
-  }
-  // WGI indicators under source=3 (Worldwide Governance Indicators) require
-  // the GOV_WGI_ prefix. The bare `RL.EST` returns "indicator not found";
-  // verified empirically against the API. E.3.2 already uses GOV_WGI_GE.EST.
-  const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/GOV_WGI_RL.EST?format=json&mrv=1&source=3`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const json = (await res.json()) as unknown[];
-    const record = (json?.[1] as unknown[])?.[0] as
-      | {
-          value?: number | null;
-          date?: string;
-          country?: { value?: string };
-        }
-      | undefined;
-    if (!record || record.value === null || record.value === undefined) return null;
-    return {
-      score: String(Math.round(record.value * 100) / 100),
-      year: String(record.date),
-      countryName: record.country?.value ?? countryIso3,
-    };
-  } catch {
-    return null;
-  }
-}
-
-export async function fetchAllWgiScores(
-  countryIsos: string[]
-): Promise<Map<string, { score: string; year: string; countryName: string }>> {
-  const results = new Map<string, { score: string; year: string; countryName: string }>();
-  for (const iso3 of countryIsos) {
-    const result = await fetchWgiScore(iso3);
-    if (result) {
-      results.set(iso3, result);
-      console.log(`  [WGI] ${iso3}: ${result.score} (${result.year})`);
-    } else {
-      console.warn(`  [WGI] ${iso3}: no score returned`);
-    }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  return results;
-}
+// Methodology v6.0.0 / ADR-032 — the ISO3_TO_ISO2 map, fetchWgiScore,
+// fetchVdemRuleOfLawScore, and fetchAllWgiScores were retired alongside
+// the Pillar E restructure. Pillar E no longer ingests external indices
+// (E.3.1 / E.3.2 retired); the new E.2.1 (severity-weighted policy
+// changes) is LLM-extracted from the same recall hints.

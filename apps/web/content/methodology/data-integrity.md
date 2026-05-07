@@ -56,6 +56,4 @@ and the common symbols.
 Missing indicators are never imputed. The sub-factor weight redistributes
 across the present indicators and a square-root penalty applies. The
 &ldquo;Insufficient disclosure&rdquo; flag fires at any pillar with under
-70% coverage. The Stability edge case (E.1.1) substitutes the within-country
-cohort mean for programmes younger than three years; the substitution is
-recorded in provenance.
+70% coverage.

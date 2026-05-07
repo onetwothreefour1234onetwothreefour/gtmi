@@ -31,6 +31,12 @@ const SHARED_PREAMBLE_PLUS_NEWLINES = sampleV1Prompt.slice(
   sampleV1Prompt.indexOf('Extraction Task:')
 );
 
+// Methodology v6.0.0 / ADR-032: PHASE_3_3_PROMPT_OVERRIDES is empty
+// (every pillar's prompts now live in methodology-v1.ts as the single
+// source of truth). The helper is retained dormant in case a future
+// overlay needs the SHARED_PREAMBLE prefix — cleanup deferred to
+// ADR-033 alongside the other dormant-infrastructure sweep.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function withPreamble(extractionTask: string): string {
   return SHARED_PREAMBLE_PLUS_NEWLINES + extractionTask;
 }
@@ -110,7 +116,6 @@ export const PHASE_3_3_PROMPT_OVERRIDES: Record<string, string> = {
   // methodology-v1.ts are now the canonical source of truth for every
   // Pillar B field (no Phase 3.3 overlay). See ADR-029.
   // ────────────────────────────────────────────────────────────────────
-
   // ────────────────────────────────────────────────────────────────────
   // Pillar C overrides removed in methodology v4.0.0 — the entire
   // Pillar C indicator set has been restructured (renamed to "Benefits"),
@@ -118,7 +123,6 @@ export const PHASE_3_3_PROMPT_OVERRIDES: Record<string, string> = {
   // in methodology-v1.ts are now the canonical source of truth for every
   // Pillar C field (no Phase 3.3 overlay). See ADR-030.
   // ────────────────────────────────────────────────────────────────────
-
   // ────────────────────────────────────────────────────────────────────
   // Pillar D overrides removed in methodology v5.0.0 — the entire
   // Pillar D indicator set has been restructured (D dropped from 11 to
@@ -126,133 +130,18 @@ export const PHASE_3_3_PROMPT_OVERRIDES: Record<string, string> = {
   // methodology-v1.ts are now the canonical source of truth for every
   // Pillar D field (no Phase 3.3 overlay). See ADR-031.
   // ────────────────────────────────────────────────────────────────────
-
   // ────────────────────────────────────────────────────────────────────
-  // E.1.1 — Format / date-filter: tighten 5-year window enforcement.
+  // Pillar E overrides removed in methodology v6.0.0 — the entire
+  // Pillar E indicator set has been restructured (8 → 4 indicators;
+  // sub-factor E.3 retired alongside the WGI / V-Dem external-index
+  // ingestion path; old E.1.1 severity-weighted count moved to new
+  // E.2.1 with normFn change z_score → min_max; old E.1.3 program age
+  // moved to new E.1.1; new E.1.2 cumulative approvals introduces the
+  // numeric_or_categorical dual-format normFn; new E.2.2 covers
+  // suspension history). The prompts in methodology-v1.ts are now the
+  // canonical source of truth for every Pillar E field (no Phase 3.3
+  // overlay). See ADR-032.
   // ────────────────────────────────────────────────────────────────────
-  'E.1.1': withPreamble(
-    `Extraction Task: E.1.1 — Material policy changes in last 5 years
-Question: Compute a severity-weighted count of material policy changes affecting this program in the last 5 years.
-
-DATE FILTER (read first, apply throughout):
-The current year is 2026. "Last 5 years" means changes with explicit dates in calendar years 2021, 2022, 2023, 2024, 2025, or 2026. Changes dated 2020 or earlier do not count, even if the page lists them.
-
-Material change definition: change to eligibility criteria, quota/cap, fee schedule beyond inflation, rights granted, introduction/abolition of sub-stream, or processing time SLA.
-
-Severity weights:
-  * Major (eligibility/pathway change, abolition/reintroduction): 3
-  * Moderate (quota change, fee restructure): 2
-  * Minor (inflation-only fee adjustment, form/portal update): 1
-
-Recall hints:
-
-The source need not be a formal changelog. Count any of these as evidence of a change WITH AN EXPLICIT DATE 2021 OR LATER:
-  * "introduced in [YYYY]", "replaced in [YYYY]", "renamed to ... in [YYYY]", "merged with ... in [YYYY]"
-  * "from [YYYY]", "since [YYYY]", "as of [date]"
-  * "previously [old value], now [new value]", "increased from X to Y in [YYYY]"
-  * "reformed [YYYY]", "overhauled [YYYY]", "tightened [YYYY]", "expanded [YYYY]"
-  * "this stream replaces the former [program] (introduced [YYYY])"
-  * Migration Policy Institute, OECD migration outlook, IMD reports, third-party trackers covering policy timeline are valid evidence — extract their dated change list and apply the date filter.
-
-Sum the severity-weighted points across all 2021+ changes you find. Report the integer total. The sourceSentence field should quote ONE representative dated change (preferably the highest-severity).
-
-Edge cases:
-
-If the source mentions "the program was last revised in [year < 2021]" with no later changes, return 0 with notes "no changes in the 2021-2026 window".
-Do not count announced-but-not-implemented changes here (those belong to E.1.2).
-Do not infer changes from tone or general policy commentary; only count explicitly dated changes.
-If the page lists historical changes from before 2021 with NO 2021+ changes, return 0 — do not return empty.
-If the source provides no dated change information at all (positive or negative), return empty with notes "no change information on this page".`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // E.1.2 — Negative-match: "vague" rejection threshold needs sharper
-  // criteria.
-  // ────────────────────────────────────────────────────────────────────
-  'E.1.2': withPreamble(
-    `Extraction Task: E.1.2 — Forward-announced pipeline changes
-Question: Does the document announce any upcoming change with a specified future effective date?
-
-Recall hints:
-
-Specific future effective date REQUIRED — patterns that qualify:
-  * "From 1 January 2027, the salary threshold will rise to ..."
-  * "Effective 6 April 2026, dependants will ..."
-  * "Beginning [quarter] [year], processing times for ..."
-  * "The new requirement takes effect on [date]."
-"Date window" qualifies only if narrower than 6 months and tied to a fiscal-year style trigger ("from 1 July 2026").
-
-Patterns that DO NOT qualify (return false unless something else qualifies):
-  * "We are reviewing the eligibility criteria"
-  * "Changes may be introduced in due course"
-  * "A consultation is open until [date]"
-  * "We expect to publish updated guidance later this year"
-  * "Policy is under review"
-
-Edge cases:
-
-Multiple changes: list all in notes; value is true if at least one qualifies.
-"Indexed annually for inflation" is NOT a forward-announced change — it's an automatic adjustment.
-Announcement must be in this official source; news/commentary references do not count toward this field.
-If the page is silent on future changes, return false (not empty) — silence on forward changes is unambiguous.`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // E.2.1 — Recall: linked annual reports / dashboards count.
-  // ────────────────────────────────────────────────────────────────────
-  'E.2.1': withPreamble(
-    `Extraction Task: E.2.1 — Published approval rate or admission statistics
-Question: Does the document publish approval rate or admission statistics for this program?
-
-Recall hints:
-
-Positive evidence — return true:
-  * "Last year, [N] applicants were granted this visa."
-  * "The approval rate for [program] in [year] was [X]%."
-  * Linked tables or dashboards on the SAME official authority's domain that show admission counts or approval rates for this program.
-  * "Express Entry rounds-of-invitations" data on canada.ca counts as admission statistics for Express Entry.
-  * "Working holiday maker programme report" / "annual migration report" counts if it is for the same program.
-  * Linked statistics portal goes to the same government authority (e.g., from immi.homeaffairs.gov.au to abs.gov.au is acceptable).
-
-Edge cases:
-
-Statistics must be from the last 3 years (2023+); older statistics alone = false.
-Aggregated statistics covering many programs (not this specific one) do NOT count — must be program-specific or breakable-down by program.
-"Annual migration update" without per-program breakdown does NOT count.
-If the page has a "Statistics" or "Reporting" link to the same authority's data hub, follow that link's mention and count it as true with a note.`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // E.2.3 — Recall: government policy guides / operational manuals.
-  // ────────────────────────────────────────────────────────────────────
-  'E.2.3': withPreamble(
-    `Extraction Task: E.2.3 — Public guidance and decision criteria documentation
-Question: How thoroughly does the government publish decision criteria and applicant guidance?
-Allowed values:
-
-"comprehensive": detailed decision criteria, worked examples/scenarios, explicit evidence requirements; OR a published operational/policy manual the public can read.
-"substantive": clear decision criteria and evidence requirements, no worked examples.
-"basic": eligibility and required documents stated; little guidance on how decisions are made.
-"minimal": high-level overview with eligibility listed but little else.
-"absent": does not address decision criteria.
-
-Recall hints:
-
-Positive evidence for "comprehensive":
-  * Linked operational instructions / policy guides / caseworker manuals on the same authority's domain (UK Home Office "Modernised Guidance" suite, IRCC policy manuals, DOHA "Policy" pages).
-  * "Workforce planning model" or "occupation list methodology" describing decision logic.
-  * Worked illustrative scenarios ("Applicant A earns X — they qualify because ...").
-Positive evidence for "substantive":
-  * "How we assess your application" section with explicit weight-by-criterion breakdown.
-  * Clear evidence requirements list per criterion.
-FAQ counts as substantive only if it addresses decision criteria, not only procedural questions.
-
-Edge cases:
-
-Base rating on THIS document plus official guidance it directly links from the same authority. No third-party guides.
-"Worked examples" = explicit illustrative scenarios.
-If the page has a prominent "Read the policy guidance" link to the same authority that opens detailed criteria, treat as "comprehensive" even if the current page is itself summary-level.`
-  ),
 };
 
 // ────────────────────────────────────────────────────────────────────

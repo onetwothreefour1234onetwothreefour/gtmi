@@ -43,9 +43,8 @@ export const methodologyV1 = {
       'D.2': ['D.2.1', 'D.2.2', 'D.2.3'],
     },
     E: {
-      'E.1': ['E.1.1', 'E.1.2', 'E.1.3'],
-      'E.2': ['E.2.1', 'E.2.2', 'E.2.3'],
-      'E.3': ['E.3.1', 'E.3.2'],
+      'E.1': ['E.1.1', 'E.1.2'],
+      'E.2': ['E.2.1', 'E.2.2'],
     },
   },
   pillar_weights: { A: 0.28, B: 0.15, C: 0.2, D: 0.22, E: 0.15 },
@@ -63,8 +62,7 @@ export const methodologyV1 = {
     'D.1': 0.4,
     'D.2': 0.6,
     'E.1': 0.5,
-    'E.2': 0.3,
-    'E.3': 0.2,
+    'E.2': 0.5,
   },
   indicator_weights: {
     'A.1.1': 0.25,
@@ -97,13 +95,9 @@ export const methodologyV1 = {
     'D.2.2': 0.4,
     'D.2.3': 0.2,
     'E.1.1': 0.5,
-    'E.1.2': 0.3,
-    'E.1.3': 0.2,
-    'E.2.1': 0.4,
-    'E.2.2': 0.3,
-    'E.2.3': 0.3,
-    'E.3.1': 0.5,
-    'E.3.2': 0.5,
+    'E.1.2': 0.5,
+    'E.2.1': 0.5,
+    'E.2.2': 0.5,
   },
   normalization_choices: {
     'A.1.1': 'min_max',
@@ -135,17 +129,13 @@ export const methodologyV1 = {
     'D.2.1': 'boolean',
     'D.2.2': 'min_max',
     'D.2.3': 'boolean',
-    'E.1.1': 'z_score',
-    'E.1.2': 'boolean',
-    'E.1.3': 'min_max',
-    'E.2.1': 'boolean',
-    'E.2.2': 'categorical',
-    'E.2.3': 'categorical',
-    'E.3.1': 'min_max',
-    'E.3.2': 'min_max',
+    'E.1.1': 'min_max',
+    'E.1.2': 'numeric_or_categorical',
+    'E.2.1': 'min_max',
+    'E.2.2': 'boolean',
   },
   cme_paq_split: { cme: 0.3, paq: 0.7 },
-  version_tag: '5.0.0',
+  version_tag: '6.0.0',
   indicators: [
     {
       key: 'A.1.1',
@@ -1282,7 +1272,7 @@ If only the applicant's country-of-origin's rule on losing citizenship matters (
     },
     {
       key: 'E.1.1',
-      label: 'Material policy changes in last 5 years (count, weighted by severity)',
+      label: 'Program age (years since introduction in current form)',
       dataType: 'numeric',
       pillar: 'E',
       subFactor: 'E.1',
@@ -1290,255 +1280,181 @@ If only the applicant's country-of-origin's rule on losing citizenship matters (
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: E.1.1 — Material policy changes in last 5 years
-Question: Compute a severity-weighted count of material policy changes affecting this program in the last 5 years.
-Material change definition: change to eligibility criteria, quota/cap, fee schedule beyond inflation, rights granted, introduction/abolition of sub-stream, or processing time SLA.
-Severity weights:
+        `Extraction Task: E.1.1 — Program age (years since introduction in current form)
+Question: How many full years have elapsed since this program was introduced in its current form? Report the actual integer count, not capped — the scoring engine handles the 20-year ceiling.
 
-Major (eligibility/pathway change, abolition/reintroduction): 3
-Moderate (quota change, fee restructure): 2
-Minor (inflation-only fee adjustment, form/portal update): 1
+"Current form" means: first established under the current name and current eligibility framework. A relaunch under a new name, new statutory basis, or substantively new criteria resets the clock; minor amendments (fee reindexation, form renumbering, procedural tweaks) do NOT reset.
 
 Recall hints:
 
-The source need not be a formal changelog. Count any of these as evidence of a change:
+  - "Introduced in [YYYY]", "established [YYYY]", "launched [YYYY]" → use that year.
+  - "Replaces the former [program] (introduced [YYYY])" → the current program's own introduction year, NOT the predecessor's.
+  - "Reformed in [YYYY] with new eligibility framework" → use the reform year if the reform was substantive (new legal basis, new name, new applicant cohort).
+  - "Renumbered" / "renamed without substantive change" → do NOT reset; use the older introduction year.
+  - Common patterns: SID 482 (AUS, 2024), Express Entry FSW (CAN, 2015), Tech.Pass (SGP, 2021), Skilled Worker Visa (GBR, 2020).
 
-  - "introduced in YYYY", "replaced in YYYY", "renamed to ... in YYYY", "merged with ... in YYYY"
-  - "from YYYY", "since YYYY", "as of [date within last 5 years]"
-  - "previously [old value], now [new value]", "increased from X to Y in YYYY"
-  - "reformed", "overhauled", "tightened", "expanded", "this stream replaces the former [program]"
-  - News-format sources tracking the program's history (Migration Policy Institute, OECD migration outlook chapters, IMD reports) often provide explicit change counts — use them when present.
-
-The current date is 2026; "last 5 years" means changes dated 2021 or later.
-
-Sum the severity-weighted points across all changes you find. Report the integer total. The sourceSentence field should quote one representative change.
+Compute: (current calendar year) − (introduction year). The scoring ceiling is 20, but report the actual age (e.g. an H-1B-style program from 1990 returns 36, which the engine clamps to 20 at score time).
 
 Edge cases:
 
-Do not count announced-but-not-implemented changes here (those belong to E.1.2).
-Do not infer changes from tone or general policy commentary; only count explicitly dated changes.
-If the source provides no dated change information, return empty.`,
+  - If the program was introduced in the current calendar year, return 0.
+  - Predecessor programs under different names: do NOT use the predecessor date.
+  - If the source is silent on the introduction date, return null with notes "introduction date not disclosed".
+  - Year-only acceptable; use January 1 for the calculation.`,
       scoringRubricJsonb: null,
-      normalizationFn: 'z_score',
-      direction: 'lower_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'E.1.2',
-      label: 'Forward-announced pipeline changes (positive predictability signal)',
-      dataType: 'boolean',
-      pillar: 'E',
-      subFactor: 'E.1',
-      weightWithinSubFactor: 0.3,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: E.1.2 — Forward-announced pipeline changes
-Question: Does the document announce any upcoming change with a specified future effective date?
-Edge cases:
-
-Vague forward-looking statements ("we are reviewing", "changes may be introduced") do NOT qualify. Specific effective date or date window is required.
-Announcement must be in this official source; news/commentary references do not count.
-Multiple changes: list all; value is true if at least one qualifies.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'boolean',
+      normalizationFn: 'min_max',
       direction: 'higher_is_better',
       sourceTierRequired: 1,
     },
     {
-      key: 'E.1.3',
-      label: 'Program age (years since introduction, capped at 20)',
-      dataType: 'numeric',
+      key: 'E.1.2',
+      label: 'Cumulative approvals or active visa holders',
+      dataType: 'numeric_or_categorical',
       pillar: 'E',
       subFactor: 'E.1',
-      weightWithinSubFactor: 0.2,
+      weightWithinSubFactor: 0.5,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: E.1.3 — Program age (years since introduction, capped at 20)
-Question: Years since this program was introduced in its current form. Cap at 20.
-"Current form" means: first established under current name and structure. Major reforms changing program name or creating distinct legal basis reset the clock. Minor amendments do not.
+        `Extraction Task: E.1.2 — Cumulative approvals or active visa holders
+Question: What is the total number of visas granted under this program to date, or the current number of active visa holders? Tier-2 sources allowed: annual immigration statistics reports and parliamentary / congressional records are acceptable when the official program page is silent.
+
+Return value: a single integer (preferred) or one of the categorical buckets below.
+
+Numeric form (preferred): the total cumulative approvals or current active holder count, as a single integer. Examples: "23,450 approvals issued since launch" → 23450; "as of 2025, there are 4,200 active holders" → 4200.
+
+Categorical form (only when no precise figure is available): one of the buckets below, based on the most recent reporting:
+
+  - "large":     more than 50,000 cumulative approvals or active holders
+  - "medium":    10,000 to 50,000
+  - "small":     1,000 to 10,000
+  - "marginal":  fewer than 1,000
+
+Recall hints:
+
+  - "Total grants since inception", "issued to date", "cumulative approvals", "active stock as of [date]" → numeric.
+  - Annual department-of-statistics releases ("Migration Statistics Annual", "Settlement and Migration Data") are acceptable Tier-2 sources for this field. Cite the specific year.
+  - Parliamentary committee minutes, Hansard records, congressional research service reports counting visa issuances are acceptable.
+  - When only a range is reported ("between 5,000 and 10,000"), pick the appropriate bucket and return the categorical form.
+
 Edge cases:
 
-Compute as (current year) minus (introduction year). Cap at 20. If introduced this year, value is 0.
-Predecessor programs under different names: do NOT use predecessor date.
-If silent on introduction date, return null with notes "introduction date not disclosed".
-Year only (no month/day) acceptable; use January 1 for calculation.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'min_max',
+  - If the source publishes only "applications received" (not approvals), return null with notes — the indicator is approvals, not applications.
+  - If the source publishes annual issuances only ("12,000 in 2024"), and the program is older than one year, return null with notes "annual figure only; no cumulative or stock total". Do NOT extrapolate.
+  - If no source — official, departmental, or parliamentary — publishes a figure, return the literal string "no_data". This scores 0; it does NOT score null. Absence of public reporting is itself a transparency signal.`,
+      scoringRubricJsonb: {
+        categories: [
+          {
+            value: 'large',
+            score: 100,
+            description: 'more than 50,000 cumulative approvals or active visa holders.',
+          },
+          {
+            value: 'medium',
+            score: 75,
+            description: '10,000 to 50,000 cumulative approvals or active visa holders.',
+          },
+          {
+            value: 'small',
+            score: 50,
+            description: '1,000 to 10,000 cumulative approvals or active visa holders.',
+          },
+          {
+            value: 'marginal',
+            score: 25,
+            description: 'fewer than 1,000 cumulative approvals or active visa holders.',
+          },
+          {
+            value: 'no_data',
+            score: 0,
+            description:
+              'no figure published in any official, departmental, or parliamentary source.',
+          },
+        ],
+      },
+      normalizationFn: 'numeric_or_categorical',
       direction: 'higher_is_better',
       sourceTierRequired: 1,
     },
     {
       key: 'E.2.1',
-      label: 'Published approval rate or admission statistics',
-      dataType: 'boolean',
+      label: 'Material policy changes in last 5 years (severity-weighted count)',
+      dataType: 'numeric',
       pillar: 'E',
       subFactor: 'E.2',
-      weightWithinSubFactor: 0.4,
+      weightWithinSubFactor: 0.5,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: E.2.1 — Published approval rate or admission statistics
-Question: Does the document publish approval rate or admission statistics for this program?
+        `Extraction Task: E.2.1 — Material policy changes in last 5 years (severity-weighted count)
+Question: Compute a severity-weighted count of material policy changes affecting this program in the last 5 years.
+
+DATE FILTER: the current year is 2026. "Last 5 years" means changes with explicit dates in calendar years 2021, 2022, 2023, 2024, 2025, or 2026. Changes dated 2020 or earlier do not count, even if the page lists them.
+
+Material change definition: any announced change to eligibility criteria, fee structures, processing procedures, quota levels, or rights attached to the visa.
+
+Severity weights:
+
+  - Minor change (1pt) — fee adjustment, minor procedural update, or cosmetic label change with no substantive eligibility impact.
+  - Major change (3pts) — significant eligibility criteria change, quota introduction or removal, fee increase above 20%, or rights expansion or restriction.
+  - Fundamental restructure (5pts) — complete program redesign, merger with another visa, suspension and relaunch, or change in the statutory basis.
+
+Sum the severity-weighted points across all dated changes 2021+. Return the total as a single integer.
+
+Also return a structured list of identified changes with severity in the notes field, e.g.:
+  notes: "[2024 major: salary threshold raised; 2023 minor: fee indexation; 2022 major: quota cap introduced]"
+
+Recall hints:
+
+  - "Introduced in [YYYY]", "replaced in [YYYY]", "renamed in [YYYY]", "merged with [...] in [YYYY]" → count.
+  - "Reformed [YYYY]", "overhauled [YYYY]", "tightened [YYYY]" → count.
+  - Migration Policy Institute, OECD migration outlook, IMD reports, MPI country profiles, third-party trackers covering policy timelines are valid evidence — extract their dated change list and apply the date filter.
+
 Edge cases:
 
-Statistics must be from the last 3 years; older statistics alone = false.
-Linked statistics portal counts only if it goes to the same government authority; note in notes.
-Aggregated statistics covering many programs (not this specific one) do NOT count.`,
+  - 0 weighted points = maximum score; absence of change is a positive stability signal. If the source lists historical changes only from before 2021, return 0 with notes "no changes in the 2021-2026 window".
+  - Do not count announced-but-not-implemented changes.
+  - If the page is silent on change history entirely, return null with notes "no change information on this page".`,
       scoringRubricJsonb: null,
-      normalizationFn: 'boolean',
-      direction: 'higher_is_better',
+      normalizationFn: 'min_max',
+      direction: 'lower_is_better',
       sourceTierRequired: 1,
     },
     {
       key: 'E.2.2',
-      label: 'Published quota / cap information',
-      dataType: 'categorical',
+      label: 'Program suspension or abrupt closure history (last 10 years)',
+      dataType: 'boolean',
       pillar: 'E',
       subFactor: 'E.2',
-      weightWithinSubFactor: 0.3,
+      weightWithinSubFactor: 0.5,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: E.2.2 — Published quota / cap information
-Question: How transparent is the program about quota/cap information?
-Allowed values:
+        `Extraction Task: E.2.2 — Program suspension or abrupt closure history (last 10 years)
+Question: In the last 10 years, has this program been suspended, temporarily closed to new applicants, or had its quota abruptly reduced by more than 50% without advance notice?
 
-"no_cap": program explicitly has no numerical cap.
-"published_current": cap exists and current period's number is published in this document.
-"published_historical_only": cap exists, only past years' numbers published; current undisclosed.
-"exists_undisclosed": cap exists, number not published.
+DATE FILTER: the current year is 2026. "Last 10 years" means events dated 2016 or later. Suspensions before 2016 do NOT count.
 
-If the document is silent on whether a cap exists, return the universal "not found in source" response ({"value": null, ...}) — DO NOT guess and DO NOT return a category value.
+Return value: a boolean.
+  - true  if any such event is documented within the 10-year window.
+  - false if the program has operated continuously without abrupt interruption since 2016.
 
-Edge cases:
+Recall hints:
 
-cap_number populated only for "published_current" or "published_historical_only".
-"no_cap" requires affirmative statement. Absence of mention → return null.
-Sub-caps on specific streams qualify as published caps.`,
-      scoringRubricJsonb: {
-        categories: [
-          {
-            value: 'no_cap',
-            description: 'program explicitly has no numerical cap.',
-          },
-          {
-            value: 'published_current',
-            description: "cap exists and current period's number is published in this document.",
-          },
-          {
-            value: 'published_historical_only',
-            description: "cap exists, only past years' numbers published; current undisclosed.",
-          },
-          { value: 'exists_undisclosed', description: 'cap exists, number not published.' },
-        ],
-      },
-      normalizationFn: 'categorical',
-      direction: 'higher_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'E.2.3',
-      label: 'Public guidance and decision criteria documentation',
-      dataType: 'categorical',
-      pillar: 'E',
-      subFactor: 'E.2',
-      weightWithinSubFactor: 0.3,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: E.2.3 — Public guidance and decision criteria documentation
-Question: How thoroughly does the government publish decision criteria and applicant guidance?
-Allowed values:
-
-"comprehensive": detailed decision criteria, worked examples/scenarios, explicit evidence requirements.
-"substantive": clear decision criteria and evidence requirements, no worked examples.
-"basic": eligibility and required documents stated; little guidance on how decisions are made.
-"minimal": high-level overview with eligibility listed but little else.
-"absent": does not address decision criteria.
+  - "Suspended on [date]", "paused for [period]", "closed to new applicants [date]", "moratorium" → true (when dated 2016+).
+  - "Quota abruptly reduced by more than 50%", "cap halved without notice", "intake capped mid-cycle" → true (when dated 2016+).
+  - Reform-driven temporary pauses during a relaunch (when the relaunch creates the program in its current form, the predecessor's pause does NOT count — that's the relaunch event, captured by E.1.1).
+  - Predictable annual closures ("the cap fills each March; the program reopens at fiscal year") do NOT count — that's normal quota cadence, not abrupt suspension.
 
 Edge cases:
 
-Base rating on THIS document plus official guidance it directly links from the same authority (caseworker manual, policy guide). No third-party guides.
-"Worked examples" = explicit illustrative scenarios ("Applicant A earns X and has Y — they qualify because...").
-FAQ counts as substantive guidance only if it addresses decision criteria, not only procedural questions.`,
-      scoringRubricJsonb: {
-        categories: [
-          {
-            value: 'comprehensive',
-            description:
-              'detailed decision criteria, worked examples/scenarios, explicit evidence requirements.',
-          },
-          {
-            value: 'substantive',
-            description: 'clear decision criteria and evidence requirements, no worked examples.',
-          },
-          {
-            value: 'basic',
-            description:
-              'eligibility and required documents stated; little guidance on how decisions are made.',
-          },
-          {
-            value: 'minimal',
-            description: 'high-level overview with eligibility listed but little else.',
-          },
-          { value: 'absent', description: 'does not address decision criteria.' },
-        ],
-      },
-      normalizationFn: 'categorical',
-      direction: 'higher_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'E.3.1',
-      label: 'Rule of law (V-Dem / World Bank WGI)',
-      dataType: 'numeric',
-      pillar: 'E',
-      subFactor: 'E.3',
-      weightWithinSubFactor: 0.5,
-      extractionPromptMd: `Data Ingestion Stub: E.3.1 — Rule of law
-This indicator is NOT extracted from program documents. It is ingested from external published indices at the country level.
-Source
-World Bank Worldwide Governance Indicators (WGI), Rule of Law estimate. Fallback: V-Dem Liberal Democracy Index, Rule of Law component.
-Value
-Country's most recent published score, on the source's native scale.
-
-WGI Rule of Law: approximately -2.5 to +2.5.
-V-Dem: 0 to 1.
-
-Ingestion notes
-
-Shared across ALL programs for a given country.
-Ingestion is a Phase 2 task. No LLM prompt required.
-Fetch annually when WGI publishes (typically September).
-If WGI unavailable, fall back to V-Dem and record source choice in provenance.`,
+  - If the source is silent on program history, return false with notes "no suspension history found on official sources".
+  - Source-quality threshold: a single news mention of an unconfirmed "rumour of pause" does NOT count. Require an official suspension announcement, regulator order, or post-hoc acknowledgment from the issuing authority.
+  - "Restructured but never paused" → false (the change is captured by E.2.1; this field is suspension-specifically).
+  - If the program was launched within the 10-year window AND has operated continuously since launch, return false.`,
       scoringRubricJsonb: null,
-      normalizationFn: 'min_max',
-      direction: 'higher_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'E.3.2',
-      label: 'Government effectiveness (World Bank WGI)',
-      dataType: 'numeric',
-      pillar: 'E',
-      subFactor: 'E.3',
-      weightWithinSubFactor: 0.5,
-      extractionPromptMd: `Data Ingestion Stub: E.3.2 — Government effectiveness
-This indicator is NOT extracted from program documents. It is ingested from an external published index at the country level.
-Source
-World Bank Worldwide Governance Indicators (WGI), Government Effectiveness estimate.
-Value
-Country's most recent published score, WGI native scale (approximately -2.5 to +2.5).
-Ingestion notes
-
-Shared across ALL programs for a given country.
-Ingestion is a Phase 2 task. No LLM prompt required.
-Fetch annually when WGI publishes (typically September).`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'min_max',
-      direction: 'higher_is_better',
+      normalizationFn: 'boolean',
+      direction: 'lower_is_better',
       sourceTierRequired: 1,
     },
   ],

@@ -8,12 +8,24 @@ export const PILLAR_WEIGHTS: Record<string, number> = {
   E: 0.15,
 };
 
+// Sub-factor weights — must mirror methodology-v1.ts.sub_factor_weights.
+// Methodology v2.0.0 (ADR-028): Pillar A flattened to A.1/A.2/A.3.
+// Methodology v3.0.0 (ADR-029): Pillar B expanded to B.1/B.2/B.3/B.4.
+// Methodology v4.0.0 (ADR-030): Pillar C unchanged structure.
+// Methodology v5.0.0 (ADR-031): Pillar D collapsed to D.1=0.4 / D.2=0.6
+// (D.3 tax sub-factor retired); previous score.ts weights here were
+// stale (the runtime engine re-normalised in-scope weights so the
+// stale entries were not directly load-bearing — see engine.ts pillar
+// aggregation — but they were inconsistent with the seed and the
+// methodology endpoint).
+// Methodology v6.0.0 (ADR-032): Pillar E collapsed to E.1=0.5 / E.2=0.5
+// (E.3 institutional-quality retired alongside the WGI / V-Dem path).
 export const SUB_FACTOR_WEIGHTS: Record<string, Record<string, number>> = {
-  A: { 'A.1': 0.4, 'A.2': 0.35, 'A.3': 0.25 },
-  B: { 'B.1': 0.4, 'B.2': 0.35, 'B.3': 0.25 },
-  C: { 'C.1': 0.45, 'C.2': 0.35, 'C.3': 0.2 },
-  D: { 'D.1': 0.5, 'D.2': 0.35, 'D.3': 0.15 },
-  E: { 'E.1': 0.5, 'E.2': 0.3, 'E.3': 0.2 },
+  A: { 'A.1': 0.5, 'A.2': 0.3, 'A.3': 0.2 },
+  B: { 'B.1': 0.3, 'B.2': 0.2, 'B.3': 0.3, 'B.4': 0.2 },
+  C: { 'C.1': 0.4, 'C.2': 0.4, 'C.3': 0.2 },
+  D: { 'D.1': 0.4, 'D.2': 0.6 },
+  E: { 'E.1': 0.5, 'E.2': 0.5 },
 };
 
 export const CME_WEIGHT = 0.3;

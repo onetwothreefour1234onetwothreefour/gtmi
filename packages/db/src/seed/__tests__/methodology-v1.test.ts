@@ -48,12 +48,14 @@ test('Methodology V1 Arithmetic Constraints', async (t) => {
     }
   });
 
-  await t.test('Total indicator count is exactly 37', () => {
-    // Methodology v5.0.0 (ADR-031): Pillar D reduced from 11 to 5
-    // indicators across 2 sub-factors (D.3 tax sub-factor retired;
-    // D.1.3 PR-accrual presence, D.1.4 PR retention, D.2.4 civic test
-    // burden also retired). 9 (A) + 7 (B) + 8 (C) + 5 (D) + 8 (E) = 37.
-    assert.strictEqual(methodologyV1.indicators.length, 37);
+  await t.test('Total indicator count is exactly 33', () => {
+    // Methodology v6.0.0 (ADR-032): Pillar E reduced from 8 to 4
+    // indicators across 2 sub-factors (E.3 institutional-quality
+    // sub-factor retired alongside the WGI / V-Dem ingestion path;
+    // E.1.2 forward-announced changes, E.2.1 published approval rate,
+    // E.2.3 public guidance docs, E.3.1 rule of law, E.3.2 government
+    // effectiveness all retired). 9 (A) + 7 (B) + 8 (C) + 5 (D) + 4 (E) = 33.
+    assert.strictEqual(methodologyV1.indicators.length, 33);
   });
 
   await t.test('cme_paq_split sums to 1.0', () => {

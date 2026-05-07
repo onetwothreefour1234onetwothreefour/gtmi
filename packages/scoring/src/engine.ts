@@ -11,6 +11,7 @@ import {
   normalizeBooleanWithAnnotation,
   normalizeCategorical,
   normalizeMinMax,
+  normalizeNumericOrCategorical,
   normalizeZScore,
   parseIndicatorValue,
   REGIONAL_SUBSTITUTES,
@@ -38,6 +39,7 @@ const KNOWN_NORMALIZATION_FNS = new Set<NormalizationFn>([
   'boolean',
   'boolean_with_annotation',
   'country_substitute_regional',
+  'numeric_or_categorical',
 ]);
 
 interface IndicatorResult {
@@ -186,6 +188,19 @@ export function scoreSingleIndicator(args: {
       return normalizeBooleanWithAnnotation(
         parsed as Record<string, unknown>,
         def.key,
+        def.direction
+      );
+    case 'numeric_or_categorical':
+      // Methodology v6.0.0 / ADR-032 — dual-format. parseIndicatorValue
+      // narrowed the value to number | string; the normalize helper
+      // dispatches to piecewise interpolation (numeric form) or rubric
+      // lookup (categorical form). The rubric MUST be present for the
+      // string-form fallback; the bucket configuration in
+      // NUMERIC_OR_CATEGORICAL_BUCKETS handles the numeric form.
+      return normalizeNumericOrCategorical(
+        parsed as number | string,
+        def.key,
+        def.scoringRubricJsonb,
         def.direction
       );
   }
