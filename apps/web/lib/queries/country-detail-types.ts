@@ -37,30 +37,11 @@ export interface CountryProgramRow {
   phase2Placeholder: boolean;
 }
 
-/**
- * Tax treatment aggregated across programs in this country.
- * Reads D.3.3 (territorial vs worldwide) and D.3.2 (special regime
- * available) from the field_values rows. When no approved values exist
- * for the relevant indicators, both fields are null and the page renders
- * the "Data not yet collected" placeholder.
- */
-export interface CountryTaxTreatment {
-  /**
-   * Distribution of D.3.3 raw values across the country's programmes.
-   * E.g. { territorial: 2, worldwide: 1 } when 3 programmes have a
-   * D.3.3 value extracted. Null when no programmes have a D.3.3 value.
-   */
-  taxationModel: Record<string, number> | null;
-  /**
-   * Distribution of D.3.2 raw values. Null when no programmes have it.
-   */
-  specialRegime: Record<string, number> | null;
-  /** Total programmes in this country (for the "n of N have data" line). */
-  totalProgramsInCountry: number;
-}
+// CountryTaxTreatment removed in methodology v5.0.0 (ADR-031). Tax
+// indicators (D.3.1, D.3.2, D.3.3) are no longer part of the GTMI
+// methodology; the tax-treatment widget on /countries/[iso] is gone.
 
 export interface CountryDetail {
   header: CountryHeader;
   programs: CountryProgramRow[];
-  tax: CountryTaxTreatment;
 }

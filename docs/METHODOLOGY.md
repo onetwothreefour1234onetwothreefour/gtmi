@@ -281,31 +281,31 @@ is conceptually new (visa duration & renewability).
 
 ### Pillar D — Pathway (22% of PAQ)
 
-**D.1 Permanent residence pathway (50% of pillar)**
+Restructured in methodology v5.0.0 (2026-05-06) — see ADR-031.
+Pillar D collapsed from 11 indicators across 3 sub-factors to 5
+indicators across 2 sub-factors. The D.3 tax sub-factor was retired
+entirely (the GTMI no longer measures host-country tax treatment).
+D.1.3 (PR-accrual presence), D.1.4 (PR retention), and D.2.4
+(civic/language test burden) were also retired. D.1.2 / D.2.2 score
+**conditionally** on the parent boolean (D.1.1 / D.2.1): when the
+parent is false, the child scores 0 — absence of pathway is the
+worst outcome, not missing data. See section 3.6 for the
+SCORE_DEPENDENCIES design.
 
-| Indicator                                          | Weight | Normalization      | Direction        |
-| -------------------------------------------------- | ------ | ------------------ | ---------------- |
-| D.1.1 PR provision available                       | 30%    | boolean            | yes = 100        |
-| D.1.2 Minimum years of residence to PR             | 30%    | min-max            | shorter = better |
-| D.1.3 Physical presence requirement during accrual | 20%    | min-max (inverted) | fewer = better   |
-| D.1.4 PR retention rules                           | 20%    | min-max (inverted) | fewer = better   |
+**D.1 Permanent Residency (40% of pillar)**
 
-**D.2 Citizenship pathway (35% of pillar)**
+| Indicator                              | Weight | Normalization | Direction                         |
+| -------------------------------------- | ------ | ------------- | --------------------------------- |
+| D.1.1 PR pathway available             | 50%    | boolean       | yes = 100                         |
+| D.1.2 Minimum years of residence to PR | 50%    | min-max       | shorter = better; D.1.1=false → 0 |
 
-| Indicator                                        | Weight | Normalization      | Direction          |
-| ------------------------------------------------ | ------ | ------------------ | ------------------ |
-| D.2.1 Citizenship provision available            | 30%    | boolean            | yes = 100          |
-| D.2.2 Total minimum years to citizenship         | 30%    | min-max (inverted) | shorter = better   |
-| D.2.3 Dual citizenship permitted                 | 20%    | boolean            | permitted = better |
-| D.2.4 Civic / language / integration test burden | 20%    | categorical        | lower = better     |
+**D.2 Citizenship (60% of pillar)**
 
-**D.3 Tax treatment for new talent (15% of pillar)**
-
-| Indicator                                | Weight | Normalization | Direction            |
-| ---------------------------------------- | ------ | ------------- | -------------------- |
-| D.3.1 Tax residency trigger (days/yr)    | 36%    | min-max       | more days = better   |
-| D.3.2 Special regime available           | 44%    | categorical   | available = better   |
-| D.3.3 Territorial vs. worldwide taxation | 20%    | categorical   | territorial = better |
+| Indicator                                                | Weight | Normalization | Direction                         |
+| -------------------------------------------------------- | ------ | ------------- | --------------------------------- |
+| D.2.1 Citizenship pathway available from this track      | 40%    | boolean       | yes = 100                         |
+| D.2.2 Total minimum years from visa entry to citizenship | 40%    | min-max       | shorter = better; D.2.1=false → 0 |
+| D.2.3 Dual citizenship permitted                         | 20%    | boolean       | permitted = better                |
 
 ### Pillar E — Stability (15% of PAQ)
 

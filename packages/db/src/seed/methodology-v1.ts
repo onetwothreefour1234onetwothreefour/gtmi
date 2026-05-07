@@ -39,9 +39,8 @@ export const methodologyV1 = {
       'C.3': ['C.3.1', 'C.3.2'],
     },
     D: {
-      'D.1': ['D.1.1', 'D.1.2', 'D.1.3', 'D.1.4'],
-      'D.2': ['D.2.1', 'D.2.2', 'D.2.3', 'D.2.4'],
-      'D.3': ['D.3.1', 'D.3.2', 'D.3.3'],
+      'D.1': ['D.1.1', 'D.1.2'],
+      'D.2': ['D.2.1', 'D.2.2', 'D.2.3'],
     },
     E: {
       'E.1': ['E.1.1', 'E.1.2', 'E.1.3'],
@@ -61,9 +60,8 @@ export const methodologyV1 = {
     'C.1': 0.4,
     'C.2': 0.4,
     'C.3': 0.2,
-    'D.1': 0.5,
-    'D.2': 0.35,
-    'D.3': 0.15,
+    'D.1': 0.4,
+    'D.2': 0.6,
     'E.1': 0.5,
     'E.2': 0.3,
     'E.3': 0.2,
@@ -93,17 +91,11 @@ export const methodologyV1 = {
     'C.2.3': 0.2,
     'C.3.1': 0.5,
     'C.3.2': 0.5,
-    'D.1.1': 0.3,
-    'D.1.2': 0.3,
-    'D.1.3': 0.2,
-    'D.1.4': 0.2,
-    'D.2.1': 0.3,
-    'D.2.2': 0.3,
+    'D.1.1': 0.5,
+    'D.1.2': 0.5,
+    'D.2.1': 0.4,
+    'D.2.2': 0.4,
     'D.2.3': 0.2,
-    'D.2.4': 0.2,
-    'D.3.1': 0.36,
-    'D.3.2': 0.44,
-    'D.3.3': 0.2,
     'E.1.1': 0.5,
     'E.1.2': 0.3,
     'E.1.3': 0.2,
@@ -140,15 +132,9 @@ export const methodologyV1 = {
     'C.3.2': 'categorical',
     'D.1.1': 'boolean',
     'D.1.2': 'min_max',
-    'D.1.3': 'min_max',
-    'D.1.4': 'min_max',
     'D.2.1': 'boolean',
     'D.2.2': 'min_max',
     'D.2.3': 'boolean',
-    'D.2.4': 'categorical',
-    'D.3.1': 'min_max',
-    'D.3.2': 'categorical',
-    'D.3.3': 'categorical',
     'E.1.1': 'z_score',
     'E.1.2': 'boolean',
     'E.1.3': 'min_max',
@@ -159,7 +145,7 @@ export const methodologyV1 = {
     'E.3.2': 'min_max',
   },
   cme_paq_split: { cme: 0.3, paq: 0.7 },
-  version_tag: '4.0.0',
+  version_tag: '5.0.0',
   indicators: [
     {
       key: 'A.1.1',
@@ -1104,21 +1090,33 @@ If the source is silent on dependant access specifically but the country is one 
     },
     {
       key: 'D.1.1',
-      label: 'PR provision available (yes / no)',
+      label: 'PR pathway available',
       dataType: 'boolean',
       pillar: 'D',
       subFactor: 'D.1',
-      weightWithinSubFactor: 0.3,
+      weightWithinSubFactor: 0.5,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: D.1.1 — PR provision available
-Question: Does this program provide a direct pathway to permanent residence (PR) or equivalent indefinite-stay status?
+        `Extraction Task: D.1.1 — PR pathway available
+Question: Does this visa program offer a direct pathway to permanent residency, or does holding this visa count toward PR eligibility under a linked track?
+
+Return value: a boolean — true if any PR pathway exists from this visa (including a documented switch to a successor PR-eligible visa). false if the visa is explicitly temporary with no PR route.
+
+Recall hints:
+
+"Indefinite leave to remain", "permanent residency", "indefinite stay", "永久居留" → PR pathway exists.
+"This visa leads to PR after [N] years" → true.
+"Holders of this visa may apply for PR" → true.
+"Holders may switch to [PR-eligible visa] after [N] years" → true (documented switch counts).
+"Temporary visa only — no PR pathway" / "Holders must depart at end of term" → false.
+GCC monarchies (UAE, KSA, Bahrain, Kuwait, Oman, Qatar) generally have no realistic PR pathway for non-citizens — return false unless the source explicitly describes one (e.g. UAE Golden Visa has long-term residence but is itself a renewable visa, not PR).
+
 Edge cases:
 
-Indefinite leave to remain (ILR) or equivalent permanent status counts as true.
-Pathway requiring switch to a different visa counts as true only if the switch is explicitly documented as a standard transition.
-Temporary-only program with no documented PR route = false.`,
+A pathway requiring switch to a different visa counts as true ONLY if the switch is explicitly documented as a standard transition; speculative pathways do not count.
+"Permanent" wording in the visa name does NOT automatically mean PR — Australia's "permanent resident" is PR; Singapore's "Long-Term Visit Pass" is not.
+If the source is silent on PR, return null with notes "PR pathway not addressed on this page".`,
       scoringRubricJsonb: null,
       normalizationFn: 'boolean',
       direction: 'higher_is_better',
@@ -1130,58 +1128,32 @@ Temporary-only program with no documented PR route = false.`,
       dataType: 'numeric',
       pillar: 'D',
       subFactor: 'D.1',
-      weightWithinSubFactor: 0.3,
+      weightWithinSubFactor: 0.5,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
         `Extraction Task: D.1.2 — Minimum years of residence to PR eligibility
-Question: Minimum cumulative years of residence under this program (or explicitly described combined pathway) before PR eligibility?
+Question: What is the minimum number of years of qualifying residence required before the holder can apply for PR? Report the lowest threshold available from this visa track.
+
+Recall hints:
+
+The threshold is usually expressed as "after [N] years on this visa" or "[N] years cumulative residence required for PR".
+If a combined pathway is described (e.g., "2 years on this visa + 3 years on successor visa = 5 years total to PR"), report the total.
+If multiple PR streams are available (e.g. fast-track for high earners, standard track for everyone else), report the LOWEST eligibility threshold and capture the variant in notes.
+If expressed in months, convert to years to one decimal place.
+
+Conditional pattern (IMPORTANT):
+
+If D.1.1 is false (no PR pathway exists), return the sentinel string "not_applicable" as valueRaw. The scoring engine will assign 0 to this indicator — absence of pathway is the worst outcome, not missing data.
+
+DO NOT return null when PR is unavailable — null means "not extracted", which excludes the indicator from scoring. The "not_applicable" sentinel scores 0 and stays in the cohort.
+
 Edge cases:
 
-If combined pathway described (e.g., 2 years on this visa + 2 on successor), report the total.
-If PR not available, return null.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'min_max',
-      direction: 'lower_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'D.1.3',
-      label: 'Physical presence requirement during accrual (days/yr)',
-      dataType: 'numeric',
-      pillar: 'D',
-      subFactor: 'D.1',
-      weightWithinSubFactor: 0.2,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: D.1.3 — Physical presence requirement during accrual (days/year)
-Question: How many days per year must the visa holder physically be present for that year to count toward PR qualifying period?
-Edge cases:
-
-If expressed as maximum-absence (e.g., "no more than 180 days outside"), convert to minimum-presence (365 minus 180 = 185).
-If presence not required during accrual, return 0.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'min_max',
-      direction: 'lower_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'D.1.4',
-      label: 'PR retention rules (days/yr to keep PR)',
-      dataType: 'numeric',
-      pillar: 'D',
-      subFactor: 'D.1',
-      weightWithinSubFactor: 0.2,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: D.1.4 — PR retention rules (days/year to keep PR)
-Question: After PR is granted, how many days per year must the holder physically remain to retain PR status?
-Edge cases:
-
-If stated per multi-year period ("no more than 2 consecutive years absent"), convert to average days-per-year equivalent and note original framing.
-If PR not available, return null.`,
+Some PR tracks have ongoing income / employment / character requirements stretched over the residence period — these do not change the minimum-years figure.
+"Minimum 5 years residence" + "applications typically processed in 6 months" → report 5 (years TO eligibility, not years to grant).
+"3 years physical presence in any 5-year window" → report 3.
+If the source is silent on the years-to-PR figure but D.1.1 is true, return null with notes "years-to-PR not stated on this page".`,
       scoringRubricJsonb: null,
       normalizationFn: 'min_max',
       direction: 'lower_is_better',
@@ -1189,20 +1161,33 @@ If PR not available, return null.`,
     },
     {
       key: 'D.2.1',
-      label: 'Citizenship provision available from this track (yes / no)',
+      label: 'Citizenship pathway available from this track',
       dataType: 'boolean',
       pillar: 'D',
       subFactor: 'D.2',
-      weightWithinSubFactor: 0.3,
+      weightWithinSubFactor: 0.4,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: D.2.1 — Citizenship provision available from this track
-Question: Does the pathway originating from this program lead to eligibility for citizenship, directly or via PR?
+        `Extraction Task: D.2.1 — Citizenship pathway available
+Question: Does holding this visa, or the PR status it leads to, create a pathway to citizenship eligibility?
+
+Return value: a boolean — true if any citizenship route exists for the standard principal applicant (via PR, via direct naturalisation, or via any documented chain originating in this visa). false if citizenship is explicitly unavailable, or if the country does not permit naturalisation of foreign-born adults under any standard route.
+
+Recall hints:
+
+"Eligible for citizenship after [N] years of residence" / "may apply for naturalisation" → true.
+"This visa leads to PR; PR holders may apply for citizenship after [N] years" → true.
+GCC monarchies generally do not permit naturalisation of non-Arab non-citizens under standard routes — return false unless the source explicitly states a path.
+Singapore: PR holders may apply for citizenship at the discretion of the ICA; document this as true (a discretionary route still counts as a pathway).
+Switzerland, Liechtenstein, Andorra, Monaco have very long residence requirements but DO permit naturalisation — return true.
+
 Edge cases:
 
-Temporary/indefinite-stay-only program without citizenship eligibility = false.
-Requires-switching-tracks is true only if the switch is documented in official materials.`,
+Acceleration routes (spouse-of-citizen, military service, extraordinary contribution) are NOT the standard pathway — exclude them from the answer for this indicator.
+Investment-citizenship programs that bypass residence (Malta, Cyprus pre-2020, Caribbean CBI) count as true if the source documents them.
+"Citizenship is not available to holders of this visa" → false.
+If the source is silent, return null with notes "citizenship pathway not addressed on this page".`,
       scoringRubricJsonb: null,
       normalizationFn: 'boolean',
       direction: 'higher_is_better',
@@ -1210,33 +1195,47 @@ Requires-switching-tracks is true only if the switch is documented in official m
     },
     {
       key: 'D.2.2',
-      label: 'Total minimum years from initial visa entry to citizenship eligibility',
+      label: 'Total minimum years from visa entry to citizenship eligibility',
       dataType: 'numeric',
       pillar: 'D',
       subFactor: 'D.2',
-      weightWithinSubFactor: 0.3,
+      weightWithinSubFactor: 0.4,
       extractionPromptMd:
         SHARED_PREAMBLE +
         '\n\n' +
-        `Extraction Task: D.2.2 — Total minimum years from initial visa entry to citizenship eligibility
-Question: Total minimum years from date of initial entry on this program to the earliest date a holder can apply for citizenship?
+        `Extraction Task: D.2.2 — Total minimum years from visa entry to citizenship eligibility
+Question: What is the total minimum number of years from the date of initial visa entry to the earliest possible citizenship application? Report the minimum across all available standard tracks for the principal applicant.
+
+Counting rules:
+
+Sum the full chain:
+  1. Years on this visa accruing toward PR eligibility, PLUS
+  2. Years as PR before naturalisation eligibility (if PR is on the path), PLUS
+  3. Any additional residence/character/language requirement years that must elapse before the earliest citizenship application.
 
 Recall hints:
 
-The total is usually given indirectly as a sum of two segments. Compose the answer when both segments are stated:
+The total is usually stated as a sum of two segments:
+  - "Years to PR on this visa" (D.1.2 figure) + "Years as PR before citizenship" = total minimum years.
+  - If the source publishes "X years from arrival to citizenship" / "X years' lawful residence including X as PR" / "minimum residence requirement of X years" directly, use that.
+Common patterns:
+  - Australia: 4 years lawful residence including 1 year as PR → 4 (the source publishes the total).
+  - Canada: 3 years physical presence in 5 (must hold PR) → varies by visa-to-PR time + 3 years PR.
+  - UK: 5 years lawful residence + 1 year ILR = 6 years from initial entry.
+  - Switzerland: 10 years lawful residence (federal) + cantonal requirements → 10.
 
-  - "Years to PR on this visa" + "Years as PR before citizenship" = total minimum years.
-  - If the source gives only one segment (e.g. "must be a permanent resident for 4 years" or "4 years residence in Australia"), report that single number — it is the residence requirement at the citizenship stage and is the conventional way the threshold is published.
-  - Phrases that map to the total: "minimum residence requirement", "lawfully resident for X years", "X years' residence including X as a permanent resident", "X years in Australia of which X as PR".
+Conditional pattern (IMPORTANT):
 
-If the source explicitly publishes "X years from arrival to citizenship" or equivalent, use that directly.
+If D.2.1 is false (no citizenship pathway exists), return the sentinel string "not_applicable" as valueRaw. The scoring engine will assign 0 to this indicator — absence of pathway is the worst outcome, not missing data.
+
+DO NOT return null when citizenship is unavailable — null means "not extracted", which excludes the indicator from scoring. The "not_applicable" sentinel scores 0 and stays in the cohort.
 
 Edge cases:
 
-Include time spent under PR if that's part of the pathway.
-Report the standard route for a principal applicant (not spouse-of-citizen accelerations, military service, or extraordinary contribution).
-If citizenship is not available from this track at all, return empty.
-If the source describes an indefinite-leave / PR step but is silent on the citizenship-from-PR requirement, return only the years-to-PR figure and note in source sentence that this is the PR component only.`,
+Use the standard route for a principal applicant — exclude spouse-of-citizen, military, or extraordinary contribution accelerations.
+If the source describes only the years-to-PR portion and is silent on PR-to-citizenship, return null with notes "PR-to-citizenship segment not stated on this page; partial figure only".
+If PR holders on this visa can apply for citizenship BEFORE the standard PR-to-citizenship interval elapses (a citizenship-track visa), report the actual minimum interval.
+If multiple tracks exist (e.g. fast-track via investment + slow-track standard), report the LOWEST total and note the variant.`,
       scoringRubricJsonb: null,
       normalizationFn: 'min_max',
       direction: 'lower_is_better',
@@ -1253,181 +1252,31 @@ If the source describes an indefinite-leave / PR step but is silent on the citiz
         SHARED_PREAMBLE +
         '\n\n' +
         `Extraction Task: D.2.3 — Dual citizenship permitted
-Question: Does the country permit dual or multiple citizenship for naturalizing applicants from this program?
-Edge cases:
+Question: Does the host country permit the applicant to hold dual citizenship — retaining their original nationality while naturalising?
 
-"Permitted in practice but requires renunciation formalism not enforced" is true only if source explicitly acknowledges this.
-If source silent and general rule not stated here, return null.`,
-      scoringRubricJsonb: null,
-      normalizationFn: 'boolean',
-      direction: 'higher_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'D.2.4',
-      label: 'Civic / language / integration test burden',
-      dataType: 'categorical',
-      pillar: 'D',
-      subFactor: 'D.2',
-      weightWithinSubFactor: 0.2,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: D.2.4 — Civic, language, integration test burden for citizenship
-Question: How burdensome are the civic, language, or integration tests required for citizenship from this track?
-Allowed values:
-
-"none": no test required.
-"light": single test of single type (language A2/B1 OR short civics quiz).
-"moderate": multiple tests or one substantial test (language B2+ and civics).
-"heavy": multiple substantial tests including language above B2, civics, and integration/history.
+Return value: a boolean — true if dual citizenship is permitted for naturalised citizens. false if the country requires renunciation of prior nationality as a condition of naturalisation.
 
 Recall hints:
 
-CEFR levels (A1, A2, B1, B2, C1, C2) are rarely stated by name on government pages. Use these mappings:
+"Dual citizenship is permitted" / "applicants need not renounce" / "[country] permits dual or multiple citizenship" → true.
+"Applicants must renounce their previous citizenship" / "single nationality required" → false.
+"Permitted in practice but renunciation is a formal requirement that is not enforced" → true (with notes capturing the formality).
+Common patterns:
+  - Australia, Canada, UK, USA, France, Italy, Ireland, NZ, Switzerland — true.
+  - Singapore, Japan (after 22), India, China, Saudi Arabia — generally false.
+  - Germany — true since the 2024 reform.
 
-  - "basic English" / "everyday English" / "functional English" → A2/B1 → light if it's the only test.
-  - "good knowledge of English" / "competent English" / IELTS 6 / TOEFL ~80 → B2 → moderate.
-  - "advanced English" / IELTS 7+ → C1+ → heavy.
-  - "Life in the UK test", "Australian citizenship test", "naturalisation test", "civics test" all count as a civics test.
-  - If both a language requirement AND a civics test are required, the answer is at least "moderate".
+Country-of-origin variation:
+
+If the policy varies by the applicant's country of origin (some countries are exempt, treaty-based exceptions exist), return true with a note capturing the variation.
 
 Edge cases:
 
-Exemptions for age/disability do not change category.
-If citizenship is not available from this track, return empty.
-If the source describes only "must understand basic English" with no civics test mentioned, return "light".`,
-      scoringRubricJsonb: {
-        categories: [
-          { value: 'none', description: 'no test required.' },
-          {
-            value: 'light',
-            description: 'single test of single type (language A2/B1 OR short civics quiz).',
-          },
-          {
-            value: 'moderate',
-            description: 'multiple tests or one substantial test (language B2+ and civics).',
-          },
-          {
-            value: 'heavy',
-            description:
-              'multiple substantial tests including language above B2, civics, and integration/history.',
-          },
-        ],
-      },
-      normalizationFn: 'categorical',
-      direction: 'lower_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'D.3.1',
-      label: 'Tax residency trigger (days/yr before worldwide tax applies)',
-      dataType: 'numeric',
-      pillar: 'D',
-      subFactor: 'D.3',
-      weightWithinSubFactor: 0.36,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: D.3.1 — Tax residency trigger (days/year)
-Question: How many days of physical presence trigger full tax residency (worldwide income taxation)?
-Edge cases:
-
-If test is non-pure-day-count (substantial presence with prior-year weighting, center of vital interests), report primary day-count threshold and describe additional test.
-If taxed territorially regardless of presence, return null with notes "territorial regime — see D.3.3".`,
+If the source is silent on dual citizenship and the country is not on a well-known list, return null with notes "dual citizenship policy not addressed on this page".
+"Permitted by birth but not by naturalisation" → false (this indicator covers naturalisation specifically).
+If only the applicant's country-of-origin's rule on losing citizenship matters (the host accepts dual; the applicant's home country may strip them), this indicator measures the HOST country's policy → true if the host accepts dual.`,
       scoringRubricJsonb: null,
-      normalizationFn: 'min_max',
-      direction: 'higher_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'D.3.2',
-      label: 'Special regime available (non-dom, expat bonus, flat-rate)',
-      dataType: 'categorical',
-      pillar: 'D',
-      subFactor: 'D.3',
-      weightWithinSubFactor: 0.44,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: D.3.2 — Special regime available
-Question: What special/preferential tax regime, if any, is available to holders of this visa?
-Allowed values:
-
-"none": no special regime.
-"time_limited_bonus": fixed-term reduction/exemption (e.g., 30% expat ruling for 5 years).
-"time_limited_flat_rate": fixed-term flat/lump-sum tax regime (e.g., Italy's 100k flat tax).
-"non_dom": regime exempting foreign-source income, typically domicile-based.
-"indefinite_preferential": preferential regime for duration of residence, no time cap.
-
-Edge cases:
-
-If regime is general (not tied to this visa) but accessible to holders, it qualifies; note eligibility conditions.`,
-      scoringRubricJsonb: {
-        categories: [
-          { value: 'none', description: 'no special regime.' },
-          {
-            value: 'time_limited_bonus',
-            description: 'fixed-term reduction/exemption (e.g., 30% expat ruling for 5 years).',
-          },
-          {
-            value: 'time_limited_flat_rate',
-            description: "fixed-term flat/lump-sum tax regime (e.g., Italy's 100k flat tax).",
-          },
-          {
-            value: 'non_dom',
-            description: 'regime exempting foreign-source income, typically domicile-based.',
-          },
-          {
-            value: 'indefinite_preferential',
-            description: 'preferential regime for duration of residence, no time cap.',
-          },
-        ],
-      },
-      normalizationFn: 'categorical',
-      direction: 'higher_is_better',
-      sourceTierRequired: 1,
-    },
-    {
-      key: 'D.3.3',
-      label: 'Territorial vs. worldwide taxation for residents',
-      dataType: 'categorical',
-      pillar: 'D',
-      subFactor: 'D.3',
-      weightWithinSubFactor: 0.2,
-      extractionPromptMd:
-        SHARED_PREAMBLE +
-        '\n\n' +
-        `Extraction Task: D.3.3 — Territorial vs. worldwide taxation for residents
-Question: What is the scope of taxation for tax residents?
-Allowed values:
-
-"worldwide": residents taxed on worldwide income.
-"worldwide_with_remittance_basis": worldwide in principle but foreign income taxed only if remitted.
-"territorial": residents taxed only on domestic-source income.
-"hybrid": specific income types territorial, others worldwide.
-
-Edge cases:
-
-If source distinguishes by domicile (UK pre-2025 style), report rule for typical new entrant on this visa and explain.`,
-      scoringRubricJsonb: {
-        categories: [
-          { value: 'worldwide', description: 'residents taxed on worldwide income.' },
-          {
-            value: 'worldwide_with_remittance_basis',
-            description: 'worldwide in principle but foreign income taxed only if remitted.',
-          },
-          {
-            value: 'territorial',
-            description: 'residents taxed only on domestic-source income.',
-          },
-          {
-            value: 'hybrid',
-            description: 'specific income types territorial, others worldwide.',
-          },
-        ],
-      },
-      normalizationFn: 'categorical',
+      normalizationFn: 'boolean',
       direction: 'higher_is_better',
       sourceTierRequired: 1,
     },

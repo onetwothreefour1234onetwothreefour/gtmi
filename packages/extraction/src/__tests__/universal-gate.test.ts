@@ -25,7 +25,6 @@ describe('NUMERIC_SANITY_RANGES coverage', () => {
       'C.2.2',
       'D.1.2',
       'D.2.2',
-      'D.3.1',
       'E.1.1',
       'E.1.3',
       'E.3.1',

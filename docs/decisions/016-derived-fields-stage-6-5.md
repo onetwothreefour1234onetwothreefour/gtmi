@@ -1,12 +1,10 @@
 # ADR-016 — Derived fields (Stage 6.5: deterministic computation for A.1.2 and D.2.2)
 
-**Status:** Partially superseded by ADR-028 (2026-05-05) and ADR-029
-(2026-05-05). The Pillar A portion (A.1.2 % of median) is removed
-under methodology v2.0.0; % of median is now extracted directly as
-A.1.1. The Pillar B portion (B.2.4 mandatory non-government costs)
-is removed under methodology v3.0.0; the new B.3.1 absorbs it as a
-USD component. The D.2.2 derivation and the other Pillar D / E
-derivations described below remain in force.
+**Status:** Largely superseded. Pillar A portion (A.1.2) removed by
+ADR-028 (2026-05-05); Pillar B portion (B.2.4) removed by ADR-029
+(2026-05-05); ALL Pillar D portions (D.1.2, D.2.2, D.2.3) removed
+by ADR-031 (2026-05-06). Only E.1.1 and E.1.3 derives remain in
+force from this ADR.
 
 **Original status:** Approved (Phase 3.6 / Fix D)
 **Date:** 2026-04-28

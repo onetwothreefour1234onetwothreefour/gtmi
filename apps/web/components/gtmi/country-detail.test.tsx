@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CountryHeader } from './country-header';
 import { CountryProgramsTable } from './country-programs-table';
-import { TaxTreatmentCard } from './tax-treatment-card';
-import type { CountryProgramRow, CountryTaxTreatment } from '@/lib/queries/country-detail-types';
+import type { CountryProgramRow } from '@/lib/queries/country-detail-types';
 import type { PillarKey } from '@/lib/theme';
 
 function mkProgram(
@@ -113,43 +112,5 @@ describe('CountryProgramsTable', () => {
   });
 });
 
-describe('TaxTreatmentCard', () => {
-  const empty: CountryTaxTreatment = {
-    taxationModel: null,
-    specialRegime: null,
-    totalProgramsInCountry: 4,
-  };
-
-  it('renders the empty state when both fields are null', () => {
-    render(<TaxTreatmentCard tax={empty} taxAuthorityUrl="https://ato.gov.au" />);
-    expect(screen.getByTestId('empty-state')).toHaveTextContent('Data not yet collected');
-    expect(screen.getByTestId('empty-state')).toHaveTextContent('https://ato.gov.au');
-  });
-
-  it('renders both buckets with distribution counts when populated', () => {
-    const tax: CountryTaxTreatment = {
-      taxationModel: { territorial: 2, worldwide: 1 },
-      specialRegime: { yes: 2 },
-      totalProgramsInCountry: 4,
-    };
-    render(<TaxTreatmentCard tax={tax} taxAuthorityUrl={null} />);
-    const card = screen.getByTestId('tax-treatment-card');
-    expect(card).toHaveTextContent('Territorial vs worldwide');
-    expect(card).toHaveTextContent('Special regime');
-    expect(card).toHaveTextContent('territorial');
-    expect(card).toHaveTextContent('2 of 4');
-  });
-
-  it('handles half-populated payloads (one indicator extracted, one not)', () => {
-    const tax: CountryTaxTreatment = {
-      taxationModel: { territorial: 1 },
-      specialRegime: null,
-      totalProgramsInCountry: 1,
-    };
-    render(<TaxTreatmentCard tax={tax} taxAuthorityUrl={null} />);
-    const card = screen.getByTestId('tax-treatment-card');
-    expect(card).toHaveTextContent('Territorial vs worldwide');
-    expect(card).toHaveTextContent('territorial');
-    expect(card).toHaveTextContent('Data not yet collected');
-  });
-});
+// TaxTreatmentCard tests removed in methodology v5.0.0 (ADR-031) — the
+// tax-regime widget was deleted alongside the D.3 sub-factor retirement.

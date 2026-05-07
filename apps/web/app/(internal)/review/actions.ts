@@ -1,7 +1,12 @@
 'use server';
 
 import { db, fieldValues, fieldDefinitions, reviewQueue } from '@gtmi/db';
-import { normalizeRawValue, PHASE2_PLACEHOLDER_PARAMS, scoreSingleIndicator } from '@gtmi/scoring';
+import {
+  normalizeRawValue,
+  PHASE2_PLACEHOLDER_PARAMS,
+  SCORE_DEPENDENCIES,
+  scoreSingleIndicator,
+} from '@gtmi/scoring';
 import type { FieldDefinitionRecord } from '@gtmi/scoring';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
@@ -34,6 +39,9 @@ interface FieldDefForRow {
   normalizationFn: string;
   direction: string;
   scoringRubricJsonb: unknown;
+  /** Methodology v5.0.0 / ADR-031 — needed to look up the parent
+   *  field_value when SCORE_DEPENDENCIES gates the child indicator. */
+  programId: string;
 }
 
 async function readFieldDefForRow(rowId: string): Promise<FieldDefForRow | null> {
@@ -47,6 +55,7 @@ async function readFieldDefForRow(rowId: string): Promise<FieldDefForRow | null>
       normalizationFn: fieldDefinitions.normalizationFn,
       direction: fieldDefinitions.direction,
       scoringRubricJsonb: fieldDefinitions.scoringRubricJsonb,
+      programId: fieldValues.programId,
     })
     .from(fieldDefinitions)
     .innerJoin(fieldValues, eq(fieldValues.fieldDefinitionId, fieldDefinitions.id))
@@ -55,10 +64,35 @@ async function readFieldDefForRow(rowId: string): Promise<FieldDefForRow | null>
   return rows[0] ?? null;
 }
 
-function computeScoreFor(
+/**
+ * Methodology v5.0.0 / ADR-031 — fetch the parent indicator's current
+ * value_normalized for a child with a SCORE_DEPENDENCIES entry. Returns
+ * undefined when the field has no dependency or the parent row is
+ * absent / not approved (the dependency check then short-circuits to
+ * "no parent context" and the child scores normally).
+ */
+async function readParentValueForChild(
+  childKey: string,
+  programId: string
+): Promise<unknown | undefined> {
+  const dep = SCORE_DEPENDENCIES[childKey];
+  if (!dep) return undefined;
+  const rows = await db
+    .select({ valueNormalized: fieldValues.valueNormalized, status: fieldValues.status })
+    .from(fieldValues)
+    .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
+    .where(and(eq(fieldDefinitions.key, dep.parent), eq(fieldValues.programId, programId)))
+    .limit(1);
+  if (rows.length === 0) return undefined;
+  const row = rows[0]!;
+  if (row.status !== 'approved' && row.status !== 'pending_review') return undefined;
+  return row.valueNormalized;
+}
+
+async function computeScoreFor(
   def: FieldDefForRow,
   valueNormalized: unknown
-): { score: string | null; valueNormalized: unknown } {
+): Promise<{ score: string | null; valueNormalized: unknown }> {
   if (valueNormalized === null || valueNormalized === undefined) {
     return { score: null, valueNormalized };
   }
@@ -73,10 +107,12 @@ function computeScoreFor(
       direction: def.direction as FieldDefinitionRecord['direction'],
       scoringRubricJsonb: def.scoringRubricJsonb as FieldDefinitionRecord['scoringRubricJsonb'],
     };
+    const parentValue = await readParentValueForChild(def.key, def.programId);
     const score = scoreSingleIndicator({
       fieldDefinition,
       valueNormalized,
       normalizationParams: PHASE2_PLACEHOLDER_PARAMS,
+      parentValue,
     });
     return { score: score === null ? null : String(score), valueNormalized };
   } catch (err) {
@@ -111,7 +147,7 @@ export async function approveFieldValue(id: string, editedRaw?: string): Promise
           scoringRubricJsonb: def.scoringRubricJsonb,
         });
         update['valueNormalized'] = reNormalized;
-        const { score } = computeScoreFor(def, reNormalized);
+        const { score } = await computeScoreFor(def, reNormalized);
         update['valueIndicatorScore'] = score;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -217,7 +253,7 @@ export async function editApprovedFieldValue(id: string, editedRaw: string): Pro
       scoringRubricJsonb: def.scoringRubricJsonb,
     });
     update['valueNormalized'] = reNormalized;
-    const { score } = computeScoreFor(def, reNormalized);
+    const { score } = await computeScoreFor(def, reNormalized);
     update['valueIndicatorScore'] = score;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

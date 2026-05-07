@@ -7,14 +7,6 @@ import {
   PublishStageImpl,
   ScrapeStageImpl,
   ValidateStageImpl,
-  deriveD12,
-  deriveD13,
-  deriveD14,
-  deriveD22,
-  deriveD23,
-  deriveD24,
-  deriveD31,
-  deriveD33,
   deriveE11,
   deriveE13,
   dynamicTierQuotas,
@@ -27,12 +19,6 @@ import {
   planCanaryCost,
   resetRunCostAggregate,
   scoreProgramFromDb,
-  COUNTRY_CIVIC_TEST_POLICY,
-  COUNTRY_DUAL_CITIZENSHIP_POLICY,
-  COUNTRY_PR_PRESENCE_POLICY,
-  COUNTRY_PR_TIMELINE,
-  COUNTRY_TAX_BASIS,
-  COUNTRY_TAX_RESIDENCY,
   PROGRAM_POLICY_HISTORY,
 } from '@gtmi/extraction';
 import type {
@@ -44,7 +30,7 @@ import type {
   ProvenanceRecord,
   ScrapeResult,
 } from '@gtmi/extraction';
-import { db, blockerDomains, fieldDefinitions, fieldValues, programs } from '@gtmi/db';
+import { db, blockerDomains, fieldDefinitions, programs } from '@gtmi/db';
 import { sql } from 'drizzle-orm';
 import { ACTIVE_FIELD_CODES } from '@gtmi/scoring';
 import {
@@ -53,8 +39,7 @@ import {
   fetchVdemRuleOfLawScore,
   fetchWgiScore,
 } from '../../../scripts/country-sources';
-import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from '@gtmi/extraction';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 const METHODOLOGY_VERSION = '1.0.0';
 const AUTO_APPROVE_CONFIDENCE_THRESHOLD = 0.85;
@@ -397,21 +382,10 @@ export const extractSingleProgram = task({
     }
 
     // --- Stage 2: Batch extract LLM fields. Exclude E.3.2 (always API),
-    // E.3.1 (when V-Dem-handled), and the Pillar D / E derived fields
-    // (Phase 3.6 derive stage owns these — see ADR-016 + ADR-028 + ADR-029).
-    // Pillar A and Pillar B no longer have derived fields. ---
-    const DERIVED_FIELD_KEYS = new Set([
-      'D.1.2',
-      'D.1.3',
-      'D.1.4',
-      'D.2.2',
-      'D.2.3',
-      'D.2.4',
-      'D.3.1',
-      'D.3.3',
-      'E.1.1',
-      'E.1.3',
-    ]);
+    // E.3.1 (when V-Dem-handled), and the E.1.1 / E.1.3 derived fields
+    // (Phase 3.6 derive stage owns these — see ADR-016 + ADR-028 + ADR-029
+    // + ADR-031). Pillars A, B, and D no longer have any derived fields. ---
+    const DERIVED_FIELD_KEYS = new Set(['E.1.1', 'E.1.3']);
     const llmFields: FieldSpec[] = allFieldDefs
       .filter(
         (d) =>
@@ -490,113 +464,12 @@ export const extractSingleProgram = task({
 
     // ── Stage 6.5 — Derive (Phase 3.6 / ADR-016). Pure arithmetic; no LLM.
     {
-      const fieldDefByKey = new Map(allFieldDefs.map((d) => [d.key, d]));
-      async function readApprovedFieldValue(key: string): Promise<{
-        valueRaw: string | null;
-        valueCurrency: string | null;
-        sourceUrl: string | null;
-        sourceSentence: string | null;
-      } | null> {
-        const fd = fieldDefByKey.get(key);
-        if (!fd) return null;
-        const rows = await db
-          .select({
-            valueRaw: fieldValues.valueRaw,
-            provenance: fieldValues.provenance,
-            status: fieldValues.status,
-          })
-          .from(fieldValues)
-          .where(
-            and(eq(fieldValues.programId, programId), eq(fieldValues.fieldDefinitionId, fd.id))
-          )
-          .limit(1);
-        if (rows.length === 0) return null;
-        const row = rows[0]!;
-        if (row.status !== 'approved' && row.status !== 'pending_review') return null;
-        const prov = (row.provenance ?? {}) as Record<string, unknown>;
-        return {
-          valueRaw: row.valueRaw,
-          valueCurrency:
-            typeof prov['valueCurrency'] === 'string' ? (prov['valueCurrency'] as string) : null,
-          sourceUrl: typeof prov['sourceUrl'] === 'string' ? (prov['sourceUrl'] as string) : null,
-          sourceSentence:
-            typeof prov['sourceSentence'] === 'string' ? (prov['sourceSentence'] as string) : null,
-        };
-      }
-      const lookupExtraction = (key: string) => {
-        const r = allExtractionResults.get(key);
-        return r && r.output.valueRaw !== '' ? r : null;
-      };
-
-      const d11Live = lookupExtraction('D.1.1');
-      const d11Db = d11Live ? null : await readApprovedFieldValue('D.1.1');
-      const d11Raw = d11Live?.output.valueRaw ?? d11Db?.valueRaw ?? null;
-      const d11Boolean: boolean | null =
-        d11Raw === null ? null : ['true', 'yes', '1'].includes(d11Raw.toLowerCase().trim());
-
-      // Phase 3.6.4 / FIX 2 — D.1.2 derived from COUNTRY_PR_TIMELINE.
-      const d12PolicyEntry = COUNTRY_PR_TIMELINE[country] ?? null;
-      const d12DerivedResult = deriveD12({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: d12PolicyEntry,
-      });
-      const d12Years: number | null = d12DerivedResult?.numericValue ?? null;
-      const d12SourceUrl: string | null = d12PolicyEntry?.sourceUrl ?? null;
-
-      const d22Result = deriveD22({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        d11Boolean,
-        d12Years,
-        d12SourceUrl,
-        citizenshipResidence: COUNTRY_CITIZENSHIP_RESIDENCE_YEARS[country] ?? null,
-      });
-      // Phase 3.6.1 / FIX 6 — D.2.3 derived-knowledge.
-      const d23Result = deriveD23({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: COUNTRY_DUAL_CITIZENSHIP_POLICY[country] ?? null,
-      });
-
-      // Phase 3.6.2 / ITEM 2 — D.1.3 / D.1.4 country-level derives.
-      // (B.2.4 was retired in methodology v3.0.0 / ADR-029.)
-      const prPresence = COUNTRY_PR_PRESENCE_POLICY[country] ?? null;
-      const d13Result = deriveD13({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: prPresence,
-      });
-      const d14Result = deriveD14({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: prPresence,
-      });
-
-      // Phase 3.9 / W21 — country-level D.2.4 / D.3.1 / D.3.3 derives.
-      const d24Result = deriveD24({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: COUNTRY_CIVIC_TEST_POLICY[country] ?? null,
-      });
-      const d31Result = deriveD31({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: COUNTRY_TAX_RESIDENCY[country] ?? null,
-      });
-      const d33Result = deriveD33({
-        programId,
-        countryIso: country,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: COUNTRY_TAX_BASIS[country] ?? null,
-      });
+      // Methodology v5.0.0 (ADR-031) — all 8 Pillar D deriveDxx calls
+      // removed. D.1.2 / D.2.2 / D.2.3 are LLM-extracted; D.1.3 / D.1.4 /
+      // D.2.4 / D.3.1 / D.3.3 retired. Country-data modules
+      // (COUNTRY_PR_TIMELINE, COUNTRY_DUAL_CITIZENSHIP_POLICY, etc.) are
+      // retained as analyst reference but no longer plumbed into the
+      // orchestrator.
 
       // Phase 3.9 / W20 — E.1.3 (program age) + E.1.1 (severity-weighted
       // policy-change count). E.1.3 reads programs.launch_year; load
@@ -621,18 +494,7 @@ export const extractSingleProgram = task({
         history: PROGRAM_POLICY_HISTORY[programId] ?? null,
       });
 
-      for (const derived of [
-        d12DerivedResult,
-        d22Result,
-        d23Result,
-        d13Result,
-        d14Result,
-        d24Result,
-        d31Result,
-        d33Result,
-        e13Result,
-        e11Result,
-      ]) {
+      for (const derived of [e13Result, e11Result]) {
         if (!derived) continue;
         try {
           await publish.executeDerived(derived.extraction, derived.provenance);

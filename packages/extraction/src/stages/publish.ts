@@ -73,9 +73,8 @@ export const NUMERIC_SANITY_RANGES: Record<string, { min: number; max: number }>
   'B.2.2': { min: 0, max: 20 }, // mandatory in-person touchpoints
   'B.3.1': { min: 0, max: 1_000_000 }, // total applicant cost USD (principal + 1 spouse + 2 children)
   'C.2.2': { min: 0, max: 100 }, // dependent child age cap (use no_cap token if no upper limit)
-  'D.1.2': { min: 0, max: 50 }, // years to PR
-  'D.2.2': { min: 0, max: 99 }, // years to citizenship
-  'D.3.1': { min: 0, max: 366 }, // tax residency trigger days
+  'D.1.2': { min: 0, max: 50 }, // years to PR (or "not_applicable" sentinel when D.1.1=false)
+  'D.2.2': { min: 0, max: 50 }, // total years to citizenship (or "not_applicable" sentinel when D.2.1=false)
   'E.1.1': { min: 0, max: 1000 }, // policy changes count (severity-weighted)
   'E.1.3': { min: 0, max: 200 }, // program age in years
   'E.3.1': { min: -5, max: 5 }, // V-Dem / WGI rule of law
@@ -206,7 +205,8 @@ export function validateBooleanWithAnnotationShape(
 // normalisationFn-aware: boolean_with_annotation rows JSON-parse valueRaw
 // into the structured object; boolean rows map the "permitted" /
 // "not_permitted" rubric strings to true / false. min_max / z_score
-// fields keep the numeric path (used by deriveD22).
+// fields keep the numeric path. (Pillar D deriveDxx functions all
+// removed in methodology v5.0.0 / ADR-031.)
 function normalizeDerivedValueRaw(
   valueRaw: string,
   normalizationFn: string

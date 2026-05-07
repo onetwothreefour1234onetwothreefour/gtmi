@@ -120,163 +120,12 @@ export const PHASE_3_3_PROMPT_OVERRIDES: Record<string, string> = {
   // ────────────────────────────────────────────────────────────────────
 
   // ────────────────────────────────────────────────────────────────────
-  // D.2.3 — Negative-match: country's general dual-citizenship policy
-  // is rarely on the visa page itself.
+  // Pillar D overrides removed in methodology v5.0.0 — the entire
+  // Pillar D indicator set has been restructured (D dropped from 11 to
+  // 5 indicators, sub-factor D.3 retired). The prompts in
+  // methodology-v1.ts are now the canonical source of truth for every
+  // Pillar D field (no Phase 3.3 overlay). See ADR-031.
   // ────────────────────────────────────────────────────────────────────
-  'D.2.3': withPreamble(
-    `Extraction Task: D.2.3 — Dual citizenship permitted
-Question: Does the country permit dual or multiple citizenship for naturalizing applicants from this program?
-
-Recall hints:
-
-If the page is a citizenship-eligibility page on the official immigration domain, the dual-citizenship answer is usually stated nearby. Common phrases:
-  * "Canada permits dual citizenship" → true.
-  * "Australia permits dual or multiple citizenship" → true.
-  * "United Kingdom permits dual citizenship" → true.
-  * "Singapore does not generally permit dual citizenship for adult naturalised citizens" → false.
-  * "Hong Kong applies the People's Republic of China nationality law" — Mainland Chinese rule disallows dual; for non-Chinese applicants the practical answer differs.
-If the source explicitly mentions a renunciation requirement (must renounce previous citizenship), → false unless the country's law makes the renunciation purely formal.
-
-Edge cases:
-
-"Permitted in practice but requires renunciation formalism not enforced" is true only if source explicitly acknowledges this.
-If the page is silent and you cannot find a statement on the same official-immigration domain, return empty with notes "country's dual-citizenship rule not stated on this page".`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // D.2.4 — Recall: add CLB (Canadian Language Benchmark) mapping.
-  // ────────────────────────────────────────────────────────────────────
-  'D.2.4': withPreamble(
-    `Extraction Task: D.2.4 — Civic, language, integration test burden for citizenship
-Question: How burdensome are the civic, language, or integration tests required for citizenship from this track?
-Allowed values:
-
-"none": no test required.
-"light": single test of single type (language A2/B1 OR short civics quiz).
-"moderate": multiple tests or one substantial test (language B2+ and civics).
-"heavy": multiple substantial tests including language above B2, civics, and integration/history.
-
-Recall hints:
-
-CEFR levels (A1, A2, B1, B2, C1, C2) are rarely stated by name on government pages. Use these mappings:
-  * Canadian Language Benchmark (CLB): CLB 4 ≈ A2/B1; CLB 5–6 ≈ B1/B2; CLB 7+ ≈ B2/C1. Canadian citizenship requires CLB 4 → "light" before adding civics.
-  * IELTS bands: IELTS 4 ≈ A2/B1 → light; IELTS 6 ≈ B2 → moderate; IELTS 7+ ≈ C1 → heavy.
-  * "basic English" / "everyday English" / "functional English" → A2/B1 → light if it's the only test.
-  * "good knowledge of English" / "competent English" / TOEFL ~80 → B2 → moderate.
-  * "advanced English" / TOEFL 100+ → C1+ → heavy.
-Civics tests by name:
-  * "Life in the UK Test" — civics test.
-  * "Australian citizenship test" — civics test.
-  * "Discover Canada" study guide + citizenship test — civics test.
-  * "naturalisation test" / "civics test" generally → civics test.
-If both a language requirement AND a civics test are required, the answer is at least "moderate".
-
-Edge cases:
-
-Exemptions for age/disability do not change category.
-If citizenship is not available from this track, return empty.
-If the source describes only "must understand basic English" with no civics test mentioned, return "light".
-Canadian citizenship: CLB 4 + Discover Canada citizenship test = "moderate" (two distinct tests).`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // D.3.1 — Recall: "183-day common-law test" pattern is universal but
-  // not always tagged as "tax residency trigger".
-  // ────────────────────────────────────────────────────────────────────
-  'D.3.1': withPreamble(
-    `Extraction Task: D.3.1 — Tax residency trigger (days/year)
-Question: How many days of physical presence trigger full tax residency (worldwide income taxation)?
-
-Recall hints:
-
-Common phrasings (all positive evidence — extract the day count):
-  * "An individual is a [Country] tax resident if they are physically present for [X] days or more in a calendar year."
-  * "183-day rule", "183 days or more", "more than 183 days".
-  * "[X] days in any 12-month period".
-  * "Substantial presence test" (US-style): primary day-count is 183 (3-year weighted) — extract 183 with a note about weighting.
-  * "Significant residential ties test" (Canada): not a pure day count — extract 183 (the secondary day-count threshold) with notes about the residential-ties test.
-For Singapore: "physically present in Singapore for 183 days or more" → 183.
-For UK: Statutory Residence Test — automatic UK residence at 183 days; report 183 with a note about ties tests.
-For Australia: 183-day test (any 12-month period) → 183.
-For Hong Kong: territorial system — see edge case below.
-
-Edge cases:
-
-If test is non-pure-day-count (substantial presence with prior-year weighting, center of vital interests), report primary day-count threshold (almost always 183) and describe additional test in notes.
-If taxed territorially regardless of presence, return null with notes "territorial regime — see D.3.3" (Hong Kong, Singapore at the foreign-source level).
-If the page is silent on the day-count test but asserts the country has a residence-based system, return 183 only if you find the trigger elsewhere on the same authority.`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // D.3.2 — Negative-match: model returns empty for "no special regime"
-  // case rather than "none".
-  // ────────────────────────────────────────────────────────────────────
-  'D.3.2': withPreamble(
-    `Extraction Task: D.3.2 — Special regime available
-Question: What special/preferential tax regime, if any, is available to holders of this visa?
-Allowed values:
-
-"none": no special regime available to holders of this program.
-"time_limited_bonus": fixed-term reduction/exemption (e.g., 30% expat ruling for 5 years).
-"time_limited_flat_rate": fixed-term flat/lump-sum tax regime (e.g., Italy's 100k flat tax).
-"non_dom": regime exempting foreign-source income, typically domicile-based.
-"indefinite_preferential": preferential regime for duration of residence, no time cap.
-
-Recall hints:
-
-If the source clearly addresses tax treatment for this visa class and describes no special regime, return "none" — do not return empty.
-Named regimes to recognize as positive evidence for the non-"none" categories:
-  * "Australian temporary resident foreign-income exemption" (482 holders) → "non_dom" (foreign-source income exempt while a temp resident).
-  * "UK non-dom remittance basis" (pre-2025 rules) → "non_dom".
-  * "Italy 100k flat tax" → "time_limited_flat_rate".
-  * "Spain Beckham law" → "time_limited_bonus".
-  * "Netherlands 30%-ruling" → "time_limited_bonus".
-  * "Portugal NHR (legacy / replacement)" → varies; note specifics.
-  * "Singapore — no special regime; territorial system applies generally" → "none".
-  * "Canada — no special regime for new arrivals" → "none".
-
-Edge cases:
-
-If regime is general (not tied to this visa) but accessible to holders, it qualifies; note eligibility conditions.
-If the page does not address tax at all, return empty (this is ABSENT, not "none").
-"Tax holiday" for specific industries is NOT a personal tax regime.`
-  ),
-
-  // ────────────────────────────────────────────────────────────────────
-  // D.3.3 — Recall: Canada/Australia/UK/most OECD = worldwide; HK/SGP =
-  // territorial. Most pages don't use the exact word "worldwide".
-  // ────────────────────────────────────────────────────────────────────
-  'D.3.3': withPreamble(
-    `Extraction Task: D.3.3 — Territorial vs. worldwide taxation for residents
-Question: What is the scope of taxation for tax residents?
-Allowed values:
-
-"worldwide": residents taxed on worldwide income.
-"worldwide_with_remittance_basis": worldwide in principle but foreign income taxed only if remitted.
-"territorial": residents taxed only on domestic-source income.
-"hybrid": specific income types territorial, others worldwide.
-
-Recall hints:
-
-Country defaults to look up if the page mentions any of:
-  * Canada / Australia / UK (post-2025) / USA / NZ / most OECD members → "worldwide".
-  * Hong Kong / Singapore (foreign-sourced not remitted) → "territorial".
-  * UK pre-April 2025 (non-dom remittance basis) → "worldwide_with_remittance_basis".
-  * Malaysia → "territorial" generally; some hybrid carve-outs.
-Phrases that map to worldwide:
-  * "Canadian residents are taxed on their worldwide income"
-  * "you must report income from all sources, both inside and outside [Country]"
-  * "global income subject to tax"
-Phrases that map to territorial:
-  * "only [Country]-source income is taxable"
-  * "foreign-source income is not taxed"
-  * "income earned outside [Country] is generally exempt"
-
-Edge cases:
-
-If source distinguishes by domicile (UK pre-2025 style), report rule for typical new entrant on this visa and explain.
-If the page is silent on income-source treatment but references the country's general rule, apply the country default (above) and lower confidence to ≤ 0.6.`
-  ),
 
   // ────────────────────────────────────────────────────────────────────
   // E.1.1 — Format / date-filter: tighten 5-year window enforcement.
@@ -481,6 +330,10 @@ interface IndicatorRestructure {
   extractionPromptMd: string;
 }
 
+// Methodology v5.0.0 / ADR-031 — orphaned alongside C32_REGIONAL_RUBRIC
+// after the last boolean_with_annotation field (D.1.4) retired.
+// Retained dormant pending ADR-032 cleanup.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const STRUCTURED_BOOL_RUBRIC = {
   categories: [
     { value: 'true', score: 0, description: 'requirement / charge present (penalised)' },
@@ -526,67 +379,14 @@ const C32_REGIONAL_RUBRIC = {
 };
 
 export const PHASE_3_5_INDICATOR_RESTRUCTURES: Record<string, IndicatorRestructure> = {
-  // B.2.3 / B.2.4 boolean_with_annotation restructures removed in
-  // methodology v3.0.0 — those Pillar B keys are retired (ADR-029).
-  // The boolean_with_annotation pattern is still in force for D.1.3 / D.1.4.
-
-  'D.1.3': {
-    dataType: 'json',
-    normalizationFn: 'boolean_with_annotation',
-    direction: 'lower_is_better',
-    scoringRubricJsonb: STRUCTURED_BOOL_RUBRIC,
-    extractionPromptMd: withPreamble(
-      `Extraction Task: D.1.3 — Physical presence requirement during PR accrual (boolean+annotation)
-Question: Does this programme require the visa holder to physically be present in the country for some minimum number of days each year for that year to count toward PR-qualifying time?
-
-Return value: a JSON object with this exact shape:
-  { "required": boolean, "daysPerYear": number | null, "notes": string | null }
-
-Recall hints:
-
-If the page describes a physical-presence rule during accrual, set required=true and populate daysPerYear with the figure.
-If the page describes the rule as "no more than X days outside the country", convert to required=true and daysPerYear = 365 - X.
-If presence is not required during accrual (rare for talent visas), set required=false, daysPerYear=null.
-
-Edge cases:
-
-If the source is silent on accrual presence specifically but states a per-year retention rule (D.1.4), do NOT conflate the two — return null/null with notes "accrual rule not stated; D.1.4 retention rule documented separately".
-notes can include qualifying-period framing ("e.g. 1,095 days within 5 years for Canada citizenship-from-PR" → required=true, daysPerYear=219).`
-    ),
-  },
-
-  'D.1.4': {
-    dataType: 'json',
-    normalizationFn: 'boolean_with_annotation',
-    direction: 'lower_is_better',
-    scoringRubricJsonb: STRUCTURED_BOOL_RUBRIC,
-    extractionPromptMd: withPreamble(
-      `Extraction Task: D.1.4 — PR retention rules (boolean+annotation)
-Question: After PR is granted, does this programme require the holder to maintain physical presence to keep PR status?
-
-Return value: a JSON object with this exact shape:
-  { "required": boolean, "daysPerYear": number | null, "notes": string | null }
-
-Recall hints:
-
-Common patterns to extract:
-  * Canada: PR holders must be in Canada at least 730 days in any 5-year period → required=true, daysPerYear=146 (730/5), notes "730 days in 5 years (rolling)".
-  * Australia: 5-year travel facility on PR; must apply for resident return visa to re-enter after 5 years → required=true, daysPerYear=null (binary travel-facility model), notes "RRV required after 5 years out".
-  * UK ILR: lapses if absent from UK for 2 consecutive years → required=true, daysPerYear=null, notes "ILR lapses after 2 years' absence".
-If PR is not available from this programme, return required=false, daysPerYear=null, notes "PR not available".
-
-Edge cases:
-
-If the page mentions PR as a pathway endpoint but does NOT describe the retention rule, return null/null/null with notes "retention rule not on this page".`
-    ),
-  },
-
-  // C.3.2 country_substitute_regional restructure removed in methodology
-  // v4.0.0 — new C.3.2 is a plain categorical (full / partial / none)
-  // extracted directly from the page. The country_substitute_regional
-  // infrastructure (REGIONAL_SUBSTITUTES, executeCountrySubstitute,
-  // engine branch) is left in place dormant and will be cleaned up in a
-  // follow-up PR. See ADR-030.
+  // Methodology v5.0.0 (ADR-031): the entire PHASE_3_5_INDICATOR_RESTRUCTURES
+  // map is empty.
+  //   - B.2.3 / B.2.4 retired in v3.0.0 (ADR-029)
+  //   - C.3.2 country_substitute_regional reverted to plain categorical in v4.0.0 (ADR-030)
+  //   - D.1.3 / D.1.4 retired in v5.0.0 (ADR-031)
+  //
+  // The boolean_with_annotation and country_substitute_regional engine
+  // infrastructure is left in place dormant; cleanup deferred to ADR-032.
 };
 
 /**

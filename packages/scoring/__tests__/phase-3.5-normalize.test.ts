@@ -11,89 +11,21 @@ import { ScoringError } from '../src/types';
 // Phase 3.5 / ADR-014 — normalizer tests for boolean_with_annotation
 // and country_substitute_regional.
 
-describe('Phase 3.5 — normalizeBooleanWithAnnotation', () => {
-  // D.1.3 / D.1.4 use direction='lower_is_better' (presence of a
-  // physical-presence requirement is a penalty), so true → 0 and
-  // false → 100. (B.2.3 and B.2.4 were retired in methodology v3.0.0
-  // / ADR-029.)
+describe('Phase 3.5 — normalizeBooleanWithAnnotation (dormant under v5.0.0)', () => {
+  // D.1.3 / D.1.4 (last production users) retired in methodology v5.0.0
+  // (ADR-031). BOOLEAN_WITH_ANNOTATION_KEYS map is now empty; the
+  // normalizer + engine branch are dormant pending ADR-032 cleanup. The
+  // single regression test below verifies the dormant code still
+  // produces the documented "no boolean key registered" error so a
+  // future re-introduction has a clear contract.
 
-  it('D.1.3 required=true (with daysPerYear) → 0', () => {
-    expect(
-      normalizeBooleanWithAnnotation(
-        { required: true, daysPerYear: 219, notes: '1,095 days in 5 years' },
-        'D.1.3',
-        'lower_is_better'
-      )
-    ).toBe(0);
-  });
-
-  it('D.1.3 required=false → 100', () => {
-    expect(
-      normalizeBooleanWithAnnotation(
-        { required: false, daysPerYear: null, notes: null },
-        'D.1.3',
-        'lower_is_better'
-      )
-    ).toBe(100);
-  });
-
-  it('D.1.4 required=true → 0', () => {
-    expect(
-      normalizeBooleanWithAnnotation(
-        { required: true, daysPerYear: 146, notes: '730 days in 5 years (rolling)' },
-        'D.1.4',
-        'lower_is_better'
-      )
-    ).toBe(0);
-  });
-
-  it('D.1.4 required=false → 100', () => {
-    expect(
-      normalizeBooleanWithAnnotation(
-        { required: false, daysPerYear: null, notes: 'PR not available from this track' },
-        'D.1.4',
-        'lower_is_better'
-      )
-    ).toBe(100);
-  });
-
-  it('respects higher_is_better direction (sanity check)', () => {
-    expect(
-      normalizeBooleanWithAnnotation(
-        { required: true, daysPerYear: null, notes: null },
-        'D.1.3',
-        'higher_is_better'
-      )
-    ).toBe(100);
-    expect(
-      normalizeBooleanWithAnnotation(
-        { required: false, daysPerYear: null, notes: null },
-        'D.1.3',
-        'higher_is_better'
-      )
-    ).toBe(0);
-  });
-
-  it('throws when fieldKey is not registered', () => {
+  it('throws when fieldKey is not registered (no Pillar D fields registered under v5.0.0)', () => {
+    expect(() =>
+      normalizeBooleanWithAnnotation({ value: true }, 'D.1.3', 'lower_is_better')
+    ).toThrow(/no boolean key registered/);
     expect(() =>
       normalizeBooleanWithAnnotation({ value: true }, 'X.0.0', 'lower_is_better')
     ).toThrow(ScoringError);
-  });
-
-  it('throws when the registered boolean key is missing from the parsed object', () => {
-    expect(() =>
-      normalizeBooleanWithAnnotation({ notes: 'orphan' }, 'D.1.3', 'lower_is_better')
-    ).toThrow(/expects "required: boolean"/);
-  });
-
-  it('throws when the registered boolean key is non-boolean', () => {
-    expect(() =>
-      normalizeBooleanWithAnnotation(
-        { required: 'yes', daysPerYear: null, notes: null },
-        'D.1.3',
-        'lower_is_better'
-      )
-    ).toThrow(/expects "required: boolean"/);
   });
 });
 

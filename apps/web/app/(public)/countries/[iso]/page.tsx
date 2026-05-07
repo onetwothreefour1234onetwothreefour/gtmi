@@ -4,7 +4,6 @@ import {
   CountryHeader,
   CountryProgramsTable,
   CountryRadar,
-  TaxTreatmentCard,
   EmptyState,
   DataTableNote,
   PreviewBanner,
@@ -179,15 +178,13 @@ export default async function CountryDetailPage({ params }: PageProps) {
             className="serif"
             style={{ fontSize: 32, fontWeight: 400, margin: 0, letterSpacing: '-0.02em' }}
           >
-            How the country taxes visa-holder income.
+            Tax data is no longer part of the GTMI methodology.
           </h2>
           <p className="mt-2 max-w-prose text-ink-3">
-            Aggregated from indicators D.3.2 (special regime availability) and D.3.3 (territorial vs
-            worldwide taxation) across this country&rsquo;s programmes.
+            Methodology v5.0.0 (ADR-031) removed Pillar D&rsquo;s tax sub-factor (D.3). The GTMI now
+            measures only PR and citizenship pathways under Pillar D. For host-country tax
+            treatment, refer to the country&rsquo;s tax authority directly.
           </p>
-          <div className="mt-6">
-            <TaxTreatmentCard tax={detail.tax} taxAuthorityUrl={detail.header.taxAuthorityUrl} />
-          </div>
         </div>
       </section>
 

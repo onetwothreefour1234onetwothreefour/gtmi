@@ -9,14 +9,6 @@ import {
   captureException,
   formatRunCostSummary,
   resetRunCostAggregate,
-  deriveD12,
-  deriveD13,
-  deriveD14,
-  deriveD22,
-  deriveD23,
-  deriveD24,
-  deriveD31,
-  deriveD33,
   deriveE11,
   deriveE13,
   dynamicTierQuotas,
@@ -30,12 +22,6 @@ import {
   mergeDiscoveredUrls,
   planCanaryCost,
   scoreProgramFromDb,
-  COUNTRY_CIVIC_TEST_POLICY,
-  COUNTRY_DUAL_CITIZENSHIP_POLICY,
-  COUNTRY_PR_PRESENCE_POLICY,
-  COUNTRY_PR_TIMELINE,
-  COUNTRY_TAX_BASIS,
-  COUNTRY_TAX_RESIDENCY,
   PROGRAM_POLICY_HISTORY,
 } from '@gtmi/extraction';
 import type {
@@ -47,7 +33,7 @@ import type {
   ProvenanceRecord,
   ScrapeResult,
 } from '@gtmi/extraction';
-import { db, fieldDefinitions, fieldValues, programs } from '@gtmi/db';
+import { db, fieldDefinitions, programs } from '@gtmi/db';
 import { sql } from 'drizzle-orm';
 import { ACTIVE_FIELD_CODES } from '@gtmi/scoring';
 import {
@@ -57,8 +43,6 @@ import {
   fetchWgiScore,
   ISO3_TO_ISO2,
 } from './country-sources';
-import { COUNTRY_CITIZENSHIP_RESIDENCE_YEARS } from '@gtmi/extraction';
-import { and } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import { createHash } from 'crypto';
 
@@ -715,13 +699,11 @@ async function main() {
 
     // E.3.2 (WGI GE.EST) and E.3.1 (WGI RL.EST when PHASE3_VDEM_ENABLED) are
     // handled via direct World Bank API — exclude both from the LLM batch.
-    // D.2.2 and the country/policy-derived rows are computed by the derive
-    // stage (Phase 3.6 / ADR-016) — exclude them too so the LLM doesn't
-    // produce a competing low-confidence row that would overwrite the
-    // derived row. Pillar A and Pillar B no longer have derived fields
-    // (methodology v2.0.0 / v3.0.0; ADR-028 / ADR-029).
+    // E.1.1 / E.1.3 are derived (severity-weighted policy changes + program
+    // age). Pillars A, B, C, D have no derived fields under methodology
+    // v5.0.0 (ADR-028 / ADR-029 / ADR-030 / ADR-031).
     const e31HandledByVdemPath = PHASE3_VDEM_ENABLED && vdemResult !== null;
-    const DERIVED_FIELD_KEYS = new Set(['D.1.2', 'D.2.2', 'D.2.3', 'D.1.3', 'D.1.4']);
+    const DERIVED_FIELD_KEYS = new Set<string>();
     // Phase 3.9 / W12 — modeFieldSet supersedes the legacy
     // targetedMissingSet. Both `narrow` and the gate-failed /
     // rubric-changed / field modes restrict the LLM batch.
@@ -930,133 +912,13 @@ async function main() {
       }
     }
 
-    // ── Stage 6.5 — Derive (Phase 3.6 / ADR-016, Pillar A portion superseded
-    // by methodology v2.0.0). Pure arithmetic; no LLM. Computes D.2.2 and
-    // the country/policy-derived rows from already-extracted inputs +
-    // static lookup tables. Skip conditions return null and emit a one-
-    // line log. Successful derived rows are written to field_values with
-    // status='pending_review' (confidence 0.6, never auto-approves).
+    // ── Stage 6.5 — Derive (Phase 3.6 / ADR-016; A/B/D portions superseded
+    // by ADR-028 / ADR-029 / ADR-031). Pure arithmetic; no LLM. Under
+    // methodology v5.0.0 only E.1.1 (severity-weighted policy changes)
+    // and E.1.3 (program age) remain derived. Successful derived rows
+    // are written to field_values with status='pending_review'
+    // (confidence 0.6, never auto-approves).
     {
-      // Resolve D.1.1 / D.1.2 from the extraction map first; fall back to
-      // existing approved field_values rows if the current run didn't
-      // re-extract them.
-      const lookupExtraction = (key: string) => {
-        const r = allExtractionResults.get(key);
-        return r && r.output.valueRaw !== '' ? r : null;
-      };
-
-      const fieldDefByKey = new Map(allFieldDefs.map((d) => [d.key, d]));
-      async function readApprovedFieldValue(key: string): Promise<{
-        valueRaw: string | null;
-        valueCurrency: string | null;
-        sourceUrl: string | null;
-        sourceSentence: string | null;
-        valueNormalized: unknown;
-      } | null> {
-        const fd = fieldDefByKey.get(key);
-        if (!fd) return null;
-        const rows = await db
-          .select({
-            valueRaw: fieldValues.valueRaw,
-            provenance: fieldValues.provenance,
-            valueNormalized: fieldValues.valueNormalized,
-            status: fieldValues.status,
-          })
-          .from(fieldValues)
-          .where(
-            and(eq(fieldValues.programId, programId), eq(fieldValues.fieldDefinitionId, fd.id))
-          )
-          .limit(1);
-        if (rows.length === 0) return null;
-        const row = rows[0]!;
-        if (row.status !== 'approved' && row.status !== 'pending_review') return null;
-        const prov = (row.provenance ?? {}) as Record<string, unknown>;
-        return {
-          valueRaw: row.valueRaw,
-          valueCurrency:
-            typeof prov['valueCurrency'] === 'string' ? (prov['valueCurrency'] as string) : null,
-          sourceUrl: typeof prov['sourceUrl'] === 'string' ? (prov['sourceUrl'] as string) : null,
-          sourceSentence:
-            typeof prov['sourceSentence'] === 'string' ? (prov['sourceSentence'] as string) : null,
-          valueNormalized: row.valueNormalized,
-        };
-      }
-
-      // D.1.1 — boolean.
-      const d11Live = lookupExtraction('D.1.1');
-      const d11Db = d11Live ? null : await readApprovedFieldValue('D.1.1');
-      const d11Raw = d11Live?.output.valueRaw ?? d11Db?.valueRaw ?? null;
-      const d11Boolean: boolean | null =
-        d11Raw === null ? null : ['true', 'yes', '1'].includes(d11Raw.toLowerCase().trim());
-
-      // D.1.2 — years to PR. Phase 3.6.4 / FIX 2: D.1.2 is now derived
-      // from COUNTRY_PR_TIMELINE rather than LLM-extracted (unreliable
-      // because the rule lives on PR-authority pages, not the visa page).
-      // The derived D.1.2 result feeds deriveD22 below.
-      const d12PolicyEntry = COUNTRY_PR_TIMELINE[countryIso] ?? null;
-      const d12DerivedResult = deriveD12({
-        programId,
-        countryIso,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: d12PolicyEntry,
-      });
-      const d12Years: number | null = d12DerivedResult?.numericValue ?? null;
-      const d12SourceUrl: string | null = d12PolicyEntry?.sourceUrl ?? null;
-
-      const d22Result = deriveD22({
-        programId,
-        countryIso,
-        methodologyVersion: METHODOLOGY_VERSION,
-        d11Boolean,
-        d12Years,
-        d12SourceUrl,
-        citizenshipResidence: COUNTRY_CITIZENSHIP_RESIDENCE_YEARS[countryIso] ?? null,
-      });
-      // Phase 3.6.1 / FIX 6 — D.2.3 derived-knowledge from country
-      // citizenship-policy lookup. Skips when permitted is null.
-      const d23Result = deriveD23({
-        programId,
-        countryIso,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: COUNTRY_DUAL_CITIZENSHIP_POLICY[countryIso] ?? null,
-      });
-
-      // Phase 3.6.2 / ITEM 2 — D.1.3 / D.1.4 country-level derives.
-      // (B.2.4 was retired in methodology v3.0.0 / ADR-029.)
-      const prPresence = COUNTRY_PR_PRESENCE_POLICY[countryIso] ?? null;
-      const d13Result = deriveD13({
-        programId,
-        countryIso,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: prPresence,
-      });
-      const d14Result = deriveD14({
-        programId,
-        countryIso,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: prPresence,
-      });
-
-      // Phase 3.9 / W21 — country-level D.2.4 / D.3.1 / D.3.3 derives.
-      const d24Result = deriveD24({
-        programId,
-        countryIso,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: COUNTRY_CIVIC_TEST_POLICY[countryIso] ?? null,
-      });
-      const d31Result = deriveD31({
-        programId,
-        countryIso,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: COUNTRY_TAX_RESIDENCY[countryIso] ?? null,
-      });
-      const d33Result = deriveD33({
-        programId,
-        countryIso,
-        methodologyVersion: METHODOLOGY_VERSION,
-        policy: COUNTRY_TAX_BASIS[countryIso] ?? null,
-      });
-
       // Phase 3.9 / W20 — E.1.3 (program age) + E.1.1 (severity-weighted
       // policy-change count). E.1.3 reads launch_year from the programs
       // table; E.1.1 reads from the per-program policy-history lookup.
@@ -1074,18 +936,7 @@ async function main() {
         history: PROGRAM_POLICY_HISTORY[programId] ?? null,
       });
 
-      for (const derived of [
-        d12DerivedResult,
-        d22Result,
-        d23Result,
-        d13Result,
-        d14Result,
-        d24Result,
-        d31Result,
-        d33Result,
-        e13Result,
-        e11Result,
-      ]) {
+      for (const derived of [e13Result, e11Result]) {
         if (!derived) continue;
         try {
           await publish.executeDerived(derived.extraction, derived.provenance);

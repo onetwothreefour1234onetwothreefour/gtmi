@@ -71,12 +71,21 @@ export function normalizeRawValue(
     case 'min_max':
     case 'z_score': {
       // Phase 3.6.3 / FIX 4 — numeric "no limit" sentinel handling. Fields
-      // like A.3.3 (applicant age cap) encode "no cap" as 999 / "none" /
+      // like A.1.5 (applicant age cap) encode "no cap" as 999 / "none" /
       // "no_cap" / "no_limit". Passing 999 through min_max would distort
       // the cohort max. Return the structured NO_LIMIT_MARKER instead;
       // the engine short-circuits to 100/0 based on direction.
       if (isNumericNoLimitSentinel(valueRaw)) {
         return { ...NO_LIMIT_MARKER };
+      }
+      // Methodology v5.0.0 / ADR-031 — conditional zero-scoring sentinel.
+      // For pathway-dependent numerics (D.1.2, D.2.2) the LLM emits the
+      // 'not_applicable' token when the parent boolean is false. Convert
+      // to the existing notApplicable marker; the engine's
+      // SCORE_DEPENDENCIES check overrides the marker's null behaviour
+      // to score 0 when the parent gate fires.
+      if (valueRaw.trim().toLowerCase() === 'not_applicable') {
+        return { notApplicable: true, reason: 'pathway unavailable' };
       }
       const cleaned = valueRaw.replace(/[$,\s%]/g, '');
       const n = parseFloat(cleaned);

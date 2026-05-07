@@ -3,13 +3,7 @@ import { db } from '@gtmi/db';
 import { unstable_cache } from 'next/cache';
 import { sql } from 'drizzle-orm';
 import type { PillarKey } from '@/lib/theme';
-import { aggregateTaxTreatment, type FieldValueAggregate } from './country-detail-helpers';
-import type {
-  CountryDetail,
-  CountryHeader,
-  CountryProgramRow,
-  CountryTaxTreatment,
-} from './country-detail-types';
+import type { CountryDetail, CountryHeader, CountryProgramRow } from './country-detail-types';
 
 const FIELDS_TOTAL = 48;
 
@@ -40,12 +34,6 @@ interface ProgramRowRaw {
 interface AggMetaRow {
   lastVerifiedAt: Date | null;
   sourcesTracked: number;
-}
-
-interface TaxFieldRow {
-  fieldKey: string;
-  valueRaw: string | null;
-  status: string;
 }
 
 function toNumber(v: string | null): number | null {
@@ -128,23 +116,13 @@ async function fetchCountryDetail(iso: string): Promise<CountryDetail | null> {
     WHERE p.country_iso = ${isoUpper}
   `;
 
-  const taxFieldsSql = sql`
-    SELECT
-      fd.key            AS "fieldKey",
-      fv.value_raw      AS "valueRaw",
-      fv.status         AS status
-    FROM programs p
-    INNER JOIN field_values fv ON fv.program_id = p.id
-    INNER JOIN field_definitions fd ON fd.id = fv.field_definition_id
-    WHERE p.country_iso = ${isoUpper}
-      AND fd.key IN ('D.3.2', 'D.3.3')
-  `;
+  // Tax-treatment query (D.3.2 + D.3.3) removed in methodology v5.0.0
+  // (ADR-031). Pillar D no longer measures tax.
 
-  const [headerRaw, programsRaw, aggMetaRaw, taxRaw] = await Promise.all([
+  const [headerRaw, programsRaw, aggMetaRaw] = await Promise.all([
     db.execute(headerSql),
     db.execute(programsSql),
     db.execute(aggMetaSql),
-    db.execute(taxFieldsSql),
   ]);
 
   const headerRows = headerRaw as unknown as HeaderRow[];
@@ -168,14 +146,6 @@ async function fetchCountryDetail(iso: string): Promise<CountryDetail | null> {
     phase2Placeholder: r.phase2Placeholder === true,
   }));
 
-  const taxRows = taxRaw as unknown as TaxFieldRow[];
-  const taxAggregates: FieldValueAggregate[] = taxRows.map((r) => ({
-    fieldKey: r.fieldKey,
-    valueRaw: r.valueRaw,
-    status: r.status,
-  }));
-  const tax: CountryTaxTreatment = aggregateTaxTreatment(taxAggregates, programs.length);
-
   const header: CountryHeader = {
     iso: h.iso,
     name: h.name,
@@ -190,7 +160,7 @@ async function fetchCountryDetail(iso: string): Promise<CountryDetail | null> {
     sourcesTracked: aggMeta.sourcesTracked,
   };
 
-  return { header, programs, tax };
+  return { header, programs };
 }
 
 export const getCountryDetail = (iso: string) =>

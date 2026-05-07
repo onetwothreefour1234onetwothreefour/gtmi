@@ -59,18 +59,15 @@ describe('migration 00010 — methodology v2 column reconciliation', () => {
     );
   });
 
-  it('seed source-of-truth agrees with the surviving boolean_with_annotation overrides', () => {
-    // Methodology v3.0.0 (ADR-029) retired B.2.3 and B.2.4. The historical
-    // SQL in migration 00010 is preserved as-is; only D.1.3 / D.1.4 remain
-    // active in the seed.
-    for (const key of ['D.1.3', 'D.1.4']) {
-      const r = PHASE_3_5_INDICATOR_RESTRUCTURES[key];
-      expect(r, `seed entry missing for ${key}`).toBeDefined();
-      expect(r!.normalizationFn).toBe('boolean_with_annotation');
-      expect(r!.dataType).toBe('json');
-    }
+  it('all four boolean_with_annotation overrides are removed in methodology v5.0.0 (ADR-031)', () => {
+    // The historical SQL in migration 00010 is preserved as-is. The
+    // seed-side PHASE_3_5_INDICATOR_RESTRUCTURES map is empty:
+    //   - B.2.3 / B.2.4 retired in v3.0.0 (ADR-029)
+    //   - D.1.3 / D.1.4 retired in v5.0.0 (ADR-031)
     expect(PHASE_3_5_INDICATOR_RESTRUCTURES['B.2.3']).toBeUndefined();
     expect(PHASE_3_5_INDICATOR_RESTRUCTURES['B.2.4']).toBeUndefined();
+    expect(PHASE_3_5_INDICATOR_RESTRUCTURES['D.1.3']).toBeUndefined();
+    expect(PHASE_3_5_INDICATOR_RESTRUCTURES['D.1.4']).toBeUndefined();
   });
 
   it('C.3.2 country_substitute_regional override removed in methodology v4.0.0 (ADR-030)', () => {

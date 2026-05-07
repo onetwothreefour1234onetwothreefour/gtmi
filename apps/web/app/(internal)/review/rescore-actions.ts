@@ -20,7 +20,7 @@
 
 import { db, fieldDefinitions, fieldValues, programs } from '@gtmi/db';
 import { scoreProgramFromDb } from '@gtmi/extraction';
-import { PHASE2_PLACEHOLDER_PARAMS, scoreSingleIndicator } from '@gtmi/scoring';
+import { PHASE2_PLACEHOLDER_PARAMS, SCORE_DEPENDENCIES, scoreSingleIndicator } from '@gtmi/scoring';
 import type { FieldDefinitionRecord } from '@gtmi/scoring';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { revalidatePath, revalidateTag } from 'next/cache';
@@ -70,6 +70,30 @@ function buildFieldDefinitionRecord(def: FieldDefForRescore): FieldDefinitionRec
 }
 
 /**
+ * Methodology v5.0.0 / ADR-031 — fetch the parent indicator's
+ * value_normalized for a child whose key has a SCORE_DEPENDENCIES
+ * entry. Returns undefined when the field has no dependency or the
+ * parent row is missing / not approved.
+ */
+async function readParentValueForChild(
+  childKey: string,
+  programId: string
+): Promise<unknown | undefined> {
+  const dep = SCORE_DEPENDENCIES[childKey];
+  if (!dep) return undefined;
+  const rows = await db
+    .select({ valueNormalized: fieldValues.valueNormalized, status: fieldValues.status })
+    .from(fieldValues)
+    .innerJoin(fieldDefinitions, eq(fieldDefinitions.id, fieldValues.fieldDefinitionId))
+    .where(and(eq(fieldDefinitions.key, dep.parent), eq(fieldValues.programId, programId)))
+    .limit(1);
+  if (rows.length === 0) return undefined;
+  const row = rows[0]!;
+  if (row.status !== 'approved' && row.status !== 'pending_review') return undefined;
+  return row.valueNormalized;
+}
+
+/**
  * Recompute `value_indicator_score` for one field_values row from the
  * stored `value_normalized` and the current `PHASE2_PLACEHOLDER_PARAMS`.
  *
@@ -85,6 +109,7 @@ export async function rescoreFieldValue(id: string): Promise<{ score: number | n
   const rows = await db
     .select({
       valueNormalized: fieldValues.valueNormalized,
+      programId: fieldValues.programId,
       def: {
         id: fieldDefinitions.id,
         key: fieldDefinitions.key,
@@ -108,10 +133,13 @@ export async function rescoreFieldValue(id: string): Promise<{ score: number | n
 
   let score: number | null = null;
   try {
+    const def = row.def as FieldDefForRescore;
+    const parentValue = await readParentValueForChild(def.key, row.programId);
     score = scoreSingleIndicator({
-      fieldDefinition: buildFieldDefinitionRecord(row.def as FieldDefForRescore),
+      fieldDefinition: buildFieldDefinitionRecord(def),
       valueNormalized: row.valueNormalized,
       normalizationParams: PHASE2_PLACEHOLDER_PARAMS,
+      parentValue,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -213,10 +241,13 @@ export async function rescoreProgram(programId: string): Promise<RescoreProgramR
     }
     let score: number | null = null;
     try {
+      const def = r.def as FieldDefForRescore;
+      const parentValue = await readParentValueForChild(def.key, programId);
       score = scoreSingleIndicator({
-        fieldDefinition: buildFieldDefinitionRecord(r.def as FieldDefForRescore),
+        fieldDefinition: buildFieldDefinitionRecord(def),
         valueNormalized: r.valueNormalized,
         normalizationParams: PHASE2_PLACEHOLDER_PARAMS,
+        parentValue,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

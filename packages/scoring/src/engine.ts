@@ -17,6 +17,7 @@ import {
   type Region,
 } from './normalize';
 import { isNoLimitMarker, isNotApplicableMarker } from './sentinels';
+import { SCORE_DEPENDENCIES } from './score-dependencies';
 import {
   INSUFFICIENT_DISCLOSURE_THRESHOLD,
   CME_WEIGHT,
@@ -64,8 +65,32 @@ export function scoreSingleIndicator(args: {
   fieldDefinition: FieldDefinitionRecord;
   valueNormalized: unknown;
   normalizationParams: NormalizationParams;
+  /**
+   * Methodology v5.0.0 / ADR-031 — when set, the engine consults
+   * SCORE_DEPENDENCIES[def.key] and short-circuits to the dependency
+   * score if `parentValue === dep.whenParentIs`. Used for D.1.2 / D.2.2
+   * conditional zero-scoring (parent boolean false → child scores 0).
+   *
+   * /review's per-row scoring action fetches the parent's current
+   * field_values row and passes its value through. Cohort scoring
+   * (runScoringEngine) uses the same logic via valueByKey lookup.
+   *
+   * If omitted, the dependency check is skipped — preserves legacy
+   * single-indicator scoring behaviour for callers that don't have
+   * cohort context.
+   */
+  parentValue?: unknown;
 }): number | null {
-  const { fieldDefinition: def, valueNormalized, normalizationParams } = args;
+  const { fieldDefinition: def, valueNormalized, normalizationParams, parentValue } = args;
+
+  // SCORE_DEPENDENCIES check FIRST — if the parent gate fires, the
+  // child's own value is irrelevant (could be a number, the
+  // notApplicable marker, or anything else; the dispatched score wins).
+  const dep = SCORE_DEPENDENCIES[def.key];
+  if (dep && parentValue !== undefined && parentValue === dep.whenParentIs) {
+    return dep.score;
+  }
+
   if (valueNormalized === null || valueNormalized === undefined) return null;
   if (isNotApplicableMarker(valueNormalized)) return null;
 
@@ -169,8 +194,16 @@ export function scoreSingleIndicator(args: {
 function scoreIndicator(
   def: FieldDefinitionRecord,
   valueNormalized: unknown,
-  input: ScoringInput
+  input: ScoringInput,
+  valueByKey: Map<string, unknown>
 ): number {
+  // Methodology v5.0.0 / ADR-031 — pass the parent value through to
+  // scoreSingleIndicator so SCORE_DEPENDENCIES can short-circuit
+  // pathway-dependent numerics to the dispatched score (e.g. D.1.2
+  // scores 0 when D.1.1 is false).
+  const dep = SCORE_DEPENDENCIES[def.key];
+  const parentValue = dep ? valueByKey.get(dep.parent) : undefined;
+
   // Inside the cohort engine we know the value is present (the caller
   // already filtered nulls + notApplicable markers in the gather loop),
   // so a null result here is a pipeline bug — surface it loudly.
@@ -178,6 +211,7 @@ function scoreIndicator(
     fieldDefinition: def,
     valueNormalized,
     normalizationParams: input.normalizationParams,
+    parentValue,
   });
   if (score === null) {
     throw new ScoringError(
@@ -223,17 +257,31 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
     // coverage/audit purposes but contribute no score (the indicator
     // genuinely does not apply to the programme). Excluding them here
     // mirrors the missing-data path and keeps min_max / z_score
-    // parsing honest.
+    // parsing honest. SCORE_DEPENDENCIES (ADR-031) overrides this for
+    // child indicators when the parent gate fires — handled in the
+    // virtual-zero synthesis loop below.
     if (isNotApplicableMarker(fv.valueNormalized)) continue;
     valueByDefId.set(fv.fieldDefinitionId, fv.valueNormalized);
   }
 
+  // Methodology v5.0.0 / ADR-031 — build a key→value map for parent
+  // lookups in SCORE_DEPENDENCIES. Includes ALL field_values (not just
+  // activeDefs) so a child can be scored against a parent that lives
+  // outside the active scope. notApplicable rows are excluded here too
+  // — a notApplicable parent doesn't fire the gate.
+  const valueByKey = new Map<string, unknown>();
+  for (const [defId, val] of valueByDefId) {
+    const def = defById.get(defId);
+    if (def) valueByKey.set(def.key, val);
+  }
+
   // Step 3: Score each present indicator (only within active scope)
   const indicatorResults: IndicatorResult[] = [];
+  const scoredDefIds = new Set<string>();
   for (const def of activeDefs) {
     const valueNormalized = valueByDefId.get(def.id);
     if (valueNormalized === undefined) continue; // missing — excluded
-    const score = scoreIndicator(def, valueNormalized, input);
+    const score = scoreIndicator(def, valueNormalized, input, valueByKey);
     indicatorResults.push({
       defKey: def.key,
       subFactor: def.subFactor,
@@ -241,6 +289,30 @@ export function runScoringEngine(input: ScoringInput): ScoringOutput {
       score,
       weight: def.weightWithinSubFactor,
     });
+    scoredDefIds.add(def.id);
+  }
+
+  // Methodology v5.0.0 / ADR-031 — virtual zero synthesis. If a child
+  // indicator has SCORE_DEPENDENCIES wired AND its parent gate fires
+  // AND the child has no field_values row at all, synthesise a virtual
+  // score (per the dependency config — currently always 0) so the
+  // cohort scoring is independent of LLM coverage on the child. Without
+  // this, a pathway-unavailable programme would silently dodge the
+  // penalty the dependency exists to enforce.
+  for (const [childKey, dep] of Object.entries(SCORE_DEPENDENCIES)) {
+    const childDef = activeDefs.find((d) => d.key === childKey);
+    if (!childDef) continue; // child not in active scope
+    if (scoredDefIds.has(childDef.id)) continue; // child already scored above
+    const parentValue = valueByKey.get(dep.parent);
+    if (parentValue === dep.whenParentIs) {
+      indicatorResults.push({
+        defKey: childDef.key,
+        subFactor: childDef.subFactor,
+        pillar: childDef.pillar,
+        score: dep.score,
+        weight: childDef.weightWithinSubFactor,
+      });
+    }
   }
 
   // Step 4: Aggregate to sub-factor scores

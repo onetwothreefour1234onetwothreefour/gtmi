@@ -77,8 +77,8 @@ describe('groupFieldsByPillar', () => {
     expect(out.find((p) => p.key === 'C')?.indicatorCount).toBe(0);
   });
 
-  it('produces the full 43-indicator tree from a methodology-shaped input', () => {
-    // Synthetic field set matching the live DB shape: 9 + 7 + 8 + 11 + 8.
+  it('produces the full 37-indicator tree from a methodology-shaped input', () => {
+    // Synthetic field set matching the live DB shape: 9 + 7 + 8 + 5 + 8.
     const make = (k: string, p: string, s: string): FieldDefinitionInput =>
       makeField({ key: k, pillar: p, subFactor: s });
     const fields: FieldDefinitionInput[] = [
@@ -109,18 +109,12 @@ describe('groupFieldsByPillar', () => {
       make('C.2.3', 'C', 'C.2'),
       make('C.3.1', 'C', 'C.3'),
       make('C.3.2', 'C', 'C.3'),
-      // Pillar D — 11
+      // Pillar D — 5 indicators across D.1 (2), D.2 (3) under methodology v5.0.0 (D.3 retired)
       make('D.1.1', 'D', 'D.1'),
       make('D.1.2', 'D', 'D.1'),
-      make('D.1.3', 'D', 'D.1'),
-      make('D.1.4', 'D', 'D.1'),
       make('D.2.1', 'D', 'D.2'),
       make('D.2.2', 'D', 'D.2'),
       make('D.2.3', 'D', 'D.2'),
-      make('D.2.4', 'D', 'D.2'),
-      make('D.3.1', 'D', 'D.3'),
-      make('D.3.2', 'D', 'D.3'),
-      make('D.3.3', 'D', 'D.3'),
       // Pillar E — 8
       make('E.1.1', 'E', 'E.1'),
       make('E.1.2', 'E', 'E.1'),
@@ -133,15 +127,15 @@ describe('groupFieldsByPillar', () => {
     ];
     const out = groupFieldsByPillar(fields, ALL_PILLAR_WEIGHTS, {});
     const totalIndicators = out.reduce((s, p) => s + p.indicatorCount, 0);
-    expect(totalIndicators).toBe(43);
+    expect(totalIndicators).toBe(37);
     expect(out.find((p) => p.key === 'A')?.indicatorCount).toBe(9);
     expect(out.find((p) => p.key === 'B')?.indicatorCount).toBe(7);
     expect(out.find((p) => p.key === 'C')?.indicatorCount).toBe(8);
-    expect(out.find((p) => p.key === 'D')?.indicatorCount).toBe(11);
+    expect(out.find((p) => p.key === 'D')?.indicatorCount).toBe(5);
     expect(out.find((p) => p.key === 'E')?.indicatorCount).toBe(8);
-    // Pillar A/C/D/E each have 3 sub-factors; Pillar B has 4 = 16 sub-factors total.
+    // Pillar A/C/E each have 3 sub-factors; Pillar B has 4; Pillar D has 2 = 15 sub-factors total.
     const totalSubFactors = out.reduce((s, p) => s + p.subFactors.length, 0);
-    expect(totalSubFactors).toBe(16);
+    expect(totalSubFactors).toBe(15);
   });
 
   it('preserves indicator order within a sub-factor as inserted', () => {

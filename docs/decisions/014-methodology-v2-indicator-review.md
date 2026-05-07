@@ -2,11 +2,13 @@
 
 **Status:** APPROVED — analyst review complete. Implementation shipped on
 `phase-3.5-methodology-v2-proposal` branch. See "Implementation notes
-(Phase 3.5)" at the bottom of this document. Partially superseded:
+(Phase 3.5)" at the bottom of this document. Fully superseded:
 B.2.3 / B.2.4 boolean_with_annotation entries retired by ADR-029
 (2026-05-05); C.3.2 country_substitute_regional restructure removed by
-ADR-030 (2026-05-06). D.1.3 / D.1.4 boolean_with_annotation remain in
-force.
+ADR-030 (2026-05-06); D.1.3 / D.1.4 boolean_with_annotation entries
+retired by ADR-031 (2026-05-06). Zero active fields use Phase 3.5
+restructures. The boolean_with_annotation + country_substitute_regional
+engine infrastructure is dormant pending ADR-032 cleanup.
 **Date:** 2026-04-27 (proposed); 2026-04-27 (approved + implemented).
 **Authors:** Szabi (drafted Phase 3.5 PROPOSED); approved + implementation
 spec (Phase 3.5) by Szabi.

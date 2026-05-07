@@ -45,62 +45,11 @@ function buildInput(opts: {
   };
 }
 
-describe('runScoringEngine — boolean_with_annotation (Phase 3.5)', () => {
-  const STRUCTURED_RUBRIC = {
-    categories: [
-      { value: 'true', score: 0 },
-      { value: 'false', score: 100 },
-    ],
-  };
-
-  it('D.1.3 required=true (lower_is_better) → indicator score 0', () => {
-    const input = buildInput({
-      defKey: 'D.1.3',
-      fn: 'boolean_with_annotation',
-      direction: 'lower_is_better',
-      rubric: STRUCTURED_RUBRIC,
-      valueNormalized: { required: true, daysPerYear: 219, notes: '1,095 days in 5 years' },
-    });
-    const out = runScoringEngine(input);
-    expect(out.subFactorScores['B.2']).toBe(0);
-  });
-
-  it('D.1.3 required=false → 100', () => {
-    const input = buildInput({
-      defKey: 'D.1.3',
-      fn: 'boolean_with_annotation',
-      direction: 'lower_is_better',
-      rubric: STRUCTURED_RUBRIC,
-      valueNormalized: { required: false, daysPerYear: null, notes: null },
-    });
-    const out = runScoringEngine(input);
-    expect(out.subFactorScores['B.2']).toBe(100);
-  });
-
-  it('D.1.3 with daysPerYear annotation → score uses required boolean only (annotation does not affect score)', () => {
-    const input = buildInput({
-      defKey: 'D.1.3',
-      fn: 'boolean_with_annotation',
-      direction: 'lower_is_better',
-      rubric: STRUCTURED_RUBRIC,
-      valueNormalized: { required: true, daysPerYear: 219, notes: '1,095 days in 5 years' },
-    });
-    const out = runScoringEngine(input);
-    expect(out.subFactorScores['B.2']).toBe(0);
-  });
-
-  it('D.1.4 required=false → 100 even when daysPerYear is null', () => {
-    const input = buildInput({
-      defKey: 'D.1.4',
-      fn: 'boolean_with_annotation',
-      direction: 'lower_is_better',
-      rubric: STRUCTURED_RUBRIC,
-      valueNormalized: { required: false, daysPerYear: null, notes: null },
-    });
-    const out = runScoringEngine(input);
-    expect(out.subFactorScores['B.2']).toBe(100);
-  });
-});
+// boolean_with_annotation engine integration tests removed in
+// methodology v5.0.0 (ADR-031): D.1.3 / D.1.4 retired alongside
+// B.2.3 / B.2.4 (ADR-029). Zero active fields use the
+// boolean_with_annotation normalizer; the engine branch is dormant
+// pending ADR-032 cleanup.
 
 describe('runScoringEngine — country_substitute_regional (Phase 3.5)', () => {
   const C32_RUBRIC = {

@@ -81,25 +81,9 @@ export const RUBRIC_SCORES: Record<string, Record<string, number>> = {
     partial: 50,
     none: 0,
   },
-  'D.2.4': {
-    none: 100,
-    light: 70,
-    moderate: 40,
-    heavy: 0,
-  },
-  'D.3.2': {
-    none: 0,
-    time_limited_bonus: 50,
-    time_limited_flat_rate: 65,
-    non_dom: 80,
-    indefinite_preferential: 100,
-  },
-  'D.3.3': {
-    worldwide: 0,
-    worldwide_with_remittance_basis: 60,
-    territorial: 100,
-    hybrid: 40,
-  },
+  // Pillar D categorical rubrics (D.2.4 / D.3.2 / D.3.3) removed in
+  // methodology v5.0.0 (ADR-031) — those keys are retired. The new
+  // Pillar D is all booleans + numerics with no rubric scores.
   'E.2.2': {
     no_cap: 100,
     published_current: 90,

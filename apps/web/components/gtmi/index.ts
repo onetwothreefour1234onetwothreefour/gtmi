@@ -52,7 +52,7 @@ export { FalsifiabilityCommitments } from './falsifiability-commitments';
 export { CountryHeader } from './country-header';
 export { CountryProgramsTable } from './country-programs-table';
 export { CountryRadar, type CountryRadarProgram } from './country-radar';
-export { TaxTreatmentCard } from './tax-treatment-card';
+// TaxTreatmentCard removed in methodology v5.0.0 (ADR-031).
 export { CountriesGrid } from './countries-grid';
 
 // Phase 4-E — internal tools (review queue + changes audit).

@@ -4,7 +4,7 @@
  *
  * Wave 1 was the original 27 sub-factors used to validate the end-to-end
  * pipeline on the AUS canary. Wave 2 covers the remaining sub-factors
- * needed for full methodology coverage (43 fields total under v4.0.0).
+ * needed for full methodology coverage (37 fields total under v5.0.0).
  *
  * Consumers MUST import `ACTIVE_FIELD_CODES` rather than `WAVE_1_FIELD_CODES`
  * directly so a single flag flip changes scope across canary, Trigger.dev,
@@ -48,31 +48,24 @@ export const WAVE_1_FIELD_CODES: string[] = [
   'D.1.2',
   'D.2.1',
   'D.2.2',
+  'D.2.3',
   'E.1.1',
   'E.1.3',
   'E.2.2',
   'E.3.2',
 ];
 
-// Remaining sub-factors required for full 43-field methodology coverage.
+// Remaining sub-factors required for full 37-field methodology coverage.
 // Methodology v2.0.0: all Pillar A indicators were flattened into WAVE_1.
 // Methodology v3.0.0 (ADR-029): all Pillar B indicators flattened into
 // WAVE_1 — no derived field remains in B (B.2.4 was the only one).
 // Methodology v4.0.0 (ADR-030): all Pillar C indicators flattened into
 // WAVE_1; C.1.4 / C.2.4 retired and removed.
-export const WAVE_2_FIELD_CODES: string[] = [
-  'D.1.3',
-  'D.1.4',
-  'D.2.3',
-  'D.2.4',
-  'D.3.1',
-  'D.3.2',
-  'D.3.3',
-  'E.1.2',
-  'E.2.1',
-  'E.2.3',
-  'E.3.1',
-];
+// Methodology v5.0.0 (ADR-031): all Pillar D indicators flattened into
+// WAVE_1; D.1.3 / D.1.4 / D.2.4 / D.3.1 / D.3.2 / D.3.3 retired and removed.
+// Eight Pillar D deriveDxx functions deleted; D.1.2 / D.2.2 / D.2.3 are
+// now LLM-extracted directly.
+export const WAVE_2_FIELD_CODES: string[] = ['E.1.2', 'E.2.1', 'E.2.3', 'E.3.1'];
 
 export const ACTIVE_FIELD_CODES: string[] = WAVE_2_ENABLED
   ? [...WAVE_1_FIELD_CODES, ...WAVE_2_FIELD_CODES]

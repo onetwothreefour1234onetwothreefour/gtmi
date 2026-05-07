@@ -82,18 +82,15 @@ export function normalizeBoolean(value: boolean, direction: Direction): number {
 //
 // The boolean field NAME varies per indicator (per the user-approved
 // shape from ADR-014):
-//   D.1.3 → { required: boolean, daysPerYear: number|null, notes: string|null }
-//   D.1.4 → { required: boolean, daysPerYear: number|null, notes: string|null }
+// Methodology v5.0.0 (ADR-031): the map is empty.
+//   - B.2.3 / B.2.4 retired in v3.0.0 (ADR-029)
+//   - D.1.3 / D.1.4 retired in v5.0.0 (ADR-031)
 //
-// (B.2.3 and B.2.4 were retired in methodology v3.0.0 / ADR-029.)
-//
-// We resolve the boolean field name via a per-field-key map so the
-// scoring engine doesn't need to do schema-discovery on each row.
+// The boolean_with_annotation engine branch + normalize function are
+// left in place dormant per §k.4 of ADR-031; cleanup deferred to ADR-032
+// (alongside country_substitute_regional cleanup).
 // ────────────────────────────────────────────────────────────────────
-export const BOOLEAN_WITH_ANNOTATION_KEYS: Record<string, string> = {
-  'D.1.3': 'required',
-  'D.1.4': 'required',
-};
+export const BOOLEAN_WITH_ANNOTATION_KEYS: Record<string, string> = {};
 
 export function normalizeBooleanWithAnnotation(
   parsed: Record<string, unknown>,

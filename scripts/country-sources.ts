@@ -38,24 +38,8 @@ export const COUNTRY_LEVEL_SOURCES: CountryLevelSource[] = [
     fieldKeys: ['C.3.1'],
     country: 'AUS',
   },
-  {
-    url: 'https://www.ato.gov.au/individuals-and-families/coming-to-australia-or-going-overseas/your-tax-residency',
-    tier: 1,
-    geographicLevel: 'national',
-    reason:
-      'ATO tax residency tests — D.3.1 (residency trigger days), D.3.3 (territorial vs worldwide)',
-    fieldKeys: ['D.3.1', 'D.3.3'],
-    country: 'AUS',
-  },
-  {
-    url: 'https://www.ato.gov.au/individuals-and-families/coming-to-australia-or-going-overseas/your-tax-residency/foreign-and-temporary-residents',
-    tier: 1,
-    geographicLevel: 'national',
-    reason:
-      'ATO foreign and temporary resident tax — D.3.1, D.3.2 (special regime: temp resident foreign-source income exemption), D.3.3',
-    fieldKeys: ['D.3.1', 'D.3.2', 'D.3.3'],
-    country: 'AUS',
-  },
+  // ATO tax-residency entries (D.3.1, D.3.2, D.3.3) removed in
+  // methodology v5.0.0 (ADR-031) — Pillar D no longer measures tax.
   {
     url: 'https://immi.homeaffairs.gov.au/citizenship/become-a-citizen/permanent-resident',
     tier: 1,

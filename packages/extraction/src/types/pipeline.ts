@@ -128,31 +128,20 @@ export interface PublishStage {
   executeDerived(extraction: ExtractionOutput, provenance: ProvenanceRecord): Promise<string>;
 }
 
-// Phase 3.6 / ADR-016 (superseded by methodology v2.0.0 ADR) — Stage 6.5: Derive.
+// Phase 3.6 / ADR-016 (Pillar A portion superseded by ADR-028; Pillar B
+// portion superseded by ADR-029; ALL Pillar D portions superseded by
+// ADR-031) — Stage 6.5: Derive.
 //
-// Pure deterministic computation of D.2.2 (and other downstream derived
-// fields) from already-extracted inputs plus static lookup tables. No
-// LLM calls. Inputs are resolved by the caller (canary-run.ts /
-// extract-single-program.ts) from the extraction map and the static
-// tables in `scripts/`. The Pillar A derive (A.1.2 % of median) was
-// removed in methodology v2.0.0 — A.1.1 is now extracted directly.
+// Pure deterministic computation of E.1.1 (severity-weighted policy
+// changes) and E.1.3 (program age) from already-extracted inputs plus
+// static lookup tables. No LLM calls. Inputs are resolved by the
+// caller (canary-run.ts / extract-single-program.ts) from the
+// extraction map and the static tables.
+//
+// All eight Pillar D deriveDxx functions were removed in methodology
+// v5.0.0 (ADR-031). D.1.2 / D.2.2 / D.2.3 are now LLM-extracted
+// directly; D.1.3 / D.1.4 / D.2.4 / D.3.1 / D.3.3 are retired.
 export interface DeriveStageInputs {
-  d22: import('../stages/derive').DerivedD22Input;
-  /** Phase 3.6.1 / FIX 6 — D.2.3 dual citizenship derive. Optional for
-   * backwards compatibility with callers that don't pass it. */
-  d23?: import('../stages/derive').DerivedD23Input;
-  /** Phase 3.6.2 / ITEM 2 — D.1.3 physical presence during PR accrual. */
-  d13?: import('../stages/derive').DerivedD13Input;
-  /** Phase 3.6.2 / ITEM 2 — D.1.4 PR retention rules. */
-  d14?: import('../stages/derive').DerivedD14Input;
-  /** Phase 3.6.4 / FIX 2 — D.1.2 minimum years of residence to PR eligibility. */
-  d12?: import('../stages/derive').DerivedD12Input;
-  /** Phase 3.9 / W21 — D.2.4 civic / language / integration test burden. */
-  d24?: import('../stages/derive').DerivedD24Input;
-  /** Phase 3.9 / W21 — D.3.1 tax-residency trigger (days/yr). */
-  d31?: import('../stages/derive').DerivedD31Input;
-  /** Phase 3.9 / W21 — D.3.3 territorial vs. worldwide taxation. */
-  d33?: import('../stages/derive').DerivedD33Input;
   /** Phase 3.9 / W20 — E.1.3 program age (years since launch, capped at 20). */
   e13?: import('../stages/derive').DerivedE13Input;
   /** Phase 3.9 / W20 — E.1.1 severity-weighted policy-change count. */

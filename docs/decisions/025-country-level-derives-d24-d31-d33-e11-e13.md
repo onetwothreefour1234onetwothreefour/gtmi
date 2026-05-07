@@ -1,6 +1,8 @@
 # ADR-025 — Country-level derives for D.2.4 / D.3.1 / D.3.3 + E.1.1 / E.1.3
 
-**Status:** ACCEPTED — 2026-05-01.
+**Status:** ACCEPTED — 2026-05-01. Partially superseded by ADR-031
+(2026-05-06): D.2.4, D.3.1, D.3.3 derives deleted alongside the keys
+themselves. E.1.1 and E.1.3 derives remain in force.
 **Supersedes:** none. Extends ADR-016 (derived fields, Stage 6.5).
 
 ## Context

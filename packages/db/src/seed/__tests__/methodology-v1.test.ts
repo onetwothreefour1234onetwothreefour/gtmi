@@ -48,12 +48,12 @@ test('Methodology V1 Arithmetic Constraints', async (t) => {
     }
   });
 
-  await t.test('Total indicator count is exactly 43', () => {
-    // Methodology v4.0.0 (ADR-030): Pillar C reduced from 10 to 8
-    // indicators (3 retired keys: C.1.4 LMT, C.2.4 same-sex partner;
-    // plus C.1.1 employer-sponsorship dropped — keys repurposed under
-    // new Benefits-pillar structure). 9 (A) + 7 (B) + 8 (C) + 11 (D) + 8 (E) = 43.
-    assert.strictEqual(methodologyV1.indicators.length, 43);
+  await t.test('Total indicator count is exactly 37', () => {
+    // Methodology v5.0.0 (ADR-031): Pillar D reduced from 11 to 5
+    // indicators across 2 sub-factors (D.3 tax sub-factor retired;
+    // D.1.3 PR-accrual presence, D.1.4 PR retention, D.2.4 civic test
+    // burden also retired). 9 (A) + 7 (B) + 8 (C) + 5 (D) + 8 (E) = 37.
+    assert.strictEqual(methodologyV1.indicators.length, 37);
   });
 
   await t.test('cme_paq_split sums to 1.0', () => {

@@ -31,6 +31,8 @@ export {
   isNotApplicableMarker,
 } from './sentinels';
 export type { NoLimitMarker, NotApplicableMarker } from './sentinels';
+export { SCORE_DEPENDENCIES } from './score-dependencies';
+export type { ScoreDependency } from './score-dependencies';
 export type {
   ScoringInput,
   ScoringOutput,

@@ -34,12 +34,13 @@ export const PHASE2_PLACEHOLDER_PARAMS: NormalizationParams = {
   // C — Benefits (methodology v4.0.0 / ADR-030; renamed from "Rights")
   'C.2.2': { min: 0, max: 30 }, // dependent child age cap — min_max (no_cap → 100 via NO_LIMIT_MARKER)
 
-  // D — Pathways
-  'D.1.2': { min: 0, max: 10 }, // years to PR eligibility — min_max
-  // D.1.3 / D.1.4 were min_max in v1; restructured to boolean_with_annotation
-  // in Phase 3.5 / ADR-014, so numeric calibration no longer applies.
-  'D.2.2': { min: 5, max: 30 }, // years to citizenship — min_max
-  'D.3.1': { min: 0, max: 365 }, // tax residency trigger days — min_max
+  // D — Pathway (methodology v5.0.0 / ADR-031; renamed framing to PR + Citizenship)
+  'D.1.2': { min: 0, max: 50 }, // years to PR eligibility — min_max (widened to cover Switzerland-style 10y pathways)
+  'D.2.2': { min: 0, max: 50 }, // total years to citizenship — min_max (widened to cover long-pathway countries)
+  // D.3.1 (tax residency trigger), D.1.3/D.1.4 (PR presence/retention),
+  // and D.2.4 (civic test burden) all retired in v5.0.0.
+  // Conditional zero-scoring (SCORE_DEPENDENCIES) handles D.1.2/D.2.2
+  // when the parent boolean (D.1.1/D.2.1) is false.
 
   // E — Environment & Stability
   'E.1.1': { mean: 3, stddev: 2.5 }, // policy changes count (severity-weighted) — z_score

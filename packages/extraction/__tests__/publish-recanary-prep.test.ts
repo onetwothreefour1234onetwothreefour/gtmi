@@ -10,72 +10,17 @@ import { checkProvenanceRow } from '@gtmi/shared';
 //   1. boolean_with_annotation shape validation
 //   2. country-substitute synthetic provenance shape (must pass verify-provenance)
 
-describe('validateBooleanWithAnnotationShape', () => {
-  it('D.1.3 accepts { required: boolean, daysPerYear: number|null, notes: string|null }', () => {
-    expect(() =>
-      validateBooleanWithAnnotationShape('D.1.3', {
-        required: true,
-        daysPerYear: 219,
-        notes: '1,095 days in 5 years',
-      })
-    ).not.toThrow();
-    expect(() =>
-      validateBooleanWithAnnotationShape('D.1.3', {
-        required: false,
-        daysPerYear: null,
-        notes: null,
-      })
-    ).not.toThrow();
-  });
-
-  it('D.1.4 accepts { required: boolean, daysPerYear: number|null, notes: string|null }', () => {
-    expect(() =>
-      validateBooleanWithAnnotationShape('D.1.4', {
-        required: true,
-        daysPerYear: 730,
-        notes: '730 days in 5 years (PR retention)',
-      })
-    ).not.toThrow();
-    expect(() =>
-      validateBooleanWithAnnotationShape('D.1.4', {
-        required: false,
-        daysPerYear: null,
-        notes: 'PR not available',
-      })
-    ).not.toThrow();
-  });
-
-  it('throws when fieldKey is unknown', () => {
+describe('validateBooleanWithAnnotationShape (dormant under v5.0.0)', () => {
+  // D.1.3 / D.1.4 (last production users) retired in methodology v5.0.0
+  // (ADR-031). Single sentinel test verifying the dormant validator
+  // throws on any unknown key.
+  it('throws when fieldKey is unknown (no Pillar D fields registered under v5.0.0)', () => {
+    expect(() => validateBooleanWithAnnotationShape('D.1.3', { value: true })).toThrow(
+      /no boolean key registered/
+    );
     expect(() => validateBooleanWithAnnotationShape('X.0.0', { value: true })).toThrow(
       /no boolean key registered/
     );
-  });
-
-  it('throws when the registered boolean key is missing', () => {
-    expect(() => validateBooleanWithAnnotationShape('D.1.3', { notes: 'orphan' })).toThrow(
-      /expects "required: boolean"/
-    );
-  });
-
-  it('throws when the registered boolean key is non-boolean', () => {
-    expect(() =>
-      validateBooleanWithAnnotationShape('D.1.3', {
-        required: 'yes',
-        daysPerYear: null,
-        notes: null,
-      })
-    ).toThrow(/expects "required: boolean"/);
-  });
-
-  it('throws when an unexpected property is present', () => {
-    expect(() =>
-      validateBooleanWithAnnotationShape('D.1.3', {
-        required: true,
-        daysPerYear: null,
-        notes: null,
-        secret: 'evil',
-      })
-    ).toThrow(/unexpected property "secret"/);
   });
 });
 
